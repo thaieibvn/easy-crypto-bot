@@ -1,0 +1,132 @@
+<template class="section-template">
+<section id="backtest" class="wrapper style1 intro fullscreen">
+  <div id="btBody" class="inner">
+    <h2>Backtest Strategy</h2> You can backtest your strategies to see how they would have played out in the past.<br>
+    Please note that the past performance does not guarantees future results.<br>
+    <hr />
+
+    <div class="text-center">
+      <div class="text-left" style="display:inline-block;margin:0 auto 1.875em auto;">
+        <div class="inline" id="btStrategy">
+          <span class="inline-block min-width5">Strategy:&nbsp;</span>
+          <div class="drop-down-white">
+            <a href="#/" onclick="dropDown('#btStrategy')"><span id="btStrategyCombobox" class="name inline-block min-width20">Choose Strategy</span> <span	class="caret"></span></a>
+            <a id="editBtStrategy" title="Edit Strategy" onclick="editBtStrategy()" href="#/"><i class="far fa-edit"></i></a>
+            <ul id="btStrategiesList" class="backtest-dropdown" style="right: 3.4em;">
+            </ul>
+          </div>
+        </div>
+        <br>
+        <div class="inline" id="btExchange">
+          <span class="inline-block min-width5">Exchange:&nbsp;</span>
+          <div class="drop-down-white">
+            <a href="#/" onclick="dropDown('#btExchange')"><span id="btExchangeCombobox" class="name inline-block min-width20">Choose Exchange</span> <span	class="caret"></span></a>
+            <ul class="backtest-dropdown">
+              <li><a href="#/" onclick="dropDownItem('Binance', '#btExchange', btFillBinanceInstruments())">Binance</a></li>
+            </ul>
+          </div>
+        </div>
+        <br>
+        <div class="inline" id="btInstrument">
+          <span class="inline-block min-width5">Instrument:&nbsp;</span><input class="search" onkeyup="btInstrumentKeyup()" id="btInstrumentSearch" type="text" placeholder="Ticker" />
+          <div id="btInstrumentList" class="drop-down-white">
+            <a href="#/" class="display-none"><span  class="name"></span> <span	class="caret"></span></a>
+            <ul class="backtest-dropdown">
+            </ul>
+          </div>
+        </div>
+        <br>
+
+        <div class="inline" id="btTimeframe">
+          <span class="inline-block min-width5 ">Timeframe:&nbsp;</span>
+          <div class="drop-down-white">
+            <a href="#/" onclick="dropDown('#btTimeframe')"><span id="btTimeframeCombobox" class="name inline-block min-width20">Choose Timeframe</span> <span	class="caret"></span></a>
+            <ul class="backtest-dropdown">
+              <li><a href="#/" onclick="dropDownItem('1 minute', '#btTimeframe')">1 minute</a></li>
+              <li><a href="#/" onclick="dropDownItem('3 minutes', '#btTimeframe')">3 minutes</a></li>
+              <li><a href="#/" onclick="dropDownItem('5 minutes', '#btTimeframe')">5 minutes</a></li>
+              <li><a href="#/" onclick="dropDownItem('15 minutes', '#btTimeframe')">15 minutes</a></li>
+              <li><a href="#/" onclick="dropDownItem('30 minutes', '#btTimeframe')">30 minutes</a></li>
+              <li><a href="#/" onclick="dropDownItem('1 hour', '#btTimeframe')">1 hour</a></li>
+              <li><a href="#/" onclick="dropDownItem('2 hours', '#btTimeframe')">2 hours</a></li>
+              <li><a href="#/" onclick="dropDownItem('4 hours', '#btTimeframe')">4 hours</a></li>
+              <li><a href="#/" onclick="dropDownItem('6 hours', '#btTimeframe')">6 hours</a></li>
+              <li><a href="#/" onclick="dropDownItem('12 hours', '#btTimeframe')">12 hours</a></li>
+              <li><a href="#/" onclick="dropDownItem('1 day', '#btTimeframe')">1 day</a></li>
+            </ul>
+          </div>
+        </div>
+        <br>
+        <span class="inline-block min-width5">Period from:&nbsp;</span><input id="btFromDate" type="date" />&nbsp;&nbsp;to:&nbsp;&nbsp;<input id="btToDate" type="date" />
+        <div class="text-center ">
+
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center">
+      <a id="runBacktestBtn" href="#/" onclick="runBacktest()" class="button button-big margin-s-b30"><i class="text-green fas fa-play"></i> Run Backtest</a>
+    </div>
+
+    <div id="btResultDiv" class="display-none">
+      <hr>
+      <div id="btRunning">
+        <h3 class="text-center" id="btRunPercent"></h3>
+        <div id="btRunPercent2" class="text-center" style="margin-top:1em;">  </div>
+        <div id="btRunRocket" class="text-center" style="margin-top:1em;">
+          <img class="rocket-big" src="./assets/images/rocket.gif" alt="..">
+        </div>
+      </div>
+      <div id="btResult" class="display-none">
+        <h2 class="text-center">Result</h2>
+        <div class="text-center margin-s-b10">The commissions are included in all results. Commission rate: <span id="btFeeRate">0.05</span>%</div>
+        <div class="features">
+          <section>
+            <h3><i class=" fas fa-rocket"></i>&nbsp;Performance</h3> Total Return:&nbsp;<span class="text-white" id="btTotalReturn"></span><br>
+            Win/Loss Ratio:&nbsp;<span class="text-white" id="btWinLoss"></span><br>
+            Maximum Drawdown:&nbsp;<span class="text-white" id="btMaxDrawdown"></span><br>
+            Average gain/loss per trade:&nbsp;<span class="text-white" id="btAvgWinLossPerTrade"></span><br>
+            Initial 1000$ now will be:&nbsp;<span class="text-white" id="btResultWithUsd"></span><br>
+            Executed Trades:&nbsp;<span class="text-white" id="btExecutedTrades"></span><br>
+        </section>
+          <section>
+            <h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> Strategy:&nbsp;
+            <span class="text-white" id="btStrategyRes"></span><br> Exchange:&nbsp;
+            <span class="text-white" id="btExchangeRes"></span><br> Instrument:&nbsp;
+            <span class="text-white" id="btInstrumentRes"></span><br> Timeframe:&nbsp;
+            <span class="text-white" id="btTimeframeRes"></span><br> Period Start:&nbsp;
+            <span class="text-white" id="btPeriodFromRes"></span><br> Period End:&nbsp;
+            <span class="text-white" id="btPeriodToRes"></span><br>
+          </section>
+          <section>
+            <h3><i class=" fas fa-thumbs-up"></i>&nbsp;Winning Trades</h3>
+            Win Rate:&nbsp;<span class="text-white" id="btWinningTradesP"></span><br>
+             Winning trades count:&nbsp;<span class="text-white" id="btWinningCount"></span><br>
+              Average gain per trade:&nbsp;<span class="text-white" id="btAvgGainPerWinning"></span><br>
+              Biggest gain:&nbsp;<span class="text-white" id="btBiggestGain"></span><br>
+          </section>
+          <section>
+            <h3><i class=" fas fa-thumbs-down"></i>&nbsp;Loosing Trades</h3>
+            Loose Rate:&nbsp;<span class="text-white" id="btLoosingTradesP"></span><br>
+            Loosing trades count:&nbsp;<span class="text-white" id="btLoosingCount"></span><br>
+            Average loss per trade:&nbsp;<span class="text-white" id="btAvgLostPerWinning"></span><br>
+            Biggest loss:&nbsp;<span class="text-white" id="btBiggestLost"></span><br>
+          </section>
+        </div>
+
+        <h3 class="text-center margin-s-b10">Executed Trades</h3>
+        <div class="table-wrapper">
+          <table id="btStrategiesTable">
+          </table>
+        </div>
+      </div>
+    </div>
+
+
+  </div>
+
+</section>
+</template>
+<script>
+
+</script>

@@ -1,0 +1,335 @@
+<!DOCTYPE HTML>
+<!--
+EasyCryptoBot Copyright (C) 2018 Stefan Hristov
+-->
+<html>
+
+<head>
+	<title>EasyCryptoBot</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<script src="assets/js/my-util.js"></script>
+	<script src="assets/js/strategies.js"></script>
+	<link rel="stylesheet" href="assets/css/fontawesome-all.min.css">
+	<link rel="stylesheet" href="assets/css/main.css" />
+	<link rel="import" href="sections/home.html">
+	<link rel="import" href="sections/strategies.html">
+	<link rel="import" href="sections/backtest.html">
+	<link rel="import" href="sections/trade.html">
+	<!--<link rel="import" href="sections/markets.html"> -->
+	<link rel="import" href="sections/support.html">
+
+</head>
+
+<body>
+
+	<!-- Sidebar -->
+	<section id="sidebar">
+		<div class="inner">
+			<nav>
+				<ul>
+					<li><a id="homeMenu" data-section="home" href="#">Home</a></li>
+					<li><a data-section="strategies" href="#">Strategies</a></li>
+					<li><a data-section="backtest" href="#">Backtest Strategy</a></li>
+					<li><a data-section="trade" href="#">Trade &amp; Alerts</a></li>
+					<li><a data-section="support" href="#">Support Me</a></li>
+				</ul>
+			</nav>
+		</div>
+	</section>
+
+	<!-- Wrapper -->
+	<div id="wrapper">
+		<div id="newStrategyWindow" class="modal">
+			<div>
+				<a class="close-modal" onclick="closeNewStrategy()" href="#/"><i class="text-red fas fa-times"></i></a>
+				<div>
+					<div class="text-center">
+						<h2 id="newStrategyLabel">Create New Strategy</h2> Name: <input id="strategyName" style="width:22em;" type="text" />
+					</div>
+					<hr />
+					<h3 class="text-center">1. Open Position: BUY when all of the following rules are met:</h3>
+					<div class="text-center margin-b10">
+						<div class="inline" id="buyRulesDiv">
+							Add new Rule with
+							<div class="drop-down">
+								<a href="#/" onclick="dropDown('#buyRulesDiv')"><span id="buyRulesCombobox" class="name">Sample Moving Average SMA</span> <span	class="caret"></span></a>
+								<ul>
+									<li><a href="#/" onclick="dropDownItem('Sample Moving Average SMA', '#buyRulesDiv', function(){buyRuleType='sma'})">Sample Moving Average SMA</a></li>
+									<li><a href="#/" onclick="dropDownItem('Exponential Moving Average EMA', '#buyRulesDiv', function(){buyRuleType='ema'})">Exponential Moving Average EMA</a></li>
+									<li><a href="#/" onclick="dropDownItem('Crossing Moving Averages', '#buyRulesDiv', function(){buyRuleType='cma'})">Crossing Moving Averages</a></li>
+									<li><a href="#/" onclick="dropDownItem('Relative Strength Index RSI', '#buyRulesDiv', function(){buyRuleType='rsi'})">Relative Strength Index RSI</a></li>
+									<li><a href="#/" onclick="dropDownItem('Bollinger Band', '#buyRulesDiv', function(){buyRuleType='Bollinger Band'})">Bollinger Band</a></li>
+									<li><a href="#/" onclick="dropDownItem('MACD', '#buyRulesDiv', function(){buyRuleType='MACD'})">MACD</a></li>
+								</ul>
+							</div>
+						</div>
+						&nbsp;<a id="newBuyRuleBtn" href="#/" onclick="newBuyRule()" class="button2"><i class="text-green fa fa-plus"></i> Add</a></div>
+					<div id="buyRules">
+						<ul>
+						</ul>
+					</div>
+					<hr />
+					<h3 class="text-center">2. Close Position: Sell when all of the following rules are met:</h3>
+					<div class="text-center margin-b10">
+						<div class="inline" id="sellRulesDiv">
+							Add new Rule with
+							<div class="drop-down">
+								<a href="#/" onclick="dropDown('#sellRulesDiv')"><span id="sellRulesCombobox" class="name">Sample Moving Average SMA</span> <span	class="caret"></span></a>
+								<ul>
+									<li><a href="#/" onclick="dropDownItem('Sample Moving Average SMA', '#sellRulesDiv', function(){sellRuleType='sma'})">Sample Moving Average SMA</a></li>
+									<li><a href="#/" onclick="dropDownItem('Exponential Moving Average EMA', '#sellRulesDiv', function(){sellRuleType='ema'})">Exponential Moving Average EMA</a></li>
+									<li><a href="#/" onclick="dropDownItem('Crossing Moving Averages', '#sellRulesDiv', function(){sellRuleType='cma'})">Crossing Moving Averages</a></li>
+									<li><a href="#/" onclick="dropDownItem('Relative Strength Index RSI', '#sellRulesDiv', function(){sellRuleType='rsi'})">Relative Strength Index RSI</a></li>
+									<li><a href="#/" onclick="dropDownItem('Bollinger Band', '#sellRulesDiv', function(){sellRuleType='Bollinger Band'})">Bollinger Band</a></li>
+									<li><a href="#/" onclick="dropDownItem('MACD', '#sellRulesDiv', function(){sellRuleType='MACD'})">MACD</a></li>
+								</ul>
+							</div>
+						</div>
+						&nbsp;<a id="newSellRuleBtn" href="#/" onclick="newSellRule()" class="button2"><i class="text-green fa fa-plus"></i> Add</a></div>
+					<div id="sellRules">
+						<ul>
+						</ul>
+					</div>
+					<hr />
+					<div class="text-center">
+						<h3 class="text-center">3. Set Stoploss and Target: Sell if the price moves against you or if your target is met:</h3> Stoploss:&nbsp;
+						<input id="stoploss" style="width:10em;" type="number" value="5" />&nbsp;%<br> Target:&nbsp;&nbsp;&nbsp;
+						<input id="target" style="width:10em;" type="number" value="15" />&nbsp;%
+					</div>
+					<hr />
+
+					<div class="text-center margin-s-b30">
+						<a href="#/" onclick="saveStrategy()" class="button2" style="width:12em;margin:0 1em">Save</a>
+						<a href="#/" onclick="closeNewStrategy()" class="button2" style="width:12em;margin:0 1em">Cancel</a>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div id="executionResultsWindow" class="modal">
+			<div>
+				<a class="close-modal" onclick="closeExecutionWindow()" href="#/"><i class="text-red fas fa-times"></i></a>
+				<div class="text-center">
+					<h2 id="executionDetailsLabel" class="text-center ">Execution Details</h2>
+					<div id="executionDetailsLabel2" class="margin-s-b10">The commissions are included in all results. Commission rate: <span id="executionFeeRate">0.05</span>%</div>
+					<div class="features">
+						<div class="section trade-section">
+							<h3><i class=" fas fa-rocket"></i>&nbsp;Performance</h3> Total Return:&nbsp;
+							<span class="bold" id="executionTotalReturn"></span><br> Win/Loss Ratio:&nbsp;
+							<span class="bold" id="executionWinLoss"></span><br> Average gain/loss per trade:&nbsp;
+							<span class="bold" id="executionAvgWinLossPerTrade"></span><br>Net Gain/Loss:&nbsp;
+							<span class="bold" id="executionResultWithUsd"></span><br> Executed Trades:&nbsp;
+							<span class="bold" id="executionExecutedTrades"></span><br>
+						</div>
+						<div class="section">
+							<h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> Strategy:&nbsp;
+							<span class="bold" id="executionStrategyRes"></span><br> Exchange:&nbsp;
+							<span class="bold" id="executionExchangeRes"></span><br> Instrument:&nbsp;
+							<span class="bold" id="executionInstrumentRes"></span><br> Timeframe:&nbsp;
+							<span class="bold" id="executionTimeframeRes"></span>
+							<div id="executionPosSizeResDiv" class="inline"><br> Position Size:&nbsp;
+								<span class="bold" id="executionPosSizeRes"></span></div>
+							<div id="executionMaxLossResDiv" class="inline"><br> Maximum Execution Loss:&nbsp;
+								<span class="bold" id="executionMasLossRes"></span></div>
+						</div>
+						<div class="section trade-section">
+							<h3><i class=" fas fa-thumbs-up"></i>&nbsp;Winning Trades</h3> Win Rate:&nbsp;<span class="bold" id="executionWinningTradesP"></span><br> Winning trades count:&nbsp;<span class="bold" id="executionWinningCount"></span><br> Average gain per trade:&nbsp;<span class="bold" id="executionAvgGainPerWinning"></span><br>							Biggest gain:&nbsp;<span class="bold" id="executionBiggestGain"></span><br>
+						</div>
+						<div class="section trade-section">
+							<h3><i class=" fas fa-thumbs-down"></i>&nbsp;Loosing Trades</h3> Loose Rate:&nbsp;<span class="bold" id="executionLoosingTradesP"></span><br> Loosing trades count:&nbsp;<span class="bold" id="executionLoosingCount"></span><br> Average loss per trade:&nbsp;<span class="bold" id="executionAvgLostPerWinning"></span><br>							Biggest loss:&nbsp;<span class="bold" id="executionBiggestLost"></span><br>
+						</div>
+					</div>
+
+					<h3 id="executionTableLabel" class="text-center margin-s-b10">Executed Trades</h3>
+					<div class="table-wrapper">
+						<table id="executionStrategiesTable">
+						</table>
+					</div>
+					<div class="text-center margin-s-b30">
+						<a href="#/" onclick="closeExecutionWindow()" class="button2" style="width:12em;margin:0 1em">Close</a>
+					</div>
+				</div>
+			</div>
+		</div>
+
+	</div>
+
+	<!-- Footer -->
+	<footer id="footer" class="wrapper style1-alt">
+		<div class="inner">
+			<ul class="menu">
+				<li>&copy; All rights reserved.</li>
+				<!-- <li>Design: <a href="http://spread-trades-app.com">Spread Trades App</a></li>-->
+			</ul>
+		</div>
+	</footer>
+
+	<div id="modalConfirm" class="modal-small">
+		<div class="text-center">
+			<div></div>
+			<br> <a id="modalConfirmOk" style="width:10em;" class="button2" href="#/">OK</a> <a style="width:10em;" id="modalConfirmCancel" class="button2" href="#/">Cancel</a>
+		</div>
+	</div>
+	<div id="modalInfo" class="modal-small">
+		<div class="text-center">
+			<div></div>
+			<br> <a id="modalInfoOk" class="button2" href="#/" style="width:10em;">OK</a>
+		</div>
+	</div>
+
+	<!-- Scripts -->
+	<script>
+		window.$ = window.jQuery = require('./assets/js/jquery.min.js');
+	</script>
+	<script src="assets/js/jquery.min.js"></script>
+	<script src="assets/js/jquery.scrollex.min.js"></script>
+	<script src="assets/js/jquery.scrolly.min.js"></script>
+	<script src="assets/js/skel.min.js"></script>
+	<script src="assets/js/util.js"></script>
+	<script src="assets/js/main.js"></script>
+	<script src="assets/js/menu.js"></script>
+	<script src="assets/js/binance.js"></script>
+	<script src="assets/js/indicators.js"></script>
+	<script src="assets/js/backtest.js"></script>
+	<script src="assets/js/trade.js"></script>
+	<script>
+		//require('./assets/js/menu')
+		//require('./assets/js/db')
+		//require('./assets/js/binance')
+		fillDefaultStrategies();
+		checkEulaAccepted();
+		//removeTmpFiles();
+		enablePowerSaveBlocker();
+		console.log('Teststststst');
+
+		let curVersion = '1.0.0';
+		function checkForUpdates() {
+			$.ajax({
+				type: 'get',
+				url: 'https://easycryptobot.com/version.html',
+				success: function(data) {
+					try {
+						if(typeof data === 'string' && data.startsWith('version')){
+							let version = data.split(':');
+							if(version[1] !== curVersion) {
+									openModalInfo('An update is available!<br>You can download it at<br><span class="one-click-select">https://easycryptobot.com/update</span>');
+							}
+						}
+					} catch (err) {
+						openModalInfo(err);
+					}
+				},
+				error: function() {
+					openModalInfo('ERR');
+				}
+			});
+		}
+		checkForUpdates()
+
+		let confirmOkFunc = null;
+		let confirmCalcelFunc = null;
+
+		function openModalAccept(msg, okFunc, calcelFunc) {
+			$('#modalConfirm').removeClass('modal-big');
+			$('#modalConfirm').addClass('modal-small');
+			$('#modalConfirmOk').html('Accept');
+			openModalConfirmImpl(msg, okFunc, calcelFunc);
+		}
+
+		function openModalAcceptBig(msg, okFunc, calcelFunc) {
+			$('#modalConfirm').removeClass('modal-small');
+			$('#modalConfirm').addClass('modal-big');
+			$('#modalConfirmOk').html('Accept');
+			openModalConfirmImpl(msg, okFunc, calcelFunc);
+		}
+
+		function openModalConfirmBig(msg, okFunc, calcelFunc) {
+			$('#modalConfirm').removeClass('modal-small');
+			$('#modalConfirm').addClass('modal-big');
+			$('#modalConfirmOk').html('OK');
+			openModalConfirmImpl(msg, okFunc, calcelFunc);
+		}
+
+		function openModalConfirm(msg, okFunc, calcelFunc) {
+			$('#modalConfirm').removeClass('modal-big');
+			$('#modalConfirm').addClass('modal-small');
+			$('#modalConfirmOk').html('OK');
+			openModalConfirmImpl(msg, okFunc, calcelFunc);
+		}
+
+		function openModalConfirmImpl(msg, okFunc, calcelFunc) {
+			$('#modalConfirm').css('display', 'flex');
+			$('#wrapper').css('opacity', '0.5');
+			$('#wrapper').css('pointer-events', 'none');
+			$('#sidebar').css('opacity', '0.5');
+			$('#sidebar').css('pointer-events', 'none');
+			$('#modalConfirm>div>div').html(msg);
+			$('#modalConfirm').focus();
+			if (okFunc !== undefined) {
+				confirmOkFunc = okFunc;
+			}
+			if (calcelFunc !== undefined) {
+				confirmCalcelFunc = calcelFunc;
+			}
+		}
+
+		$('#modalConfirmOk').click(function(e) {
+			e.preventDefault();
+			$('#modalConfirm').css('display', 'none');
+			$('#wrapper').css('opacity', '1');
+			$('#wrapper').css('pointer-events', 'auto');
+			$('#sidebar').css('opacity', '1');
+			$('#sidebar').css('pointer-events', 'auto');
+			if (confirmOkFunc !== null) {
+				confirmOkFunc();
+				confirmOkFunc = null;
+			}
+		});
+
+		$('#modalConfirmCancel').click(function(e) {
+			e.preventDefault();
+			$('#modalConfirm').css('display', 'none');
+			$('#wrapper').css('opacity', '1');
+			$('#wrapper').css('pointer-events', 'auto');
+			$('#sidebar').css('opacity', '1');
+			$('#sidebar').css('pointer-events', 'auto');
+			if (confirmCalcelFunc !== null) {
+				confirmCalcelFunc();
+				confirmCalcelFunc = null;
+			}
+		});
+
+		function openModalInfo(msg) {
+			$('#modalInfo').removeClass('modal-big');
+			$('#modalInfo').addClass('modal-small');
+			openModalInfoImpl(msg);
+		}
+
+		function openModalInfoBig(msg) {
+			$('#modalInfo').removeClass('modal-small');
+			$('#modalInfo').addClass('modal-big');
+			openModalInfoImpl(msg);
+		}
+
+		function openModalInfoImpl(msg) {
+			$('#modalInfo').css('display', 'flex');
+			$('#wrapper').css('opacity', '0.5');
+			$('#wrapper').css('pointer-events', 'none');
+			$('#sidebar').css('opacity', '0.5');
+			$('#sidebar').css('pointer-events', 'none');
+			$('#modalInfo>div>div').html(msg);
+		}
+
+		$('#modalInfoOk').click(function(e) {
+			e.preventDefault();
+			$('#modalInfo').css('display', 'none');
+			$('#wrapper').css('opacity', '1');
+			$('#wrapper').css('pointer-events', 'auto');
+			$('#sidebar').css('opacity', '1');
+			$('#sidebar').css('pointer-events', 'auto');
+		});
+	</script>
+</body>
+
+</html>

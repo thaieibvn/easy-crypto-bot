@@ -1,0 +1,403 @@
+//EasyCryptoBot Copyright (C) 2018 Stefan Hristov
+const Binance = require('node-binance-api');
+const binance = new Binance().options({
+  APIKEY: 'key', APISECRET: 'secret', useServerTime: true, // If you get timestamp errors, synchronize to server time at startup
+  test: false // If you want to use sandbox mode where orders are simulated
+});
+
+let binanceInstruments = null;
+async function getBinanceInstruments() {
+  if (binanceInstruments === null) {
+    return new Promise((resolve, reject) => {
+      binance.prices((error, ticker) => {
+        if (error) {
+          reject(error);
+        } else {
+          binanceInstruments = ticker;
+          resolve(ticker);
+        }
+      })
+    });
+  } else {
+    return Promise.resolve(binanceInstruments);
+  }
+}
+
+function getBinanceTicksImpl(instrument, timeframe, startTime, endTime) {
+  return new Promise((resolve, reject) => {
+    binance.candlesticks(instrument, timeframe, (error, ticks, symbol) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(ticks);
+      }
+    }, {
+      limit: 500,
+      startTime: startTime.getTime(),
+      endTime: endTime.getTime()
+    });
+  });
+}
+
+var binanceCache = [
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null
+];
+function getBinanceTicksDb(instrument, timeframe, startTime, endTime) {
+  let dbFilename = getDbFileName('binance', instrument, timeframe);
+  let cachedDataDb = new Datastore({
+    filename: getAppDataFolder() + '/db/tmp/' + dbFilename,
+    autoload: true
+  });
+  return new Promise((resolve, reject) => {
+    cachedDataDb.find({
+      d: {
+        $gte: startTime,
+        $lte: endTime
+      }
+    }).sort({d: 1}).exec((error, data) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(data);
+      }
+    })
+  });
+}
+
+function storeBinanceTicks(instrument, timeframe, data) {
+  let dbFilename = getDbFileName('binance', instrument, timeframe);
+  let dataDb = new Datastore({
+    filename: getAppDataFolder() + '/db/tmp/' + dbFilename,
+    autoload: true
+  });
+  return new Promise((resolve, reject) => {
+    dataDb.insert(data, (error, result) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(result);
+      }
+    })
+  });
+}
+
+function getDateWithoutLastTick(timeframe, date) {
+  let tmpDate = new Date(date.getTime());
+  switch (timeframe) {
+    case '1m':
+      tmpDate.setMinutes(tmpDate.getMinutes() - 1, 0, 0);
+      break;
+    case '3m':
+      tmpDate.setMinutes(tmpDate.getMinutes() - 3, 0, 0);
+      break;
+    case '5m':
+      tmpDate.setMinutes(tmpDate.getMinutes() - 5, 0, 0);
+      break;
+    case '15m':
+      tmpDate.setMinutes(tmpDate.getMinutes() - 15, 0, 0);
+      break;
+    case '30m':
+      tmpDate.setMinutes(tmpDate.getMinutes() - 30, 0, 0);
+      break;
+    case '1h':
+      tmpDate.setHours(tmpDate.getHours() - 1, 0, 0, 0);
+      break;
+    case '2h':
+      tmpDate.setHours(tmpDate.getHours() - 2, 0, 0, 0);
+      break;
+    case '4h':
+      tmpDate.setHours(tmpDate.getHours() - 4, 0, 0, 0);
+      break;
+    case '6h':
+      tmpDate.setHours(tmpDate.getHours() - 6, 0, 0, 0);
+      break;
+    case '12h':
+      tmpDate.setHours(tmpDate.getHours() - 12, 0, 0, 0);
+      break;
+    case '1d':
+      tmpDate.setHours(tmpDate.getHours() - 24, 0, 0, 0);
+      break;
+  }
+  return tmpDate;
+}
+function getCacheIndex(timeframe) {
+  switch (timeframe) {
+    case '1m':
+      return 0;
+    case '3m':
+      return 1;
+    case '5m':
+      return 2;
+    case '15m':
+      return 3;
+    case '30m':
+      return 4;
+    case '1h':
+      return 5;
+    case '2h':
+      return 6;
+    case '4h':
+      return 7;
+    case '6h':
+      return 8;
+    case '12h':
+      return 9;
+    case '1d':
+      return 10;
+  }
+}
+
+function getDateWithTickMore(timeframe, date) {
+  let tmpDate = new Date(date.getTime());
+  switch (timeframe) {
+    case '1m':
+      tmpDate.setMinutes(tmpDate.getMinutes() + 1, 0, 0);
+      break;
+    case '3m':
+      tmpDate.setMinutes(tmpDate.getMinutes() + 3, 0, 0);
+      break;
+    case '5m':
+      tmpDate.setMinutes(tmpDate.getMinutes() + 5, 0, 0);
+      break;
+    case '15m':
+      tmpDate.setMinutes(tmpDate.getMinutes() + 15, 0, 0);
+      break;
+    case '30m':
+      tmpDate.setMinutes(tmpDate.getMinutes() + 30, 0, 0);
+      break;
+    case '1h':
+      tmpDate.setHours(tmpDate.getHours() + 1, 0, 0, 0);
+      break;
+    case '2h':
+      tmpDate.setHours(tmpDate.getHours() + 2, 0, 0, 0);
+      break;
+    case '4h':
+      tmpDate.setHours(tmpDate.getHours() + 4, 0, 0, 0);
+      break;
+    case '6h':
+      tmpDate.setHours(tmpDate.getHours() + 6, 0, 0, 0);
+      break;
+    case '12h':
+      tmpDate.setHours(tmpDate.getHours() + 12, 0, 0, 0);
+      break;
+    case '1d':
+      tmpDate.setDate(tmpDate.getDate() + 1);
+      break;
+  }
+  return tmpDate;
+}
+
+function setBinanceCache(instrument, timeframe, startTime, endTime, data) {
+  if (data == null || data.length === 0) {
+    return;
+  }
+  let index = getCacheIndex(timeframe);
+  binanceCache[index] = {
+    'instrument': instrument,
+    'timeframe': timeframe,
+    'startTime': startTime,
+    'endTime': endTime,
+    'data': data
+  }
+}
+
+async function getBinanceTicks(instrument, timeframe, startTime, endTime) {
+  for (let cache of binanceCache) {
+    if (cache !== null && cache.instrument === instrument && cache.timeframe === timeframe && cache.startTime.getTime() === startTime.getTime() && cache.endTime.getTime() === endTime.getTime()) {
+      return cache.data;
+    }
+  }
+  let result = null;
+  try {
+    result = await getBinanceTicksDb(instrument, timeframe, startTime, endTime);
+  } catch (err) {}
+  let leftSite = false;
+  let rightSite = false;
+  let noData = result === null || result.length === 0;
+  if (!noData) {
+    leftSite = result[0].d > startTime;
+    let endTimeTmp = getDateWithoutLastTick(timeframe, endTime);
+    rightSite = result[result.length - 1].d < endTimeTmp;
+  } else {
+    //To ensure no gaps are made when adding new data
+    removeDbFile(getDbFileName('binance', instrument, timeframe));
+  }
+  if (!noData && !leftSite && !rightSite) {
+    setBinanceCache(instrument, timeframe, startTime, endTime, result);
+    return result;
+  }
+
+  let ticks = [];
+  try {
+    if (noData) {
+      let data = await downloadBinanceTicks(instrument, timeframe, startTime, endTime);
+      if (data !== null && data.length > 0) {
+        await storeBinanceTicks(instrument, timeframe, data);
+        setBinanceCache(instrument, timeframe, startTime, endTime, data);
+        return data;
+      } else {
+        return null;
+      }
+    } else {
+      if (leftSite) {
+        let ticksLeft = await downloadBinanceTicks(instrument, timeframe, startTime, result[0].d);
+        if (ticksLeft !== null && ticksLeft.length > 0) {
+          await storeBinanceTicks(instrument, timeframe, ticksLeft);
+          //ticksLeft.push.apply(result);
+          //result = ticksLeft;
+        }
+        //ticks.push.apply(ticksLeft, nextData)
+      }
+      if (rightSite) {
+
+        let tmpDate = getDateWithTickMore(timeframe, result[result.length - 1].d);
+        tmpDate.setSeconds(30);
+        let ticksRight = await downloadBinanceTicks(instrument, timeframe, tmpDate, endTime);
+        if (ticksRight !== null && ticksRight.length > 0) {
+          await storeBinanceTicks(instrument, timeframe, ticksRight);
+          //result.push.apply(ticksRight);
+        }
+      }
+    }
+    let data = await getBinanceTicksDb(instrument, timeframe, startTime, endTime);
+    setBinanceCache(instrument, timeframe, startTime, endTime, data);
+    return data
+  } catch (err) {
+    //alert(err)
+    return null;
+  }
+}
+async function downloadBinanceTicks(instrument, timeframe, startTime, endTime) {
+  $('#btRunPercent').html('Downloading ' + instrument + ' historical data from Binance. Please wait..');
+  $('#btRunPercent2').show();
+  $('#btRunPercent2').html(timeframe + ' data download progress: 0%');
+  let ticks = [];
+  try {
+    ticks = await getBinanceTicksImpl(instrument, timeframe, startTime, endTime);
+  } catch (err) {
+    return null;
+  }
+  if (ticks === null || ticks === undefined || ticks.length === 0) {
+    return null;
+  }
+
+  let lastCloseTime = new Date(ticks[ticks.length - 1][6]);
+  let tmpIndex = 0;
+  while (lastCloseTime < endTime) {
+    $('#btRunPercent2').html(timeframe + ' data download progress: ' + (
+    ((lastCloseTime.getTime() - startTime.getTime()) / (endTime.getTime() - startTime.getTime())) * 100).toFixed(0) + '%');
+    let nextData = [];
+    try {
+      nextData = await getBinanceTicksImpl(instrument, timeframe, lastCloseTime, endTime);
+    } catch (err) {
+      return null;
+    }
+    if (nextData === null || nextData === undefined || nextData.length === 0) {
+      break;
+    }
+    lastCloseTime = new Date(nextData[nextData.length - 1][6]);
+    ticks.push.apply(ticks, nextData)
+  }
+  let ticksTmp = [];
+  let indexTmp = 0;
+  //let dateTmp = new Date();
+  //var userTimezoneOffset = dateTmp.getTimezoneOffset() * 60000;
+  for (let tick of ticks) {
+    let date = new Date(tick[0]);
+    if (timeframe === '1d') {
+      //date = new Date(date.getTime() + userTimezoneOffset);
+      date.setHours(0, 0, 0, 0);
+    }
+    ticksTmp.push({
+      'd': date,
+      'o': Number.parseFloat(tick[1]),
+      'h': Number.parseFloat(tick[2]),
+      'l': Number.parseFloat(tick[3]),
+      'c': Number.parseFloat(tick[4])
+    });
+    if (indexTmp > 500 && indexTmp % 500 === 0) {
+      await sleep(0);
+    }
+    indexTmp++
+  }
+  return ticksTmp;
+}
+
+function getBinanceUSDTValue(ammount, pair, base) {
+  return new Promise((resolve, reject) => {
+    binance.prices((error, ticker) => {
+      if (pair.toLowerCase().endsWith('usdt')) {
+        resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]));
+      } else {
+        resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]) * Number.parseFloat(ticker[base.toUpperCase() + 'USDT']));
+      }
+    })
+  });
+}
+
+function checkBinanceApiKey(key, secret) {
+  const binanceApiTest = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, test: false});
+  return new Promise((resolve, reject) => {
+    binanceApiTest.balance((error, balances) => {
+      if (error !== null) {
+        resolve(false);
+      }
+      resolve(true);
+    })
+  });
+}
+
+function getBinanceBalance(key, secret, currency) {
+  const binanceApiTest = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, test: false});
+  return new Promise((resolve, reject) => {
+    binanceApiTest.balance((error, balances) => {
+      resolve(balances[currency].available);
+    })
+  });
+}
+
+function getBinanceLotSizeInfo(pair) {
+  return new Promise((resolve, reject) => {
+    binance.exchangeInfo((error, data) => {
+
+      let symbolInfo = data.symbols.filter(x => {
+        return x.symbol == pair
+      })[0];
+      let minQty = null;
+      let maxQty = null;
+      let stepSize = null;
+
+      symbolInfo.filters.forEach(filter => {
+        if (filter.filterType === 'LOT_SIZE') {
+          minQty = parseFloat(filter.minQty);
+          maxQty = parseFloat(filter.maxQty);
+          stepSize = parseFloat(filter.stepSize);
+        }
+      });
+      resolve([minQty, maxQty, stepSize]);
+    })
+  });
+}
+
+function getBinanceBidAsk(pair) {
+  return new Promise((resolve, reject) => {
+    binance.depth(pair, (error, depth, symbol) => {
+      let bids = binance.sortBids(depth.bids);
+      let asks = binance.sortAsks(depth.asks);
+      resolve([
+        Number.parseFloat(binance.first(bids)),
+        Number.parseFloat(binance.first(asks))
+      ]);
+    });
+  });
+}

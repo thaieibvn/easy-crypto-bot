@@ -1,0 +1,110 @@
+<template class="section-template">
+
+<section id="trade" class="wrapper style1 fullscreen intro">
+<div id="tradeBody"class="inner">
+  <h2>Trade &amp; Alerts</h2>
+   You can choose wheter the bot will trade for you, execute realtime simulation or just give you trade alerts.
+  <hr />
+  <div class="text-center">
+    <input type="radio" id="trExecTypeSignals" name="execType" value="alerts" onchange="tsExecTypeChange()" checked><label for="trExecTypeSignals">Alerts Only</label>
+    &nbsp;<input type="radio" onchange="tsExecTypeChange()" id="trExecTypeSim" name="execType" value="sim">  <label for="trExecTypeSim">Realtime Simulation</label>
+    &nbsp;<input type="radio" onchange="tsExecTypeChange()" id="trExecTypeTrade" name="execType" value="trade">  <label for="trExecTypeTrade">Real Trading</label>
+    <br>
+    <div class="text-left" style="display:inline-block;margin:0.5em auto 1.875em auto;">
+
+      <div class="inline" id="tsStrategy">
+        <span class="inline-block min-width5">Strategy:&nbsp;</span>
+        <div class="drop-down-white">
+          <a href="#/" onclick="dropDown('#tsStrategy')"><span id="tsStrategyCombobox" class="name inline-block min-width20">Choose Strategy</span> <span	class="caret"></span></a>
+          <ul id="tsStrategiesList" class="backtest-dropdown">
+          </ul>
+        </div>
+      </div>
+      <br>
+      <div class="inline" id="tsExchange">
+        <span class="inline-block min-width5">Exchange:&nbsp;</span>
+        <div class="drop-down-white">
+          <a href="#/" onclick="dropDown('#tsExchange')"><span id="tsExchangeCombobox" class="name inline-block min-width20">Choose Exchange</span> <span	class="caret"></span></a>
+          <ul class="backtest-dropdown">
+            <li><a href="#/" onclick="dropDownItem('Binance', '#tsExchange', tsFillBinanceInstruments())">Binance</a></li>
+          </ul>
+        </div>
+      </div>
+      <br>
+      <div class="inline" id="tsInstrument">
+        <span class="inline-block min-width5">Instrument:&nbsp;</span><input onkeyup="tsInstrumentKeyup()" id="tsInstrumentSearch" type="text" placeholder="Ticker" />
+        <div id="tsInstrumentList" class="drop-down-white">
+          <a href="#/" class="display-none"><span  class="name"></span> <span	class="caret"></span></a>
+          <ul class="backtest-dropdown">
+          </ul>
+        </div>
+      </div>
+      <br>
+
+      <div class="inline" id="tsTimeframe">
+        <span class="inline-block min-width5 ">Timeframe:&nbsp;</span>
+        <div class="drop-down-white">
+          <a href="#/" onclick="dropDown('#tsTimeframe')"><span id="tsTimeframeCombobox" class="name inline-block min-width20">Choose Timeframe</span> <span	class="caret"></span></a>
+          <ul class="backtest-dropdown">
+            <li><a href="#/" onclick="dropDownItem('1 minute', '#tsTimeframe')">1 minute</a></li>
+            <li><a href="#/" onclick="dropDownItem('3 minutes', '#tsTimeframe')">3 minutes</a></li>
+            <li><a href="#/" onclick="dropDownItem('5 minutes', '#tsTimeframe')">5 minutes</a></li>
+            <li><a href="#/" onclick="dropDownItem('15 minutes', '#tsTimeframe')">15 minutes</a></li>
+            <li><a href="#/" onclick="dropDownItem('30 minutes', '#tsTimeframe')">30 minutes</a></li>
+            <li><a href="#/" onclick="dropDownItem('1 hour', '#tsTimeframe')">1 hour</a></li>
+            <li><a href="#/" onclick="dropDownItem('2 hours', '#tsTimeframe')">2 hours</a></li>
+            <li><a href="#/" onclick="dropDownItem('4 hours', '#tsTimeframe')">4 hours</a></li>
+            <li><a href="#/" onclick="dropDownItem('6 hours', '#tsTimeframe')">6 hours</a></li>
+            <li><a href="#/" onclick="dropDownItem('12 hours', '#tsTimeframe')">12 hours</a></li>
+            <li><a href="#/" onclick="dropDownItem('1 day', '#tsTimeframe')">1 day</a></li>
+          </ul>
+        </div>
+      </div>
+      <br>
+      <div>
+        <div class="inline">
+          <div class="display-none" id="tsPosSizeDiv">
+            <span class="inline-block min-width5">Trade size:&nbsp;</span><input id="tsPosSize" onkeyup="fillPosSizeDetails()" type="number" placeholder="Ammount per Trade" />&nbsp;<span style="position:absolute;"class="text-white inline-block min-width5" id="tsQuotedCurrency"></span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="inline">
+          <div class="display-none" id="tsMaxLossDiv">
+            <span class="inline-block min-width5">Max Loss:&nbsp;</span><input id="tsMaxLoss" onkeyup="fillMaxLossDetails()" type="number" placeholder="Maximum Loss of Execution" />&nbsp;<span style="position:absolute;"class="text-white inline-block min-width5" id="tsMaxLossCurrency"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center">
+    <a id="executeStrategyBtn" href="#/" onclick="executeStrategy()" class="button button-big margin-s-b30"><i class="text-green fas fa-play"></i> Execute</a>
+  </div>
+
+  <div id="tsResultDiv" class="display-none">
+    <hr>
+    <div>
+      <h3 class="text-center margin-s-b10">Executions&nbsp;<i class="fas fa-rocket"></i> </h3>
+      <div class="table-wrapper">
+      <table id="tsStrategiesTable">
+        <tr>
+          <td>Mode</td>
+          <td>Strategy</td>
+          <td>Exchange</td>
+          <td>Instrument</td>
+          <td>TF</td>
+          <td>Trades Nb.</td>
+          <td>Result</td>
+          <td>Status</td>
+        </tr>
+      </table>
+      </div>
+    </div>
+  </div>
+
+</section>
+</template>
+<script>
+
+</script>

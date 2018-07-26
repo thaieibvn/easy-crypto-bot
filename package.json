@@ -1,0 +1,30 @@
+{
+  "name": "easy-crypto-bot",
+  "version": "1.0.0",
+  "description": "Cryptocurrency Trading Bot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hristovsn/easy-crypto-bot"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "win32": "electron-packager . easy-crypto-bot --overwrite --asar --platform=win32 --arch=ia32 --icon=assets/icons/icon.ico --prune=true --out=release-builds --version-string.CompanyName=\"Incentico Ltd.\" --version-string.FileDescription=CE --version-string.ProductName=\"Easy Crypto Bot\"",
+    "win64": "electron-packager . easy-crypto-bot --overwrite --asar --platform=win32 --arch=x64 --icon=assets/icons/icon.ico--prune=true --out=release-builds --version-string.CompanyName=\"Incentico Ltd.\" --version-string.FileDescription=CE --version-string.ProductName=\"Easy Crypto Bot\"",
+    "lin32": "electron-packager . easy-crypto-bot --overwrite --asar --platform=linux --arch=ia32 --icon=assets/icons/icon.png --prune=true --out=release-builds",
+    "lin64": "electron-packager . easy-crypto-bot --overwrite --asar --platform=linux --arch=x64 --icon=assets/icons/icon.png --prune=true --out=release-builds",
+    "mac": "electron-packager . --overwrite --platform=darwin --arch=x64 --icon=assets/icons/icon.icns --prune=true --out=release-builds"
+  },
+  "keywords": [
+    ""
+  ],
+  "author": "support@easycryptobot.com",
+  "license": "GNU GPLv3",
+  "devDependencies": {
+    "electron": "^2.0.0"
+  },
+  "dependencies": {
+    "nedb": "^1.8.0",
+    "node-binance-api": "^0.7.4"
+  }
+}
