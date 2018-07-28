@@ -1,6 +1,11 @@
 const Datastore = require('nedb');
 const shell = require('electron').shell;
-const {app, clipboard, remote} = require('electron')
+const {app, clipboard, remote} = require('electron');
+const Highcharts = require('highcharts/highstock');
+//require('highcharts/indicators/indicators')(Highcharts);
+//require('highcharts/indicators/ema')(Highcharts);
+//require('highcharts/indicators/rsi')(Highcharts);
+
 
 var eulaDb = new Datastore({
   filename: getAppDataFolder() + '/db/eula.db',
@@ -48,7 +53,7 @@ async function checkEulaAccepted() {
         try {
           storeEula({'accepted': true});
         } catch (err) {
-          openModalInfo("Cannot write in applicatin folder! Please move the application in folder that does not require administrator privileges!", function() {
+          openModalInfo("Cannot write in applicatin folder!<br>Please contact support@easycryptobot.com", function() {
             let w = remote.getCurrentWindow();
             w.close();
           });
@@ -59,7 +64,7 @@ async function checkEulaAccepted() {
       });
     }
   } catch (err) {
-    openModalInfo("Cannot run the application! Please send an email to support@easycryptobot.com with your operation system and installation location. I'll fix as soon as possible!", function() {
+    openModalInfo("Cannot run the application!<br>Please contact support@easycryptobot.com", function() {
       let w = remote.getCurrentWindow();
       w.close();
     });

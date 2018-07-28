@@ -1,4 +1,5 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
+
 async function btFillBinanceInstruments() {
   await getBinanceInstruments();
 }
@@ -397,6 +398,7 @@ async function runBacktest() {
     $('#btRunRocket').hide();
     $('#btRunning').show();
     $('#btResult').hide();
+    $('#btResultNoTrades').hide();
     $('#btResultDiv').show();
     $('#btStrategiesTable').html('<tr><td>Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr>');
     let ticks = await getBinanceTicks(instrument, getTimeframe(timeframe), getStartDate(timeframe, startDate), endDate);
@@ -462,12 +464,16 @@ async function runBacktest() {
           priceToCheckIndex++;
           let date = priceToCkeckData[0];
           if (tradeType === 'buy') {
+            if (trades.length > 0 && curDate.getTime() === trades[trades.length - 1].openDateOrg.getTime()) {
+              break;
+            }
             let priceToCkeck = (priceToCkeckData[1] + bidAskDiff) > priceToCkeckData[2]
               ? priceToCkeckData[2]
               : (priceToCkeckData[1] + bidAskDiff);
             if (checkTradeRules(strategy.buyRules, closePrices, priceToCkeck)) {
               let trade = {
                 'openDate': date,
+                'openDateOrg': curDate,
                 'entry': priceToCkeck,
                 'result': 0
               };
@@ -484,6 +490,7 @@ async function runBacktest() {
           } else {
             if (stoploss >= priceToCkeckData[3]) {
               trades[trades.length - 1]['closeDate'] = date;
+              trades[trades.length - 1]['closeDateOrg'] = curDate;
               trades[trades.length - 1]['exit'] = stoploss > priceToCkeckData[1]
                 ? priceToCkeckData[1]
                 : stoploss;
@@ -493,6 +500,7 @@ async function runBacktest() {
             }
             if (target <= priceToCkeckData[2]) {
               trades[trades.length - 1]['closeDate'] = date;
+              trades[trades.length - 1]['closeDateOrg'] = curDate;
               trades[trades.length - 1]['exit'] = target < priceToCkeckData[1]
                 ? priceToCkeckData[1]
                 : target;
@@ -508,6 +516,7 @@ async function runBacktest() {
               : (priceToCkeckData[1] - bidAskDiff);
             if (checkTradeRules(strategy.sellRules, closePrices, priceToCkeck)) {
               trades[trades.length - 1]['closeDate'] = date;
+              trades[trades.length - 1]['closeDateOrg'] = curDate;
               trades[trades.length - 1]['exit'] = priceToCkeck;
               trades[trades.length - 1]['result'] = (((priceToCkeck - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
               tradeType = 'buy';
@@ -619,12 +628,17 @@ async function runBacktest() {
         for (let priceToCkeck of pricesToCheck) {
           let date = ticks[i].d;
           if (tradeType === 'buy') {
+            //Only one trade per candle for the given timeframe
+            if (trades.length > 0 && date.getTime() === trades[trades.length - 1].openDateOrg.getTime()) {
+              break;
+            }
             priceToCkeck = (priceToCkeck + bidAskDiff) > highPrice
               ? highPrice
               : (priceToCkeck + bidAskDiff);
             if (checkTradeRules(strategy.buyRules, closePrices, priceToCkeck)) {
               let trade = {
                 'openDate': date,
+                'openDateOrg': date,
                 'entry': priceToCkeck,
                 'result': 0
               };
@@ -641,6 +655,7 @@ async function runBacktest() {
           } else {
             if (stoploss >= lowPrice) {
               trades[trades.length - 1]['closeDate'] = date;
+              trades[trades.length - 1]['closeDateOrg'] = date;
               trades[trades.length - 1]['exit'] = stoploss > openPrice
                 ? openPrice
                 : stoploss;
@@ -650,6 +665,7 @@ async function runBacktest() {
             }
             if (target <= highPrice) {
               trades[trades.length - 1]['closeDate'] = date;
+              trades[trades.length - 1]['closeDateOrg'] = date;
               trades[trades.length - 1]['exit'] = target < openPrice
                 ? openPrice
                 : target;
@@ -665,6 +681,7 @@ async function runBacktest() {
               : (priceToCkeck - bidAskDiff);
             if (checkTradeRules(strategy.sellRules, closePrices, priceToCkeck)) {
               trades[trades.length - 1]['closeDate'] = date;
+              trades[trades.length - 1]['closeDateOrg'] = date;
               trades[trades.length - 1]['exit'] = priceToCkeck;
               trades[trades.length - 1]['result'] = (((priceToCkeck - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
               tradeType = 'buy';
@@ -678,6 +695,7 @@ async function runBacktest() {
 
     if (trades.length > 0 && tradeType === 'sell') {
       trades[trades.length - 1]['closeDate'] = ticks[ticks.length - 1].d
+      trades[trades.length - 1]['closeDateOrg'] = ticks[ticks.length - 1].d
       trades[trades.length - 1]['exit'] = ticks[ticks.length - 1].c;
       trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
     }
@@ -750,6 +768,7 @@ async function runBacktest() {
       winningPercent = (winnignCount / executedTrades) * 100;
       loosingPercent = (loosingCount / executedTrades) * 100;
       resultWithUSD = 1000 * (1 + totalReturn / 100);
+      drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframe, 'btResultsChart');
     }
     if (loosingCount > 0) {
       winLossRatio = winnignCount / loosingCount;
@@ -796,10 +815,383 @@ async function runBacktest() {
     await sleep(500);
     $('#runBacktestBtn').removeClass('disabled');
     $('#btRunning').hide();
-    $('#btResult').show();
+    if (executedTrades > 0) {
+      $('#btResult').show();
+    } else {
+      drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframe, 'btResultsChartNoTrades');
+      $('#btResult').hide();
+      $('#btResultNoTrades').show();
+    }
   } catch (err) {
     $('#btRunning').hide();
     $('#runBacktestBtn').removeClass('disabled');
     openModalInfo('Internal Error Occurred!<br>' + err);
+  }
+}
+
+function containsIndicator(indicators, indicator) {
+  for (let intTmp of indicators) {
+    if (intTmp.type === indicator.type && intTmp.period === indicator.period) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getIndicatorsFromRules(indicators, rules) {
+  for (let rule of rules) {
+    let indTmp = null;
+    let indTmp2 = null;
+    if (rule.indicator === 'sma' || rule.indicator === 'ema' || rule.indicator === 'rsi') {
+      indTmp = {
+        type: rule.indicator,
+        period: rule.period,
+        data: []
+      };
+
+    } else if (rule.indicator === 'cma') {
+      if (rule.type === "SMA") {
+        indTmp = {
+          type: 'sma',
+          period: rule.period,
+          data: []
+        };
+      } else {
+        indTmp = {
+          type: 'ema',
+          period: rule.period,
+          data: []
+        };
+      }
+      if (rule.type2 === "SMA") {
+        indTmp2 = {
+          type: 'sma',
+          period: rule.period2,
+          data: []
+        };
+      } else {
+        indTmp2 = {
+          type: 'ema',
+          period: rule.period2,
+          data: []
+        };
+      }
+    }
+    if (indTmp !== null && !containsIndicator(indicators, indTmp)) {
+      indicators.push(indTmp)
+    }
+    if (indTmp2 !== null && !containsIndicator(indicators, indTmp2)) {
+      indicators.push(indTmp2)
+    }
+  }
+}
+
+function getBtChartButtons(timeframe) {
+  switch (timeframe) {
+    case '1 minute':
+      return [
+        {
+          type: 'hour',
+          count: 2,
+          text: '2H'
+        }, {
+          type: 'hour',
+          count: 4,
+          text: '4H'
+        }, {
+          type: 'hour',
+          count: 12,
+          text: '12H'
+        }, {
+          type: 'day',
+          count: 1,
+          text: '1D'
+        }
+      ]
+    case '3 minutes':
+      return [
+        {
+          type: 'hour',
+          count: 6,
+          text: '6H'
+        }, {
+          type: 'hour',
+          count: 12,
+          text: '12H'
+        }, {
+          type: 'day',
+          count: 1,
+          text: '1D'
+        }, {
+          type: 'week',
+          count: 1,
+          text: '1W'
+        }
+      ]
+    case '5 minutes':
+      return [
+        {
+          type: 'hour',
+          count: 12,
+          text: '12H'
+        }, {
+          type: 'day',
+          count: 1,
+          text: '1D'
+        }, {
+          type: 'week',
+          count: 1,
+          text: '1W'
+        }
+      ]
+    case '15 minutes':
+    case '30 minutes':
+      return [
+        {
+          type: 'day',
+          count: 1,
+          text: '1D'
+        }, {
+          type: 'week',
+          count: 1,
+          text: '1W'
+        }, {
+          type: 'month',
+          count: 1,
+          text: '1M'
+        }
+      ]
+    case '1 hour':
+    case '2 hours':
+      return [
+        {
+          type: 'week',
+          count: 1,
+          text: '1W'
+        }, {
+          type: 'month',
+          count: 1,
+          text: '1M'
+        }, {
+          type: 'month',
+          count: 3,
+          text: '3M'
+        }
+      ]
+    case '4 hours':
+    case '6 hours':
+      return [
+        {
+          type: 'month',
+          count: 1,
+          text: '1M'
+        }, {
+          type: 'month',
+          count: 3,
+          text: '3M'
+        }, {
+          type: 'all',
+          text: 'All'
+        }
+      ]
+    case '12 hours':
+    case '1 day':
+      return [
+        {
+          type: 'month',
+          count: 3,
+          text: '3M'
+        }, {
+          type: 'all',
+          text: 'All'
+        }
+      ]
+  }
+
+}
+function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframe, container) {
+  try {
+    let indicators = [];
+    getIndicatorsFromRules(indicators, strategy.buyRules);
+    getIndicatorsFromRules(indicators, strategy.sellRules);
+
+    let data = [];
+    let closePrices = []
+    for (let tick of ticks) {
+      if (tick.d < startDate) {
+        closePrices.push(tick.c);
+        continue;
+      }
+
+      for (let indicator of indicators) {
+        let value = null;
+        if (indicator.type === 'sma') {
+          value = calculateSMA(indicator.period, closePrices, tick.c)
+        } else if (indicator.type === 'ema') {
+          value = calculateEMA(indicator.period, closePrices, tick.c)
+        } else if (indicator.type === 'rsi') {
+          value = calculateRsi(indicator.period, closePrices, tick.c)
+        }
+        if (value !== null && value[0] !== null) {
+          indicator.data.push([
+            tick.d.getTime(), value[0]
+          ]);
+        }
+      }
+      data.push([tick.d.getTime(), tick.o, tick.h, tick.l, tick.c]);
+      closePrices.push(tick.c);
+    }
+
+    let openTrades = [];
+    let closeTrades = [];
+    let tradeCount = 1;
+    for (let trade of trades) {
+      openTrades.push({
+        x: trade.openDateOrg.getTime(),
+        y: trade.entry,
+        title: 'Open Trade ' + tradeCount + '<br>Date: ' + formatDateFull(trade.openDate) + '<br>Price: ' + trade.entry.toFixed(8)
+      });
+      closeTrades.push({
+        x: trade.closeDateOrg.getTime(),
+        y: trade.exit,
+        title: 'Close Trade ' + tradeCount + '<br>Date: ' + formatDateFull(trade.openDate) + '<br>Price: ' + trade.entry.toFixed(8) + '<br>Result: ' + trade.result.toFixed(2) + '%'
+      });
+      tradeCount++;
+    }
+
+    let series = [];
+    series.push({
+      id: 'main-series',
+      type: 'candlestick',
+      name: instrument + ' ' + timeframe,
+      data: data,
+      dataGrouping: {
+        enabled: false
+      }
+    });
+    series.push({
+      type: 'scatter',
+      name: 'Opened Trades',
+      data: openTrades,
+      marker: {
+        enabled: true,
+        symbol: 'circle',
+        radius: 5,
+        fillColor: '#2ECC71'
+      },
+      dataGrouping: {
+        enabled: false
+      }
+    });
+    series.push({
+      type: 'scatter',
+      name: 'Closed Trades',
+      data: closeTrades,
+      marker: {
+        enabled: true,
+        symbol: 'circle',
+        radius: 5,
+        fillColor: '#C0392B'
+      },
+      dataGrouping: {
+        enabled: false
+      }
+    });
+
+    let containsSecondAxisIndicators = false;
+    for (let indicator of indicators) {
+      if (indicator.type === 'rsi') {
+        containsSecondAxisIndicators = true;
+        series.push({
+          name: indicator.type + ' ' + indicator.period,
+          type: 'spline',
+          yAxis: 1,
+          dataGrouping: {
+            enabled: false
+          },
+          data: indicator.data
+        })
+      } else {
+        series.push({
+          name: indicator.type + ' ' + indicator.period,
+          type: 'spline',
+          dataGrouping: {
+            enabled: false
+          },
+          data: indicator.data
+        })
+      }
+    }
+    let yAxis = containsSecondAxisIndicators
+      ? [
+        {
+          crosshair: false,
+          height: '85%',
+          startOnTick: false,
+          endOnTick: false,
+          resize: {
+            enabled: true
+          }
+        }, {
+          crosshair: false,
+          height: '14%',
+          top: '86%',
+          startOnTick: false,
+          endOnTick: false,
+          resize: {
+            enabled: true
+          }
+        }
+      ]
+      : {
+        crosshair: false,
+        startOnTick: false,
+        endOnTick: false,
+        resize: {
+          enabled: true
+        }
+      };
+    let buttons = getBtChartButtons(timeframe);
+    let chart = Highcharts.stockChart(container, {
+      rangeSelector: {
+        buttons: buttons,
+        selected: 0,
+        inputEnabled: false
+      },
+      title: {
+        text: instrument + ' ' + timeframe
+      },
+      xAxis: {
+        crosshair: false
+      },
+
+      yAxis: yAxis,
+
+      plotOptions: {
+        scatter: {
+          tooltip: {
+            pointFormat: '{point.title}'
+          }
+        },
+        series: {
+          stickyTracking: false,
+          showInLegend: true,
+          gapSize: null,
+          marker: {
+            enabled: false
+          }
+        }
+      },
+      tooltip: {
+        snap: 0
+      },
+      legend: {
+        enabled: true
+      },
+      series: series
+    });
+  } catch (err) {
+    //TODO
+    alert(err)
   }
 }

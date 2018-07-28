@@ -29,7 +29,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 			<nav>
 				<ul>
 					<li><a id="homeMenu" data-section="home" href="#">Home</a></li>
-					<li><a data-section="strategies" href="#">Strategies</a></li>
+					<li><a data-section="strategies" href="#">Create Strategy</a></li>
 					<li><a data-section="backtest" href="#">Backtest Strategy</a></li>
 					<li><a data-section="trade" href="#">Trade &amp; Alerts</a></li>
 					<li><a data-section="support" href="#">Support Me</a></li>
@@ -191,6 +191,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 	<script src="assets/js/menu.js"></script>
 	<script src="assets/js/binance.js"></script>
 	<script src="assets/js/indicators.js"></script>
+	<script src="assets/js/loader.js"></script>
 	<script src="assets/js/backtest.js"></script>
 	<script src="assets/js/trade.js"></script>
 	<script>
@@ -203,7 +204,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 		enablePowerSaveBlocker();
 		console.log('Teststststst');
 
-		let curVersion = '1.0.0';
+		let curVersion = '1.0.1';
 		function checkForUpdates() {
 			$.ajax({
 				type: 'get',

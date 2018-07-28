@@ -77,6 +77,11 @@
           <img class="rocket-big" src="./assets/images/rocket.gif" alt="..">
         </div>
       </div>
+      <div id="btResultNoTrades" class="display-none">
+          <h3 class="text-center">The strategy didn't generated any trades for the given timeframe!</h3>
+          <div id="btResultsChartNoTrades">
+          </div>
+      </div>
       <div id="btResult" class="display-none">
         <h2 class="text-center">Result</h2>
         <div class="text-center margin-s-b10">The commissions are included in all results. Commission rate: <span id="btFeeRate">0.05</span>%</div>
@@ -115,14 +120,14 @@
         </div>
 
         <h3 class="text-center margin-s-b10">Executed Trades</h3>
+        <div id="btResultsChart">
+        </div>
         <div class="table-wrapper">
           <table id="btStrategiesTable">
           </table>
         </div>
       </div>
     </div>
-
-
   </div>
 
 </section>

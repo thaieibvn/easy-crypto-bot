@@ -89,6 +89,7 @@ self.addEventListener('message', function(e) {
       }
       try {
         await mutex.lock();
+        let curDate = new Date(Number.parseFloat(binance.last(chart)));
         if (!statusSent) {
           let tickTmp = binance.last(chart);
           if (chart[tickTmp] === undefined) {
@@ -150,6 +151,10 @@ self.addEventListener('message', function(e) {
           }
         } else {
           if (tradeType === 'buy') {
+            //Only one trade per candle for the given timeframe
+            if (trades.length > 0 && curDate.getTime() === trades[trades.length - 1].openDateOrg.getTime()) {
+              return;
+            }
             if (checkTradeRules(strategy.buyRules, closePrices, curPrice)) {
               //Try if the rules are met with the price that is possible to trade with - the ask price.
               let bidAsk = await getBidAsk(binance, execution.instrument);
@@ -168,6 +173,7 @@ self.addEventListener('message', function(e) {
                   //get ask price and try again
                   let trade = {
                     'openDate': new Date(),
+                    'openDateOrg': curDate,
                     'entry': curPrice,
                     'result': 0
                   };

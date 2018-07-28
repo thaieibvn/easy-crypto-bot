@@ -18,12 +18,16 @@
   "keywords": [
     ""
   ],
-  "author": "support@easycryptobot.com",
-  "license": "GNU GPLv3",
+  "author": {
+    "name": "Stefan Hristov",
+    "email": "support@easycryptobot.com"
+  },
+  "license": "GPL-3.0-only",
   "devDependencies": {
     "electron": "^2.0.0"
   },
   "dependencies": {
+    "highcharts": "^6.1.1",
     "nedb": "^1.8.0",
     "node-binance-api": "^0.7.4"
   }

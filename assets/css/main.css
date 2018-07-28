@@ -2991,3 +2991,9 @@ input[type="text"] {
   width: 22em;
   height: 8em
 }
+
+#btResultsChart, #btResultsChartNoTrades {
+  margin: 2em 0;
+  height:70vh;
+  min-height: 30em;
+}
