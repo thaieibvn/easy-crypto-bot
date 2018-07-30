@@ -204,16 +204,17 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 		enablePowerSaveBlocker();
 		console.log('Teststststst');
 
-		let curVersion = '1.0.1';
+		let curVersion = '1.0.2';
 		function checkForUpdates() {
 			$.ajax({
 				type: 'get',
 				url: 'https://easycryptobot.com/version.html',
+				cache: false,
 				success: function(data) {
 					try {
 						if(typeof data === 'string' && data.startsWith('version')){
 							let version = data.split(':');
-							if(version[1] !== curVersion) {
+							if(version[1].trim() !== curVersion) {
 									openModalInfo('An update is available!<br>You can download it at<br><span class="one-click-select">https://easycryptobot.com/update</span>');
 							}
 						}

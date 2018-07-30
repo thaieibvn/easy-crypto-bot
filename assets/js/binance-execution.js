@@ -152,7 +152,7 @@ self.addEventListener('message', function(e) {
         } else {
           if (tradeType === 'buy') {
             //Only one trade per candle for the given timeframe
-            if (trades.length > 0 && curDate.getTime() === trades[trades.length - 1].openDateOrg.getTime()) {
+            if (trades.length > 0 && curDate.getTime() === trades[trades.length - 1].closeDateOrg.getTime()) {
               return;
             }
             if (checkTradeRules(strategy.buyRules, closePrices, curPrice)) {
@@ -173,7 +173,6 @@ self.addEventListener('message', function(e) {
                   //get ask price and try again
                   let trade = {
                     'openDate': new Date(),
-                    'openDateOrg': curDate,
                     'entry': curPrice,
                     'result': 0
                   };
@@ -224,6 +223,7 @@ self.addEventListener('message', function(e) {
             if (stoploss >= curPrice || target <= curPrice) {
               executeRealTrade = true;
               trades[tradeIndex]['closeDate'] = new Date();
+              trades[tradeIndex]['closeDateOrg'] = curDate;
               trades[tradeIndex]['exit'] = curPrice;
               tradeType = 'buy';
               self.postMessage([trades[tradeIndex], 'Sell', feeRate]);
@@ -243,6 +243,7 @@ self.addEventListener('message', function(e) {
                 if (sellMet) {
                   executeRealTrade = true;
                   trades[tradeIndex]['closeDate'] = new Date();
+                  trades[tradeIndex]['closeDateOrg'] = curDate;
                   trades[tradeIndex]['exit'] = curPrice;
                   tradeType = 'buy';
                   self.postMessage([trades[tradeIndex], 'Sell', feeRate]);

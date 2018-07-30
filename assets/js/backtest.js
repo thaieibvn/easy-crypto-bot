@@ -464,7 +464,7 @@ async function runBacktest() {
           priceToCheckIndex++;
           let date = priceToCkeckData[0];
           if (tradeType === 'buy') {
-            if (trades.length > 0 && curDate.getTime() === trades[trades.length - 1].openDateOrg.getTime()) {
+            if (trades.length > 0 && curDate.getTime() === trades[trades.length - 1].closeDateOrg.getTime()) {
               break;
             }
             let priceToCkeck = (priceToCkeckData[1] + bidAskDiff) > priceToCkeckData[2]
@@ -629,7 +629,7 @@ async function runBacktest() {
           let date = ticks[i].d;
           if (tradeType === 'buy') {
             //Only one trade per candle for the given timeframe
-            if (trades.length > 0 && date.getTime() === trades[trades.length - 1].openDateOrg.getTime()) {
+            if (trades.length > 0 && date.getTime() === trades[trades.length - 1].closeDateOrg.getTime()) {
               break;
             }
             priceToCkeck = (priceToCkeck + bidAskDiff) > highPrice
@@ -1017,6 +1017,13 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
 
     let data = [];
     let closePrices = []
+    let dateTmp = new Date();
+    let currentTimeZoneOffsetInHours = dateTmp.getTimezoneOffset() / 60;
+    Highcharts.setOptions({
+      time: {
+        timezoneOffset: currentTimeZoneOffsetInHours * 60
+      }
+    });
     for (let tick of ticks) {
       if (tick.d < startDate) {
         closePrices.push(tick.c);
@@ -1075,9 +1082,9 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
       data: openTrades,
       marker: {
         enabled: true,
-        symbol: 'circle',
-        radius: 5,
-        fillColor: '#2ECC71'
+        symbol: 'triangle',
+        radius: 7,
+        fillColor: '#09c459'
       },
       dataGrouping: {
         enabled: false
@@ -1089,8 +1096,8 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
       data: closeTrades,
       marker: {
         enabled: true,
-        symbol: 'circle',
-        radius: 5,
+        symbol: 'triangle-down',
+        radius: 7,
         fillColor: '#C0392B'
       },
       dataGrouping: {

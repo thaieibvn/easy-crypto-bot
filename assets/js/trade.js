@@ -163,10 +163,21 @@ let executedStrategies = [];
 let executionWorkers = {};
 
 const executionMutex = new Mutex();
-
+const maxExecutions = 10;
 async function executeStrategy() {
   try {
     await executionMutex.lock();
+    let runningExecutions = 0;
+    for (let execution of executedStrategies) {
+      if (execution.status !== 'removed') {
+        runningExecutions++;
+      }
+    }
+    if (runningExecutions >= maxExecutions) {
+      openModalInfo('The maximum executions number is ' + maxExecutions + '. Please remove an execution before starting new one!');
+      return;
+    }
+
     $('#executeStrategyBtn').addClass('disabled');
     let strategyName = $('#tsStrategyCombobox').text();
     let exchange = $('#tsExchangeCombobox').text();
@@ -284,7 +295,7 @@ function fillExecResInTable(trades, index) {
 
 function checkMaxLossReached(index) {
   let execution = executedStrategies[index];
-  if (execution.maxLoss === null || executedStrategies[index].status === 'stopped') {
+  if (execution.maxLoss === null || executedStrategies[index].status !== 'running') {
     return;
   }
 
@@ -295,7 +306,7 @@ function checkMaxLossReached(index) {
   let totalGainLoss = execution.positionSize * (result / 100);
   if (totalGainLoss <= execution.maxLoss) {
     stopStrategyExecution(index);
-    openModalInfo('Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' has reached the maximum loss.<br>The execution was stopped.');
+    openModalInfo('Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' on ' + execution.timeframe + ' has reached the maximum loss.<br>The execution was stopped.');
   }
 }
 
@@ -388,7 +399,6 @@ function runStrategy(index) {
       apiSecret = exchangesApiKeys[execution.exchange].secret;
     }
     if (executionWorkers[execution.id] !== undefined) {
-      openModalInfo(execution.id + ' HAS TRE');
       executionWorkers[execution.id].terminate();
       executionWorkers[execution.id] = undefined;
     }
@@ -405,6 +415,7 @@ function rmExecutionFromTable(index) {
     if (executionWorkers[index] !== undefined) {
       executionWorkers[index].terminate();
       executionWorkers[index] = undefined;
+      executedStrategies[index].status = 'removed';
     }
     $('#executionTableItem' + index).remove();
   });
