@@ -53,7 +53,7 @@ async function checkEulaAccepted() {
         try {
           storeEula({'accepted': true});
         } catch (err) {
-          openModalInfo("Cannot write in applicatin folder!<br>Please contact support@easycryptobot.com", function() {
+          openModalInfo("Cannot write in applicatin folder!<br>Please contact stefan@easycryptobot.com", function() {
             let w = remote.getCurrentWindow();
             w.close();
           });
@@ -64,7 +64,7 @@ async function checkEulaAccepted() {
       });
     }
   } catch (err) {
-    openModalInfo("Cannot run the application!<br>Please contact support@easycryptobot.com", function() {
+    openModalInfo("Cannot run the application!<br>Please contact stefan@easycryptobot.com", function() {
       let w = remote.getCurrentWindow();
       w.close();
     });
@@ -109,7 +109,7 @@ function copyDonationAddress(type) {
   }
 };
 function copyMail() {
-  clipboard.writeText('support@easycryptobot.com');
+  clipboard.writeText('stefan@easycryptobot.com');
   openModalInfo("Email address is copied to clipboard");
 }
 function facebookClick() {

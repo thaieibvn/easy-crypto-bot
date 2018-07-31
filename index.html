@@ -158,10 +158,12 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 	<!-- Footer -->
 	<footer id="footer" class="wrapper style1-alt">
 		<div class="inner">
-			<ul class="menu">
-				<li>&copy; All rights reserved.</li>
-				<!-- <li>Design: <a href="http://spread-trades-app.com">Spread Trades App</a></li>-->
-			</ul>
+			<div class="text-center">
+				<ul class="menu">
+					<li>&copy; Stefan Hristov</li>
+					<li><span class="one-click-select">stefan@easycryptobot.com</span>&nbsp;<a style="display:inline-block;" href="#/" title="copy" onclick="copyMail()"><i class="fas fa-copy"></i></a></li>
+				</ul>
+			</div>
 		</div>
 	</footer>
 
@@ -205,6 +207,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 		console.log('Teststststst');
 
 		let curVersion = '1.0.2';
+
 		function checkForUpdates() {
 			$.ajax({
 				type: 'get',
@@ -212,10 +215,10 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 				cache: false,
 				success: function(data) {
 					try {
-						if(typeof data === 'string' && data.startsWith('version')){
+						if (typeof data === 'string' && data.startsWith('version')) {
 							let version = data.split(':');
-							if(version[1].trim() !== curVersion) {
-									openModalInfo('An update is available!<br>You can download it at<br><span class="one-click-select">https://easycryptobot.com/update</span>');
+							if (version[1].trim() !== curVersion) {
+								openModalInfo('An update is available!<br>You can download it at<br><span class="one-click-select">https://easycryptobot.com/update</span>');
 							}
 						}
 					} catch (err) {
