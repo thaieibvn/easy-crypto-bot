@@ -451,9 +451,10 @@ async function runBacktest() {
           closePrices.push(closePrice);
           continue;
         }
-        $('#btRunPercent').html('Backtest Execution: ' + (
-        ((i - 100) / (ticks.length - 100)) * 100).toFixed(0) + '%');
-
+        if (i > 100) {
+          $('#btRunPercent').html('Backtest Execution: ' + (
+          ((i - 100) / (ticks.length - 100)) * 100).toFixed(0) + '%');
+        }
         let pricesToCheck = get1mData(curDate, timeframe, ticks1m, lastIndex1m);
         lastIndex1m = pricesToCheck[1];
         let priceToCheckIndex = 0;
@@ -541,9 +542,10 @@ async function runBacktest() {
           closePrices.push(closePrice);
           continue;
         }
-        $('#btRunPercent').html('Backtest Execution: ' + (
-        ((i - 100) / (ticks.length - 100)) * 100).toFixed(0) + '%');
-
+        if (i > 100) {
+          $('#btRunPercent').html('Backtest Execution: ' + (
+          ((i - 100) / (ticks.length - 100)) * 100).toFixed(0) + '%');
+        }
         let checkIndex = 2;
         let cancleSize = (highPrice - lowPrice) / lowPrice;
         if (cancleSize <= 0.001) {
