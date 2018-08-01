@@ -1082,6 +1082,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
       type: 'scatter',
       name: 'Opened Trades',
       data: openTrades,
+      yAxis: 0,
       marker: {
         enabled: true,
         symbol: 'triangle',
@@ -1096,6 +1097,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
       type: 'scatter',
       name: 'Closed Trades',
       data: closeTrades,
+      yAxis: 0,
       marker: {
         enabled: true,
         symbol: 'triangle-down',
@@ -1124,6 +1126,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
         series.push({
           name: indicator.type + ' ' + indicator.period,
           type: 'spline',
+          yAxis: 0,
           dataGrouping: {
             enabled: false
           },
