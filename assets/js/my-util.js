@@ -1,16 +1,97 @@
 const Datastore = require('nedb');
 const shell = require('electron').shell;
-const {app, clipboard, remote} = require('electron');
+const {app, BrowserWindow, clipboard, remote} = require('electron');
 const Highcharts = require('highcharts/highstock');
 //require('highcharts/indicators/indicators')(Highcharts);
 //require('highcharts/indicators/ema')(Highcharts);
 //require('highcharts/indicators/rsi')(Highcharts);
-
+var fs = require('original-fs');
+//const fs = require('fs');
+const {ipcRenderer} = require("electron");
 
 var eulaDb = new Datastore({
   filename: getAppDataFolder() + '/db/eula.db',
   autoload: true
 });
+
+let confirmOkFunc = null;
+let confirmCalcelFunc = null;
+let modalInfoFunc = null;
+
+function openModalAccept(msg, okFunc, calcelFunc) {
+  $('#modalConfirm').removeClass('modal-big');
+  $('#modalConfirm').addClass('modal-small');
+  $('#modalConfirmOk').html('Accept');
+  openModalConfirmImpl(msg, okFunc, calcelFunc);
+}
+
+function openModalAcceptBig(msg, okFunc, calcelFunc) {
+  $('#modalConfirm').removeClass('modal-small');
+  $('#modalConfirm').addClass('modal-big');
+  $('#modalConfirmOk').html('Accept');
+  openModalConfirmImpl(msg, okFunc, calcelFunc);
+}
+
+function openModalConfirmBig(msg, okFunc, calcelFunc) {
+  $('#modalConfirm').removeClass('modal-small');
+  $('#modalConfirm').addClass('modal-big');
+  $('#modalConfirmOk').html('OK');
+  openModalConfirmImpl(msg, okFunc, calcelFunc);
+}
+
+function openModalConfirm(msg, okFunc, calcelFunc) {
+  $('#modalConfirm').removeClass('modal-big');
+  $('#modalConfirm').addClass('modal-small');
+  $('#modalConfirmOk').html('OK');
+  openModalConfirmImpl(msg, okFunc, calcelFunc);
+}
+
+function openModalConfirmImpl(msg, okFunc, calcelFunc) {
+  $('#modalConfirm').css('display', 'flex');
+  $('#wrapper').css('opacity', '0.5');
+  $('#wrapper').css('pointer-events', 'none');
+  $('#sidebar').css('opacity', '0.5');
+  $('#sidebar').css('pointer-events', 'none');
+  $('#modalConfirm>div>div').html(msg);
+  $('#modalConfirm').focus();
+  if (typeof okFunc === 'function') {
+    confirmOkFunc = okFunc;
+  } else {
+    confirmOkFunc = null;
+  }
+  if (typeof calcelFunc === 'function') {
+    confirmCalcelFunc = calcelFunc;
+  } else {
+    confirmCalcelFunc = null;
+  }
+}
+
+function openModalInfo(msg, func) {
+  $('#modalInfo').removeClass('modal-big');
+  $('#modalInfo').addClass('modal-small');
+  openModalInfoImpl(msg, func);
+}
+
+function openModalInfoBig(msg, func) {
+  $('#modalInfo').removeClass('modal-small');
+  $('#modalInfo').addClass('modal-big');
+  openModalInfoImpl(msg, func);
+}
+
+function openModalInfoImpl(msg, func) {
+  $('#modalInfo').css('display', 'flex');
+  $('#wrapper').css('opacity', '0.5');
+  $('#wrapper').css('pointer-events', 'none');
+  $('#sidebar').css('opacity', '0.5');
+  $('#sidebar').css('pointer-events', 'none');
+  $('#modalInfo>div>div').html(msg);
+
+  if (typeof func === 'function') {
+    modalInfoFunc = func;
+  } else {
+    modalInfoFunc = null;
+  }
+}
 
 function getEula() {
   return new Promise((resolve, reject) => {
@@ -21,6 +102,89 @@ function getEula() {
         resolve(eula);
       }
     })
+  });
+}
+
+ipcRenderer.on("download complete", (event, file) => {
+  try {
+    const newSar = getAppDataFolder() + '/update/app.asar';
+    const oldSar = remote.app.getAppPath();
+    const source = fs.createReadStream(newSar);
+    const dest = fs.createWriteStream(oldSar, {
+      flags: 'w+',
+      mode: 0664
+    });
+    source.on('end', async function() {
+      await removeFile(newSar);
+      openModalInfo('Update was completed!<br>Please restart the app to get the new features!')
+    });
+    source.on('error', function(err) {
+      cannotUpdateInfo()
+    });
+    source.pipe(dest);
+  } catch (err) {
+    openModalInfo('Could not update. Error: ' + err);
+  }
+});
+
+function cannotUpdateInfo() {
+  const newSar = getAppDataFolder() + '/update/app.asar';
+  const oldSar = remote.app.getAppPath();
+  openModalInfoBig('Could not update. It seems that the app does not have permition to apply the update. In order to update you need to manually copy file "<span class="one-click-select">' + newSar + '</span>" and paste it here: "<span class="one-click-select">' + oldSar + '</span>".');
+}
+
+process.on('uncaughtException', function(error) {
+  if (error.message.indexOf('operation not permitted, open') !== -1) {
+    //We enter here when updating the app without permitions for the app folder.
+    cannotUpdateInfo();
+  } else {
+    openModalInfoBig('An unexpected error occurred. The app will close itself.<br>Please send the following error to me at stefan@easycryptobot.com so I can fix it.<br><br>' + error.message, function() {
+      remote.app.quit()
+    }, function() {
+      remote.app.quit()
+    });
+  }
+}).on('unhandledRejection', (reason, p) => {
+  openModalInfoBig('An unexpected error occurred. The app will close itself.<br>Please send the following error to me at stefan@easycryptobot.com so I can fix it.<br><br>' + reason + '<br>' + p, function() {
+    remote.app.quit()
+  }, function() {
+    remote.app.quit()
+  });
+});
+
+async function downloadUpdates() {
+  openModalInfo('Downloading an Update..')
+  const file = getAppDataFolder() + '/update/app.asar';
+  try {
+    await removeFile(file);
+  } catch (err) {}
+  ipcRenderer.send('download', {
+    url: 'https://easycryptobot.com/downloads/app.asar',
+    properties: {
+      directory: getAppDataFolder() + '/update'
+    }
+  });
+}
+
+async function checkForUpdates() {
+  let curVersion = remote.app.getVersion();
+  $.ajax({
+    type: 'get',
+    url: 'https://easycryptobot.com/version.html',
+    cache: false,
+    success: function(data) {
+      try {
+        if (typeof data === 'string' && data.startsWith('version')) {
+          let version = data.split(':');
+          if (version[1].trim() != curVersion) {
+            openModalConfirmImpl('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>Update now?', function() {
+              downloadUpdates()
+            });
+          }
+        }
+      } catch (err) {}
+    },
+    error: function() {}
   });
 }
 
@@ -54,25 +218,24 @@ async function checkEulaAccepted() {
           storeEula({'accepted': true});
         } catch (err) {
           openModalInfo("Cannot write in applicatin folder!<br>Please contact stefan@easycryptobot.com", function() {
-            let w = remote.getCurrentWindow();
-            w.close();
+            remote.app.quit()
           });
         }
       }, function() {
-        let w = remote.getCurrentWindow();
-        w.close();
+        remote.app.quit()
       });
+    } else {
+      setTimeout(() => checkForUpdates(), 600);
     }
   } catch (err) {
     openModalInfo("Cannot run the application!<br>Please contact stefan@easycryptobot.com", function() {
-      let w = remote.getCurrentWindow();
-      w.close();
+      remote.app.quit()
     });
   }
 }
 
 async function removeTmpFiles() {
-  const fs = require('fs');
+
   const path = require('path');
   const directory = getAppDataFolder() + '/db/tmp';
   fs.readdir(directory, (err, files) => {
@@ -86,8 +249,11 @@ async function removeTmpFiles() {
 }
 
 async function removeDbFile(name) {
-  const fs = require('fs');
   const file = getAppDataFolder() + '/db/tmp/' + name;
+  return removeFile(file);
+}
+
+async function removeFile(file) {
   return new Promise((resolve, reject) => {
     fs.unlink(file, err => {
       if (err) {
@@ -124,7 +290,7 @@ function dropDownItem(name, id, func) {
   $(id + '>div>a').toggleClass('expanded');
   $(id + '>div>ul').slideToggle('fast');
   $(id + '>div>a>.name').html(name);
-  if (func !== "") {
+  if (typeof func === 'function') {
     func();
   }
 }

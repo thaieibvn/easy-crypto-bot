@@ -276,7 +276,7 @@ function newRule(id, type, direction) {
   } else if (type === "rsi") {
     addNewRsiRule(id, direction);
   } else {
-    indicatorCommingSoon(buyRuleType)
+    indicatorCommingSoon(type)
   }
 }
 
@@ -440,7 +440,6 @@ async function loadStrategies() {
 
 async function fillDefaultStrategies() {
   try {
-    const fs = require('fs');
     const target = getAppDataFolder() + '/db/strategy.db';
     fs.exists(target, async function(targetExists) {
       if (!targetExists) {

@@ -5,7 +5,6 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 <html>
 
 <head>
-	<title>EasyCryptoBot</title>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<script src="assets/js/my-util.js"></script>
@@ -197,87 +196,10 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 	<script src="assets/js/backtest.js"></script>
 	<script src="assets/js/trade.js"></script>
 	<script>
-		//require('./assets/js/menu')
-		//require('./assets/js/db')
-		//require('./assets/js/binance')
 		fillDefaultStrategies();
 		checkEulaAccepted();
 		//removeTmpFiles();
 		enablePowerSaveBlocker();
-		console.log('Teststststst');
-
-		let curVersion = '1.0.2';
-
-		function checkForUpdates() {
-			$.ajax({
-				type: 'get',
-				url: 'https://easycryptobot.com/version.html',
-				cache: false,
-				success: function(data) {
-					try {
-						if (typeof data === 'string' && data.startsWith('version')) {
-							let version = data.split(':');
-							if (version[1].trim() !== curVersion) {
-								openModalInfo('An update is available!<br>You can download it at<br><span class="one-click-select">https://easycryptobot.com/update</span>');
-							}
-						}
-					} catch (err) {
-						openModalInfo(err);
-					}
-				},
-				error: function() {
-					openModalInfo('ERR');
-				}
-			});
-		}
-		checkForUpdates()
-
-		let confirmOkFunc = null;
-		let confirmCalcelFunc = null;
-
-		function openModalAccept(msg, okFunc, calcelFunc) {
-			$('#modalConfirm').removeClass('modal-big');
-			$('#modalConfirm').addClass('modal-small');
-			$('#modalConfirmOk').html('Accept');
-			openModalConfirmImpl(msg, okFunc, calcelFunc);
-		}
-
-		function openModalAcceptBig(msg, okFunc, calcelFunc) {
-			$('#modalConfirm').removeClass('modal-small');
-			$('#modalConfirm').addClass('modal-big');
-			$('#modalConfirmOk').html('Accept');
-			openModalConfirmImpl(msg, okFunc, calcelFunc);
-		}
-
-		function openModalConfirmBig(msg, okFunc, calcelFunc) {
-			$('#modalConfirm').removeClass('modal-small');
-			$('#modalConfirm').addClass('modal-big');
-			$('#modalConfirmOk').html('OK');
-			openModalConfirmImpl(msg, okFunc, calcelFunc);
-		}
-
-		function openModalConfirm(msg, okFunc, calcelFunc) {
-			$('#modalConfirm').removeClass('modal-big');
-			$('#modalConfirm').addClass('modal-small');
-			$('#modalConfirmOk').html('OK');
-			openModalConfirmImpl(msg, okFunc, calcelFunc);
-		}
-
-		function openModalConfirmImpl(msg, okFunc, calcelFunc) {
-			$('#modalConfirm').css('display', 'flex');
-			$('#wrapper').css('opacity', '0.5');
-			$('#wrapper').css('pointer-events', 'none');
-			$('#sidebar').css('opacity', '0.5');
-			$('#sidebar').css('pointer-events', 'none');
-			$('#modalConfirm>div>div').html(msg);
-			$('#modalConfirm').focus();
-			if (okFunc !== undefined) {
-				confirmOkFunc = okFunc;
-			}
-			if (calcelFunc !== undefined) {
-				confirmCalcelFunc = calcelFunc;
-			}
-		}
 
 		$('#modalConfirmOk').click(function(e) {
 			e.preventDefault();
@@ -305,27 +227,6 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 			}
 		});
 
-		function openModalInfo(msg) {
-			$('#modalInfo').removeClass('modal-big');
-			$('#modalInfo').addClass('modal-small');
-			openModalInfoImpl(msg);
-		}
-
-		function openModalInfoBig(msg) {
-			$('#modalInfo').removeClass('modal-small');
-			$('#modalInfo').addClass('modal-big');
-			openModalInfoImpl(msg);
-		}
-
-		function openModalInfoImpl(msg) {
-			$('#modalInfo').css('display', 'flex');
-			$('#wrapper').css('opacity', '0.5');
-			$('#wrapper').css('pointer-events', 'none');
-			$('#sidebar').css('opacity', '0.5');
-			$('#sidebar').css('pointer-events', 'none');
-			$('#modalInfo>div>div').html(msg);
-		}
-
 		$('#modalInfoOk').click(function(e) {
 			e.preventDefault();
 			$('#modalInfo').css('display', 'none');
@@ -333,6 +234,10 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 			$('#wrapper').css('pointer-events', 'auto');
 			$('#sidebar').css('opacity', '1');
 			$('#sidebar').css('pointer-events', 'auto');
+			if (modalInfoFunc !== null) {
+				modalInfoFunc();
+				modalInfoFunc = null;
+			}
 		});
 	</script>
 </body>

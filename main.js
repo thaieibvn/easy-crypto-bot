@@ -1,5 +1,6 @@
 // Modules to control application life and create native browser window
-const {app, BrowserWindow} = require('electron')
+const {app, BrowserWindow, ipcMain} = require('electron')
+const {download} = require("electron-dl");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -12,7 +13,8 @@ function createWindow() {
     height: 830,
     minWidth: 750,
     minHeight: 300,
-	icon: "./assets/icons/icon.png",
+    title: "EasyCryptoBot v" + app.getVersion(),
+    icon: "./assets/icons/icon.png",
     webPreferences: {
       nodeIntegrationInWorker: true
     }
@@ -32,6 +34,11 @@ function createWindow() {
     // when you should delete the corresponding element.
     mainWindow = null
   })
+
+  ipcMain.on("download", (event, info) => {
+    download(BrowserWindow.getFocusedWindow(), info.url, info.properties).then(dl => mainWindow.webContents.send("download complete", dl.getSavePath()));
+  });
+
 }
 
 // This method will be called when Electron has finished
