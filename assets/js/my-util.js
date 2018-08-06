@@ -180,7 +180,7 @@ async function checkForUpdates() {
           if (latestVersion != curVersion) {
             let latestSplited = latestVersion.split('.');
             let curSplited = curVersion.split('.');
-            if (latestSplited[0] !== curSplited[0] || latestSplited[1] !== curSplited[1]) {
+            if (latestSplited[0] !== curSplited[0]) {
               openModalInfo('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>No automatic update is available for this version, so in order to update, you need to download again the app from <span class="one-click-select">https://easycryptobot.com/</span>. After the download you can extract the app at a new location and start it from there.')
             } else {
               openModalConfirmImpl('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>Update now?', function() {
