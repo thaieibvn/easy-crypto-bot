@@ -6,8 +6,6 @@ async function btFillBinanceInstruments() {
 
 async function btInstrumentKeyup() {
   try {
-    lastEndDateBacktest = null;
-    lastEndDateBacktestFull = null;
     let search = $('#btInstrumentSearch').val().toLowerCase();
     $('#btInstrumentList>ul').html('');
     let instruments = null;
@@ -313,8 +311,6 @@ function get1mData(startTime, timeframe, ticks1m, lastIndex) {
   }
   return [result, lastIndex];
 }
-let lastEndDateBacktest = null;
-let lastEndDateBacktestFull = null;
 
 async function runBacktest() {
   let feeRate = 0.1;
@@ -359,18 +355,7 @@ async function runBacktest() {
     openModalInfo('Start Date must be before End Date!');
     return;
   }
-  endDate.setHours(0, 0, 0, 0);
-  let now = new Date();
-  now.setHours(now.getHours() - 1);
-  if (lastEndDateBacktest !== null && lastEndDateBacktestFull !== null && lastEndDateBacktest.getTime() == endDate.getTime() && now <= lastEndDateBacktestFull) {
-    endDate.setHours(lastEndDateBacktestFull.getHours(), lastEndDateBacktestFull.getMinutes(), lastEndDateBacktestFull.getSeconds(), lastEndDateBacktestFull.getMilliseconds());
-  } else {
-    lastEndDateBacktest = new Date(endDate.getTime());
-    now = new Date();
-    endDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
-    lastEndDateBacktestFull = new Date(endDate.getTime());
-  }
-
+  endDate.setHours(23, 59, 59, 59);
   let endDateTmp = new Date(endDate.getTime());
   endDateTmp.setMonth(endDate.getMonth() - 3);
   endDateTmp.setDate(endDateTmp.getDate() - 1);

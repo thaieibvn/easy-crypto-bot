@@ -202,13 +202,17 @@ function setBinanceCache(instrument, timeframe, startTime, endTime, data) {
     'timeframe': timeframe,
     'startTime': startTime,
     'endTime': endTime,
-    'data': data
+    'data': data,
+    'time': new Date()
   }
 }
 
 async function getBinanceTicks(instrument, timeframe, startTime, endTime) {
   for (let cache of binanceCache) {
-    if (cache !== null && cache.instrument === instrument && cache.timeframe === timeframe && cache.startTime.getTime() === startTime.getTime() && cache.endTime.getTime() === endTime.getTime()) {
+    let now = new Date();
+    now.setMinutes(now.getMinutes() - 30);
+    if (cache !== null && cache.instrument === instrument && cache.timeframe === timeframe &&
+      cache.startTime.getTime() === startTime.getTime() && cache.endTime.getTime() === endTime.getTime() && now <= cache.time) {
       return cache.data;
     }
   }
