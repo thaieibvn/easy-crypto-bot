@@ -52,19 +52,14 @@ var binanceCache = [
   null,
   null
 ];
-function getBinanceTicksDb(instrument, timeframe, startTime, endTime) {
+function getBinanceTicksDb(instrument, timeframe) {
   let dbFilename = getDbFileName('binance', instrument, timeframe);
   let cachedDataDb = new Datastore({
     filename: getAppDataFolder() + '/db/tmp/' + dbFilename,
     autoload: true
   });
   return new Promise((resolve, reject) => {
-    cachedDataDb.find({
-      d: {
-        $gte: startTime,
-        $lte: endTime
-      }
-    }).sort({d: 1}).exec((error, data) => {
+    cachedDataDb.find({}).sort({d: 1}).exec((error, data) => {
       if (error) {
         reject(error);
       } else {
@@ -223,26 +218,22 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime) {
   } catch (err) {}
   let leftSite = false;
   let rightSite = false;
+
   let noData = result === null || result.length === 0;
   if (!noData) {
     leftSite = result[0].d > startTime;
     let endTimeTmp = getDateWithoutLastTick(timeframe, endTime);
     rightSite = result[result.length - 1].d < endTimeTmp;
-  } else {
-    //To ensure no gaps are made when adding new data
-    removeDbFile(getDbFileName('binance', instrument, timeframe));
   }
-  if (!noData && !leftSite && !rightSite) {
-    setBinanceCache(instrument, timeframe, startTime, endTime, result);
-    return result;
-  }
-
-  let ticks = [];
+  let popped = null;
   try {
     if (noData) {
       let data = await downloadBinanceTicks(instrument, timeframe, startTime, endTime);
       if (data !== null && data.length > 0) {
+        //TO prevent storing unfinished candle in DB
+        let lastValue = data.pop();
         await storeBinanceTicks(instrument, timeframe, data);
+        data.push(lastValue);
         setBinanceCache(instrument, timeframe, startTime, endTime, data);
         return data;
       } else {
@@ -253,29 +244,38 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime) {
         let ticksLeft = await downloadBinanceTicks(instrument, timeframe, startTime, result[0].d);
         if (ticksLeft !== null && ticksLeft.length > 0) {
           await storeBinanceTicks(instrument, timeframe, ticksLeft);
-          //ticksLeft.push.apply(result);
-          //result = ticksLeft;
         }
-        //ticks.push.apply(ticksLeft, nextData)
       }
       if (rightSite) {
-
         let tmpDate = getDateWithTickMore(timeframe, result[result.length - 1].d);
-        tmpDate.setSeconds(30);
         let ticksRight = await downloadBinanceTicks(instrument, timeframe, tmpDate, endTime);
         if (ticksRight !== null && ticksRight.length > 0) {
+          //remove
+          popped = ticksRight.pop();
           await storeBinanceTicks(instrument, timeframe, ticksRight);
-          //result.push.apply(ticksRight);
         }
       }
     }
-    let data = await getBinanceTicksDb(instrument, timeframe, startTime, endTime);
-    setBinanceCache(instrument, timeframe, startTime, endTime, data);
-    return data
+
   } catch (err) {
     //alert(err)
     return null;
   }
+  if (noData || leftSite || rightSite) {
+    result = await getBinanceTicksDb(instrument, timeframe, startTime, endTime);
+  }
+  let filteredResult = [];
+  for (let item of result) {
+    if (item.d >= startTime && item.d <= endTime)
+      filteredResult.push(item)
+  }
+  if (popped !== null) {
+    filteredResult.push(popped);
+  }
+
+  setBinanceCache(instrument, timeframe, startTime, endTime, filteredResult);
+  return filteredResult;
+
 }
 async function downloadBinanceTicks(instrument, timeframe, startTime, endTime) {
   $('#btRunPercent').html('Downloading ' + instrument + ' historical data from Binance. Please wait..');
