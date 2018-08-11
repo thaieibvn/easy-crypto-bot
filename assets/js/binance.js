@@ -235,6 +235,7 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime) {
       let data = await downloadBinanceTicks(instrument, timeframe, startTime, endTime);
       if (data !== null && data.length > 0) {
         //TO prevent storing unfinished candle in DB
+        await removeDbFile(getDbFileName('binance', instrument, timeframe));
         let lastValue = data.pop();
         await storeBinanceTicks(instrument, timeframe, data);
         data.push(lastValue);
