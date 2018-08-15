@@ -665,12 +665,13 @@ async function runBacktest() {
       }
     }
     //END
-
+    let lastTrade = null;
     if (trades.length > 0 && tradeType === 'sell') {
-      trades[trades.length - 1]['closeDate'] = ticks[ticks.length - 1].d
+      lastTrade = trades.pop();
+      /*trades[trades.length - 1]['closeDate'] = ticks[ticks.length - 1].d
       trades[trades.length - 1]['closeDateOrg'] = ticks[ticks.length - 1].d
       trades[trades.length - 1]['exit'] = ticks[ticks.length - 1].c;
-      trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+      trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;*/
     }
 
     let totalReturn = 0;
@@ -736,12 +737,15 @@ async function runBacktest() {
       $('#btStrategiesTable').append('<tr><td>' + count + '&nbsp;<i class="' + classes + '"></td><td>' + formatDateFull(trade.openDate) + '</td><td>' + formatDateFull(trade.closeDate) + '</td><td>' + trade.entry.toFixed(8) + '</td><td>' + trade.exit.toFixed(8) + '</td><td class="' + resultClass + '">' + trade.result.toFixed(2) + '%</td></tr>');
       count++;
     }
+    if (lastTrade !== null) {
+      $('#btStrategiesTable').append('<tr><td>' + count + '&nbsp;<i class="fas fa-question"></td><td>' + formatDateFull(lastTrade.openDate) + '</td><td>Not closed yet</td><td>' + lastTrade.entry.toFixed(8) + '</td><td></td><td></td></tr>');
+    }
     if (executedTrades > 0) {
       avgGainLossPerTrade = totalReturn / executedTrades;
       winningPercent = (winnignCount / executedTrades) * 100;
       loosingPercent = (loosingCount / executedTrades) * 100;
       resultWithUSD = 1000 * (1 + totalReturn / 100);
-      drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframe, 'btResultsChart');
+      drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframe, 'btResultsChart', lastTrade);
     }
     if (loosingCount > 0) {
       winLossRatio = winnignCount / loosingCount;
@@ -761,9 +765,19 @@ async function runBacktest() {
         maxDrawdown = drawdowns[i];
       }
     }
+
+    let marketReturn = 0;
+    for (let tick of ticks) {
+      if (tick.d >= startDate) {
+        marketReturn = ((ticks[ticks.length - 1].c - tick.o) / tick.o) * 100;
+        break;
+      }
+    }
+
     $('#btMaxDrawdown').html(maxDrawdown.toFixed(2) + '%');
+    $('#btMarketReturn').html(marketReturn.toFixed(2) + '%');
     $('#btTotalReturn').html(totalReturn.toFixed(2) + '%');
-    $('#btWinLoss').html(winLossRatio.toFixed(2));
+    //$('#btWinLoss').html(winLossRatio.toFixed(2));
     $('#btAvgWinLossPerTrade').html(avgGainLossPerTrade.toFixed(2) + '%');
     $('#btResultWithUsd').html(resultWithUSD.toFixed(2) + '$');
     $('#btExecutedTrades').html(executedTrades);
@@ -791,7 +805,7 @@ async function runBacktest() {
     if (executedTrades > 0) {
       $('#btResult').show();
     } else {
-      drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframe, 'btResultsChartNoTrades');
+      drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframe, 'btResultsChartNoTrades', null);
       $('#btResult').hide();
       $('#btResultNoTrades').show();
     }
@@ -804,7 +818,11 @@ async function runBacktest() {
 
 function containsIndicator(indicators, indicator) {
   for (let intTmp of indicators) {
-    if (intTmp.type === indicator.type && intTmp.period === indicator.period) {
+    if (indicator.type === 'macd') {
+      if (intTmp.type === indicator.type && intTmp.period === indicator.period && intTmp.period2 === indicator.period2 && intTmp.period3 === indicator.period3) {
+        return true;
+      }
+    } else if (intTmp.type === indicator.type && intTmp.period === indicator.period) {
       return true;
     }
   }
@@ -849,6 +867,16 @@ function getIndicatorsFromRules(indicators, rules) {
           data: []
         };
       }
+    } else if (rule.indicator === 'macd') {
+      indTmp = {
+        type: rule.indicator,
+        period: rule.period,
+        period2: rule.period2,
+        period3: rule.period3,
+        data: [],
+        data2: []
+      };
+
     }
     if (indTmp !== null && !containsIndicator(indicators, indTmp)) {
       indicators.push(indTmp)
@@ -982,7 +1010,7 @@ function getBtChartButtons(timeframe) {
   }
 
 }
-function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframe, container) {
+function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframe, container, lastTrade) {
   try {
     let indicators = [];
     getIndicatorsFromRules(indicators, strategy.buyRules);
@@ -1011,6 +1039,13 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
           value = calculateEMA(indicator.period, closePrices, tick.c)
         } else if (indicator.type === 'rsi') {
           value = calculateRsi(indicator.period, closePrices, tick.c)
+        } else if (indicator.type === 'macd') {
+          value = calculateMacd(indicator.period, indicator.period2, indicator.period3, closePrices, tick.c)
+          if (value !== null && value[2] !== null && value[2].length > 0) {
+            indicator.data2.push([
+              tick.d.getTime(), value[2][value[2].length - 1]
+            ]);
+          }
         }
         if (value !== null && value[0] !== null) {
           indicator.data.push([
@@ -1037,6 +1072,13 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
         title: 'Close Trade ' + tradeCount + '<br>Date: ' + formatDateFull(trade.openDate) + '<br>Price: ' + trade.entry.toFixed(8) + '<br>Result: ' + trade.result.toFixed(2) + '%'
       });
       tradeCount++;
+    }
+    if (lastTrade !== null) {
+      openTrades.push({
+        x: lastTrade.openDateOrg.getTime(),
+        y: lastTrade.entry,
+        title: 'Open Trade ' + tradeCount + '<br>Date: ' + formatDateFull(lastTrade.openDate) + '<br>Price: ' + lastTrade.entry.toFixed(8)
+      });
     }
 
     let series = [];
@@ -1079,20 +1121,56 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
         enabled: false
       }
     });
-
+    let freeYaxis = 1;
+    let rsiYasxix = null;
+    let macdYasxix = null;
     let containsSecondAxisIndicators = false;
     for (let indicator of indicators) {
       if (indicator.type === 'rsi') {
+        if (rsiYasxix === null) {
+          rsiYasxix = freeYaxis;
+          freeYaxis++;
+        }
         containsSecondAxisIndicators = true;
         series.push({
           name: indicator.type + ' ' + indicator.period,
           type: 'spline',
-          yAxis: 1,
+          yAxis: rsiYasxix,
           dataGrouping: {
             enabled: false
           },
           data: indicator.data
         })
+      } else if (indicator.type === 'macd') {
+        containsSecondAxisIndicators = true;
+        let hasSignalLine = indicator.data2 !== undefined && indicator.data2.length > 0;
+        let period3 = hasSignalLine
+          ? ',' + indicator.period3
+          : '';
+        if (macdYasxix === null) {
+          macdYasxix = freeYaxis;
+          freeYaxis++;
+        }
+        series.push({
+          name: indicator.type + ' ' + indicator.period + ',' + indicator.period2 + period3,
+          type: 'spline',
+          yAxis: macdYasxix,
+          dataGrouping: {
+            enabled: false
+          },
+          data: indicator.data
+        })
+        if (hasSignalLine) {
+          series.push({
+            name: indicator.type + ' ' + indicator.period + ',' + indicator.period2 + period3 + ' Signal Line',
+            type: 'spline',
+            yAxis: macdYasxix,
+            dataGrouping: {
+              enabled: false
+            },
+            data: indicator.data2
+          })
+        }
       } else {
         series.push({
           name: indicator.type + ' ' + indicator.period,
@@ -1109,7 +1187,16 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
       ? [
         {
           crosshair: false,
-          height: '85%',
+          height: '80%',
+          startOnTick: false,
+          endOnTick: false,
+          resize: {
+            enabled: true
+          }
+        }, {
+          crosshair: false,
+          height: '19%',
+          top: '81%',
           startOnTick: false,
           endOnTick: false,
           resize: {

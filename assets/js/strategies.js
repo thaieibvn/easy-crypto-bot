@@ -86,8 +86,8 @@ function parseRules(rules) {
       if (indicator === 'sma' || indicator === 'ema') {
         ruleItem.period = period;
         ruleItem.direction = direction;
-        if (isNaN(period)) {
-          openModalInfo('Please fill all moving average fields!');
+        if (isNaN(period) || period < 1) {
+          openModalInfo('Please fill all moving average fields with correct values!');
           return null;
         }
 
@@ -103,8 +103,8 @@ function parseRules(rules) {
       } else if (indicator === 'cma') {
         ruleItem.period = period;
         ruleItem.period2 = period2;
-        if (isNaN(period) || isNaN(period2)) {
-          openModalInfo('Please fill all moving average fields!');
+        if (isNaN(period) || isNaN(period2) || period < 1 || period2 < 1) {
+          openModalInfo('Please fill all moving average fields with correct values!');
           return null;
         }
         ruleItem.type = $(rule).find('.ma-type').text();
@@ -114,12 +114,42 @@ function parseRules(rules) {
         ruleItem.period = period;
         ruleItem.direction = direction;
         ruleItem.value = value;
-        if (isNaN(period) || isNaN(value)) {
-          openModalInfo('Please fill all RSI fields!');
+        if (isNaN(period) || isNaN(value) || period < 1 || value < 0) {
+          openModalInfo('Please fill all RSI fields with correct values!');
           return null;
         }
         if (direction === 'crossing') {
           ruleItem.crossDirection = crossDirection;
+        }
+      } else if (indicator === 'macd') {
+        if (isNaN(period) || isNaN(period2) || period < 1 || period2 < 1) {
+          openModalInfo('Please fill all MACD fields with correct values!');
+          return null;
+        }
+        ruleItem.period = period;
+        ruleItem.period2 = period2;
+        if (period >= period2) {
+          openModalInfo('The fast period of MADC rules should be lower than the slow period!');
+          return null;
+        }
+        ruleItem.direction = direction;
+        if (direction === 'crossing') {
+          ruleItem.crossDirection = crossDirection;
+        } else {
+          ruleItem.value = value;
+          if (isNaN(value)) {
+            openModalInfo('Please fill all MACD fields with correct values!');
+            return null;
+          }
+        }
+        ruleItem.type = $(rule).find('.macd-line').text();
+        if (ruleItem.type === 'signal line') {
+          let period3 = Number.parseInt($(rule).find('.period3').val());
+          if (isNaN(period3) || period3 < 1) {
+            openModalInfo('Please fill all MACD fields with correct values!');
+            return null;
+          }
+          ruleItem.period3 = period3;
         }
       }
       parsedRules.push(ruleItem);
@@ -228,6 +258,13 @@ function addNewRsiRule(id, type) {
   $('#' + type + 'Rules>ul').append('<li class="' + type + '-rsi" id="' + id + '">' + '<span class="bold">Rule:</span> RSI with period <input class="period" type="number" value="14" /> is&nbsp;' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'bellow\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').hide()})">bellow</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show()})">crossing</a></li>' + '</ul>' + '</div>' + '<div class="inline">&nbsp;<input class="value" type="number" /></div>' + '<div id="' + id + 'C" class="inline" style="display:none;"> from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '</div>' + '&nbsp;<a title="Info" onclick="rsiInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
 }
 
+function addNewMacdRule(id, type) {
+  $('#' + type + 'Rules>ul').append('<li class="' + type + '-macd" id="' + id + '"><span class="bold">Rule:</span> MACD, using "fast" period <input class="period" type="number" value="12" /> and "slow" period <input class="period2" type="number" value="26"/>,&nbsp;is&nbsp;<div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li><li><a href="#/" onclick="dropDownItem(\'bellow\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">bellow</a></li><li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').hide();$(\'#' + id + 'C\').show()})">crossing</a></li></ul></div>&nbsp;<div id="' + id + 'Line" class="inline"><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'Line\')"><span class="name macd-line">signal line</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'signal line\', \'#' + id + 'Line\', function(){$(\'#' + id + 'SL\').show()})">signal line</a></li><li><a href="#/" onclick="dropDownItem(\'zero\', \'#' + id + 'Line\',function(){$(\'#' + id + 'SL\').hide()})">zero</a></li></ul></div></div><div id="' + id + 'SL" class="inline">&nbsp;with period <input class="period3" type="number" value="9"/> <div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="1" /> %</div></div><div id="' + id + 'C" class="inline" style="display:none;"> from <div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li><li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li></ul></div></div>&nbsp;<a title="Info" onclick="macdInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a></li>');
+}
+function macdInfo() {
+  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">MACD, short for Moving Average Convergence/Divergence, is a trend-following momentum indicator.The MACD is the difference between a \"fast\" (short period) exponential moving average (EMA), and a \"slow\" (longer period) EMA. An EMA of the MACD that is called \"signal line\" is plotted on top of the MACD.<br><br>Signal Line Crossovers<br>Signal line crossovers are the most common MACD signals. A BUY signal is when MACD turns up and crosses above the signal line.<br><br>Center Line Crossovers<br>Center line crossovers are the next most common MACD signals. A bullish signal is generated when when the MACD Line moves above the zero line to turn positive.</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/macd-info.png\" alt=\"\">");
+}
+
 function smaInfo() {
   openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">The moving averages provide an easy way to determine the trend. It is easy to gauge the general direction and see whether a pair is trending up, trending down, or just ranging. When price action tends to stay above the moving average, it signals that price is in a general UPTREN and vise versa.<br><br>" + "A Simple Moving Average is calculated by adding up the last X period's closing prices and then dividing that number by X." + "<br><br>If you have a SMA with period 10 using daily chart, you would add up the closing prices for the last 10 days, and then divide that number by 10." + "<br><br>You can read on various strategies that use SMA in internet.</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/sma-info.png\" alt=\"\">");
 }
@@ -273,8 +310,10 @@ function newRule(id, type, direction) {
     addNewEmaRule(id, direction);
   } else if (type === 'cma') {
     addNewCmaRule(id, direction);
-  } else if (type === "rsi") {
+  } else if (type === 'rsi') {
     addNewRsiRule(id, direction);
+  } else if (type === 'macd') {
+    addNewMacdRule(id, direction);
   } else {
     indicatorCommingSoon(type)
   }
@@ -358,6 +397,25 @@ async function editStrategy(name) {
           $(id + 'P').hide();
           $(id).find('.cross-direction').text(rule.crossDirection);
         }
+      } else if (rule.indicator === 'macd') {
+        $(id).find('.period').val(rule.period);
+        $(id).find('.period2').val(rule.period2);
+        $(id).find('.direction').text(rule.direction);
+        $(id).find('.macd-line').text(rule.type);
+
+        if (rule.type === 'signal line') {
+          $(id).find('.period3').val(rule.period3);
+        } else {
+          $(id + 'SL').hide();
+        }
+
+        if (rule.direction === 'crossing') {
+          $(id + 'C').show();
+          $(id + 'P').hide();
+          $(id).find('.cross-direction').text(rule.crossDirection);
+        } else {
+          $(id).find('.value').val(rule.value);
+        }
       }
     });
     buyRuleType = buyRuleTypeTmp;
@@ -391,6 +449,25 @@ async function editStrategy(name) {
           $(id + 'C').show();
           $(id + 'P').hide();
           $(id).find('.cross-direction').text(rule.crossDirection);
+        }
+      } else if (rule.indicator === 'macd') {
+        $(id).find('.period').val(rule.period);
+        $(id).find('.period2').val(rule.period2);
+        $(id).find('.direction').text(rule.direction);
+        $(id).find('.macd-line').text(rule.type);
+
+        if (rule.type === 'signal line') {
+          $(id).find('.period3').val(rule.period3);
+        } else {
+          $(id + 'SL').hide();
+        }
+
+        if (rule.direction === 'crossing') {
+          $(id + 'C').show();
+          $(id + 'P').hide();
+          $(id).find('.cross-direction').text(rule.crossDirection);
+        } else {
+          $(id).find('.value').val(rule.value);
         }
       }
     });
@@ -491,28 +568,7 @@ async function fillDefaultStrategies() {
           'stoploss': 2,
           'target': 6
         });
-        strategies.push({
-          'name': 'Example: RSI',
-          'buyRules': [
-            {
-              'indicator': 'rsi',
-              'period': 10,
-              'direction': 'crossing',
-              'value': 25,
-              'crossDirection': 'bottom to top'
-            }
-          ],
-          'sellRules': [
-            {
-              'indicator': 'rsi',
-              'period': 10,
-              'direction': 'above',
-              'value': 70
-            }
-          ],
-          'stoploss': 2,
-          'target': 6
-        });
+
         strategies.push({
           'name': 'Example: RSI + Crossing MAs',
           'buyRules': [
@@ -549,6 +605,32 @@ async function fillDefaultStrategies() {
           'target': 3
         });
 
+        strategies.push({
+          "name": "Example: 15m EOSETH",
+          "buyRules": [
+            {
+              "indicator": "sma",
+              "period": 30,
+              "direction": "bellow",
+              "value": 3
+            }, {
+              "indicator": "rsi",
+              "period": 10,
+              "direction": "above",
+              "value": 10
+            }
+          ],
+          "sellRules": [
+            {
+              "indicator": "sma",
+              "period": 30,
+              "direction": "above",
+              "value": 2
+            }
+          ],
+          "stoploss": 3,
+          "target": 10
+        });
         for (let strategyTmp of strategies) {
           await addStrategy(strategyTmp);
         }
