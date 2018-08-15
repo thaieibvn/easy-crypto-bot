@@ -279,6 +279,9 @@ function copyDonationAddress(type) {
   } else if (type === "eth") {
     clipboard.writeText('0x07580a3C92bb176e76719D6C3403DBB719359065');
     openModalInfo("Ethereum address is copied to clipboard");
+  } else if (type === "xmr") {
+    clipboard.writeText('472puZHEQRcCvt5MNtp7yg9awPWjywVQS9Vp4nSrBixgdBBQLEi4vZxUTGqUULDF7aWg2xaMcUr9yU2drx7PjDWn2fv65Dj');
+    openModalInfo("Monero address is copied to clipboard");
   }
 };
 function copyMail() {
