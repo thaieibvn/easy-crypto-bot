@@ -248,3 +248,7 @@ function calculateMacd(period, period2, period3, historicalData, lastPrice) {
     signal
   ];
 }
+
+module.exports = {
+  checkTradeRules: checkTradeRules
+}
