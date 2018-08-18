@@ -44,12 +44,6 @@ function removeStrategy(name) {
       if (error) {
         reject(error);
       } else {
-        if ($('#btStrategyCombobox').text() === name) {
-          $('#btStrategyCombobox').text('Choose Strategy');
-        }
-        if ($('#tsStrategyCombobox').text() === name) {
-          $('#tsStrategyCombobox').text('Choose Strategy');
-        }
         resolve(numDeleted);
       }
     })
@@ -520,6 +514,12 @@ function clearStrategyFields() {
 function rmStrategy(name) {
   openModalConfirm("Are you sure you want to remove " + name + " strategy?", function() {
     rmStrategy2(name);
+    if ($('#btStrategyCombobox').text() === name) {
+      $('#btStrategyCombobox').text('Choose Strategy');
+    }
+    if ($('#tsStrategyCombobox').text() === name) {
+      $('#tsStrategyCombobox').text('Choose Strategy');
+    }
   });
 }
 
