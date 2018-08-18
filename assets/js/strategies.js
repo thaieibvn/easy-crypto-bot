@@ -44,6 +44,12 @@ function removeStrategy(name) {
       if (error) {
         reject(error);
       } else {
+        if ($('#btStrategyCombobox').text() === name) {
+          $('#btStrategyCombobox').text('Choose Strategy');
+        }
+        if ($('#tsStrategyCombobox').text() === name) {
+          $('#tsStrategyCombobox').text('Choose Strategy');
+        }
         resolve(numDeleted);
       }
     })
@@ -63,7 +69,7 @@ function addStrategy(strategyToAdd) {
 }
 
 let orgStrategyName = null;
-
+let strategyDuplicated = false;
 function parseRules(rules) {
   try {
     let rulesTmp = [];
@@ -210,14 +216,23 @@ async function saveStrategy() {
         if ($('#btStrategyCombobox').text() === orgStrategyName) {
           $('#btStrategyCombobox').text(strategy.name);
         }
+        if ($('#tsStrategyCombobox').text() === orgStrategyName) {
+          $('#tsStrategyCombobox').text(strategy.name);
+        }
         overwriteStrategy(strategy, orgStrategyName);
       });
       return;
     }
     if (orgStrategyName !== null) {
-      await removeStrategy(orgStrategyName);
+
+      if (!strategyDuplicated) {
+        await removeStrategy(orgStrategyName);
+      }
       if ($('#btStrategyCombobox').text() === orgStrategyName) {
         $('#btStrategyCombobox').text(strategy.name);
+      }
+      if ($('#tsStrategyCombobox').text() === orgStrategyName) {
+        $('#tsStrategyCombobox').text(strategy.name);
       }
     }
 
@@ -232,7 +247,9 @@ async function saveStrategy() {
 }
 
 async function overwriteStrategy(strategy, name) {
-  await removeStrategy(strategy.name);
+  if (!strategyDuplicated) {
+    await removeStrategy(strategy.name);
+  }
   if (name !== undefined) {
     await removeStrategy(name);
   }
@@ -338,7 +355,9 @@ function closeNewStrategy() {
 
 function newStrategy() {
   orgStrategyName = null;
+  strategyDuplicated = false;
   clearStrategyFields();
+  $('#duplicateStrategyBtn').hide();
   $('#newStrategyLabel').html('Create New Strategy');
   $('#newStrategyWindow').fadeIn();
   $('#strategiesBody').css('opacity', '0.5');
@@ -348,10 +367,18 @@ function newStrategy() {
   $('body').css('overflow', 'hidden');
 };
 
+function duplicateStrategy() {
+  $('#newStrategyLabel').html('Duplicate Strategy');
+  $('#strategyName').val($('#strategyName').val()+ ' (1)');
+  strategyDuplicated = true;
+}
+
 async function editStrategy(name) {
   orgStrategyName = name;
+  strategyDuplicated = false;
   clearStrategyFields();
   $('#newStrategyLabel').html('Edit Strategy');
+  $('#duplicateStrategyBtn').css('display', 'inline-block');
   try {
     const strategy = await getStrategyByName(name);
     $('#newStrategyWindow').fadeIn();

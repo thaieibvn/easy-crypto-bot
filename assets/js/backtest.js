@@ -410,6 +410,8 @@ async function runBacktest() {
     let target = Number.MAX_VALUE;
     let closePrices = [];
 
+    let buySpread = 1.025;
+    let sellSpread = 0.975;
     if (timeframe !== '1 minute') {
       let lastIndex1m = 0;
       for (let i = 0; i < ticks.length; i++) {
@@ -439,9 +441,9 @@ async function runBacktest() {
             if (trades.length > 0 && curDate.getTime() === trades[trades.length - 1].closeDateOrg.getTime()) {
               break;
             }
-            let priceToCkeck = priceToCkeckData[1] > priceToCkeckData[2]
+            let priceToCkeck = priceToCkeckData[1] * buySpread > priceToCkeckData[2]
               ? priceToCkeckData[2]
-              : priceToCkeckData[1];
+              : priceToCkeckData[1] * buySpread;
             if (checkTradeRules(strategy.buyRules, closePrices, priceToCkeck)) {
               let trade = {
                 'openDate': date,
@@ -483,9 +485,9 @@ async function runBacktest() {
             if (strategy.sellRules.length === 0) {
               continue;
             }
-            let priceToCkeck = priceToCkeckData[1] < priceToCkeckData[3]
+            let priceToCkeck = priceToCkeckData[1] * sellSpread < priceToCkeckData[3]
               ? priceToCkeckData[3]
-              : priceToCkeckData[1];
+              : priceToCkeckData[1] * sellSpread;
             if (checkTradeRules(strategy.sellRules, closePrices, priceToCkeck)) {
               trades[trades.length - 1]['closeDate'] = date;
               trades[trades.length - 1]['closeDateOrg'] = curDate;
@@ -605,9 +607,9 @@ async function runBacktest() {
             if (trades.length > 0 && date.getTime() === trades[trades.length - 1].closeDateOrg.getTime()) {
               break;
             }
-            priceToCkeck = priceToCkeck > highPrice
+            priceToCkeck = priceToCkeck * buySpread > highPrice
               ? highPrice
-              : priceToCkeck;
+              : priceToCkeck * buySpread;
             if (checkTradeRules(strategy.buyRules, closePrices, priceToCkeck)) {
               let trade = {
                 'openDate': date,
@@ -649,9 +651,9 @@ async function runBacktest() {
             if (strategy.sellRules.length === 0) {
               continue;
             }
-            priceToCkeck = priceToCkeck < lowPrice
+            priceToCkeck = priceToCkeck * sellSpread < lowPrice
               ? lowPrice
-              : priceToCkeck;
+              : priceToCkeck * sellSpread;
             if (checkTradeRules(strategy.sellRules, closePrices, priceToCkeck)) {
               trades[trades.length - 1]['closeDate'] = date;
               trades[trades.length - 1]['closeDateOrg'] = date;
