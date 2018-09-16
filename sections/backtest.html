@@ -58,9 +58,6 @@
         </div>
         <br>
         <span class="inline-block min-width5">Period from:&nbsp;</span><input id="btFromDate" type="date" />&nbsp;&nbsp;to:&nbsp;&nbsp;<input id="btToDate" type="date" />
-        <div class="text-center ">
-
-        </div>
       </div>
     </div>
 
@@ -75,6 +72,10 @@
         <div id="btRunPercent2" class="text-center" style="margin-top:1em;">  </div>
         <div id="btRunRocket" class="text-center" style="margin-top:1em;">
           <img class="rocket-big" src="./assets/images/rocket.gif" alt="..">
+        </div>
+        <div id="btCancelDiv" class="text-center">
+          <br>
+          <a id="btCancelBtn" href="#/" onclick="btCancel()" class="button button-big margin-s-b30"><i class="text-red fas fa-stop"></i> Cancel</a>
         </div>
       </div>
       <div id="btResultNoTrades" class="display-none">
@@ -127,6 +128,7 @@
         <div class="table-wrapper">
           <table id="btStrategiesTable">
           </table>
+          <div id="btStrategiesTableNav" style="overflow-x: auto; white-space: nowrap;"></div>
         </div>
       </div>
     </div>

@@ -213,6 +213,9 @@ async function saveStrategy() {
         if ($('#tsStrategyCombobox').text() === orgStrategyName) {
           $('#tsStrategyCombobox').text(strategy.name);
         }
+        if ($('#opStrategyCombobox').text() === orgStrategyName) {
+          $('#opStrategyCombobox').text(strategy.name);
+        }
         overwriteStrategy(strategy, orgStrategyName);
       });
       return;
@@ -227,6 +230,9 @@ async function saveStrategy() {
       }
       if ($('#tsStrategyCombobox').text() === orgStrategyName) {
         $('#tsStrategyCombobox').text(strategy.name);
+      }
+      if ($('#opStrategyCombobox').text() === orgStrategyName) {
+        $('#opStrategyCombobox').text(strategy.name);
       }
     }
 
@@ -363,18 +369,21 @@ function newStrategy() {
 
 function duplicateStrategy() {
   $('#newStrategyLabel').html('Duplicate Strategy');
-  $('#strategyName').val($('#strategyName').val()+ ' (1)');
+  $('#strategyName').val($('#strategyName').val() + ' (1)');
   strategyDuplicated = true;
 }
 
-async function editStrategy(name) {
-  orgStrategyName = name;
+function openStrategyVariationStrategy(strategy) {
+  orgStrategyName = null;
   strategyDuplicated = false;
-  clearStrategyFields();
-  $('#newStrategyLabel').html('Edit Strategy');
-  $('#duplicateStrategyBtn').css('display', 'inline-block');
+  $('#newStrategyLabel').html('Save Strategy Variation');
+  $('#duplicateStrategyBtn').hide();
+  openStrategy(strategy)
+}
+
+function openStrategy(strategy) {
   try {
-    const strategy = await getStrategyByName(name);
+    clearStrategyFields();
     $('#newStrategyWindow').fadeIn();
     $('#btBody').css('opacity', '0.5');
     $('#btBody').css('pointer-events', 'none');
@@ -497,6 +506,15 @@ async function editStrategy(name) {
   } catch (err) {}
 }
 
+async function editStrategy(name) {
+  orgStrategyName = name;
+  strategyDuplicated = false;
+  $('#newStrategyLabel').html('Edit Strategy');
+  $('#duplicateStrategyBtn').css('display', 'inline-block');
+  const strategy = await getStrategyByName(name);
+  openStrategy(strategy);
+}
+
 function clearStrategyFields() {
   $('#strategyName').val("");
   ruleCount = 1;
@@ -519,6 +537,9 @@ function rmStrategy(name) {
     }
     if ($('#tsStrategyCombobox').text() === name) {
       $('#tsStrategyCombobox').text('Choose Strategy');
+    }
+    if ($('#opStrategyCombobox').text() === name) {
+      $('#opStrategyCombobox').text('Choose Strategy');
     }
   });
 }

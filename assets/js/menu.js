@@ -30,9 +30,10 @@ window.navigation = window.navigation || {},
                 const sectionId = event.target.dataset.section
                 $('#' + sectionId).show()
                 $('#' + sectionId + ' section').show()
-                if(sectionId==="backtest" || sectionId==="trade") {
+                if(sectionId==="backtest" || sectionId==="trade"|| sectionId==="optimize") {
                   loadStrategiesBt();
                   fillBtTestPeriod();
+                  fillOpTestPeriod();
                 }
 
             },

@@ -164,6 +164,16 @@ let executionWorkers = {};
 
 const executionMutex = new Mutex();
 const maxExecutions = 10;
+function hasTradingStrategies() {
+  let has = false;
+  for (let execution of executedStrategies) {
+    if (execution.status === 'running') {
+      has = true;
+      break;
+    }
+  }
+  return has;
+}
 async function executeStrategy() {
   try {
     await executionMutex.lock();
@@ -441,7 +451,7 @@ function stopStrategyExecution(index) {
 
 function showExecutionResult(index) {
   let execution = executedStrategies[index];
-  $('#executionStrategiesTable').html('<tr><td class="text-left">Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr>');
+  $('#executionStrategiesTable').html('<thead><tr><td class="text-left">Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead>');
 
   if (execution.type === 'Alerts') {
     $('#executionDetailsLabel').html('Alerts');
@@ -450,7 +460,7 @@ function showExecutionResult(index) {
     $('#executionTableLabel').hide();
     $('#executionPosSizeResDiv').hide();
     $('#executionMaxLossResDiv').hide();
-    $('#executionStrategiesTable').html('<tr><td class="text-left">Direction</td><td>Date</td><td>Entry Price</td></tr>');
+    $('#executionStrategiesTable').html('<thead><tr><td class="text-left">Direction</td><td>Date</td><td>Entry Price</td></tr></thead>');
     for (let trade of execution.trades) {
       let classColor = trade.type === 'Buy'
         ? 'text-green'

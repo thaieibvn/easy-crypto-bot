@@ -1516,8 +1516,7 @@ input[type="radio"]+label:before {
 .image {
   border: 0;
   display: inline-block;
-  position: relative
-  padding: 0.1em;
+  position: relative padding: 0.1em;
   border-radius: 100%;
   border: solid 1px;
   border-color: #8cc6f7;
@@ -1525,7 +1524,7 @@ input[type="radio"]+label:before {
 }
 
 .image img {
-border-radius: 100%;
+  border-radius: 100%;
   display: block
 }
 
@@ -1952,23 +1951,23 @@ table {
   width: 100%
 }
 
-table tbody tr {
+table tr {
   border: solid 1px rgba(255, 255, 255, 0.15);
   border-left: 0;
   border-right: 0
 }
 
-.modal table tbody tr {
+.modal table tr {
   border: solid 1px rgba(17, 112, 196, 0.15);
   border-left: 0;
   border-right: 0
 }
 
-.modal table tbody tr:nth-child(2n+1) {
+.modal table tr:nth-child(2n), .modal table thead tr {
   background-color: rgba(17, 112, 196, 0.05);
 }
 
-table tbody tr:nth-child(2n+1) {
+table tr:nth-child(2n), table thead tr {
   background-color: rgba(255, 255, 255, 0.05)
 }
 
@@ -1977,11 +1976,8 @@ table td, {
 }
 
 table th {
-  color: #fff;
-  font-size: 1em;
-  font-weight: bold;
-  padding: 0 0.75em 0.75em 0.75em;
-  text-align: left
+  text-align: left;
+  padding: 0.75em 0.75em
 }
 
 table thead {
@@ -2769,7 +2765,7 @@ input[type="number"] {
   text-align: center
 }
 
-#btInstrumentSearch, #tsInstrumentSearch, #tsPosSize, #tsMaxLoss {
+#btInstrumentSearch, #tsInstrumentSearch, #tsPosSize, #tsMaxLoss, #opInstrumentSearch {
   display: inline-block;
   min-width: 34em;
   background-color: transparent;
@@ -2877,7 +2873,11 @@ span.caret {
 }
 
 .min-width5 {
-  min-width: 5.4em;
+  min-width: 5.4em !important;
+}
+
+.min-width10 {
+  min-width: 9em !important;
 }
 
 .min-width20 {
@@ -2907,6 +2907,7 @@ a.expanded>span.caret {
   top: 15vh;
   width: calc(100% - .5625em)
 }
+
 .modal-big {
   top: 2.5em;
   width: calc(100% - 5em);
@@ -2998,6 +2999,10 @@ input[type="text"] {
 
 #btResultsChart, #btResultsChartNoTrades {
   margin: 2em 0;
-  height:70vh;
+  height: 70vh;
   min-height: 30em;
+}
+
+a.active {
+  color: white;
 }

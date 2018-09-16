@@ -8,7 +8,7 @@ const Highcharts = require('highcharts/highstock');
 var fs = require('original-fs');
 //const fs = require('fs');
 const {ipcRenderer} = require("electron");
-
+//remote.getCurrentWindow().toggleDevTools()
 var eulaDb = new Datastore({
   filename: getAppDataFolder() + '/db/eula.db',
   autoload: true
@@ -47,6 +47,8 @@ function openModalConfirm(msg, okFunc, calcelFunc) {
 }
 
 function openModalConfirmImpl(msg, okFunc, calcelFunc) {
+  $('.modal-big').hide();
+  $('.modal-small').hide();
   $('#modalConfirm').css('display', 'flex');
   $('#wrapper').css('opacity', '0.5');
   $('#wrapper').css('pointer-events', 'none');
@@ -79,6 +81,8 @@ function openModalInfoBig(msg, func) {
 }
 
 function openModalInfoImpl(msg, func) {
+  $('.modal-big').hide();
+  $('.modal-small').hide();
   $('#modalInfo').css('display', 'flex');
   $('#wrapper').css('opacity', '0.5');
   $('#wrapper').css('pointer-events', 'none');
@@ -116,7 +120,10 @@ ipcRenderer.on("download complete", (event, file) => {
     });
     source.on('end', async function() {
       await removeFile(newSar);
-      openModalInfo('Update was completed!<br>Please restart the app to get the new features!')
+      openModalConfirm('Update was completed!<br>Please restart the app to get the new features!<br>Restart now?', function() {
+        remote.app.relaunch();
+        remote.app.quit()
+      });
     });
     source.on('error', function(err) {
       cannotUpdateInfo()
@@ -134,6 +141,7 @@ function cannotUpdateInfo() {
 }
 
 process.on('uncaughtException', function(error) {
+  remote.app.quit()
   if (error.message.indexOf('operation not permitted, open') !== -1) {
     //We enter here when updating the app without permitions for the app folder.
     cannotUpdateInfo();
@@ -183,7 +191,7 @@ async function checkForUpdates() {
             if (latestSplited[0] !== curSplited[0]) {
               openModalInfo('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>No automatic update is available for this version, so in order to update, you need to download again the app from <span class="one-click-select">https://easycryptobot.com/</span>. After the download you can extract the app at a new location and start it from there.')
             } else {
-              openModalConfirmImpl('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>Update now?', function() {
+              openModalConfirm('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>Update now?', function() {
                 downloadUpdates()
               });
             }
@@ -315,9 +323,11 @@ async function loadStrategiesBt() {
     const strategies = await getStrategies();
     $('#btStrategiesList').html("");
     $('#tsStrategiesList').html("");
+    $('#opStrategiesList').html("");
     strategies.forEach(function(d) {
       $('#btStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#btStrategy\')">' + d.name + '</a></li>');
       $('#tsStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#tsStrategy\')">' + d.name + '</a></li>');
+      $('#opStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#opStrategy\')">' + d.name + '</a></li>');
     });
   } catch (err) {
     console.log(err);
@@ -387,29 +397,51 @@ function getTimeframe(value) {
   }
 }
 
-class Mutex {
-  constructor() {
-    this.queue = [];
-    this.locked = false;
+//Add additional 100 ticks to the start date in order to calculate RSIs and EMAs
+function getStartDate(value, date) {
+  let startDate = new Date(date.getTime());
+  switch (value) {
+    case '1 minute':
+      startDate.setDate(startDate.getDate() - 1);
+      break;
+    case '3 minutes':
+      startDate.setDate(startDate.getDate() - 1);
+      break;
+    case '5 minutes':
+      startDate.setDate(startDate.getDate() - 1);
+      break;
+    case '15 minutes':
+      startDate.setDate(startDate.getDate() - 1);
+      break;
+    case '30 minutes':
+      startDate.setDate(startDate.getDate() - 2);
+      break;
+    case '1 hour':
+      startDate.setDate(startDate.getDate() - 4);
+      break;
+    case '2 hours':
+      startDate.setDate(startDate.getDate() - 8);
+      break;
+    case '4 hours':
+      startDate.setDate(startDate.getDate() - 17);
+      break;
+    case '6 hours':
+      startDate.setDate(startDate.getDate() - 25);
+      break;
+    case '12 hours':
+      startDate.setDate(startDate.getDate() - 50);
+      break;
+    case '1 day':
+      startDate.setDate(startDate.getDate() - 100);
+      break;
   }
+  return startDate;
+}
 
-  lock() {
-    return new Promise((resolve, reject) => {
-      if (this.locked) {
-        this.queue.push([resolve, reject]);
-      } else {
-        this.locked = true;
-        resolve();
-      }
-    });
+function chunkArray(myArray, chunkSize) {
+  var result = [];
+  while (myArray.length) {
+    result.push(myArray.splice(0, chunkSize));
   }
-
-  release() {
-    if (this.queue.length > 0) {
-      const [resolve, reject] = this.queue.shift();
-      resolve();
-    } else {
-      this.locked = false;
-    }
-  }
+  return result;
 }

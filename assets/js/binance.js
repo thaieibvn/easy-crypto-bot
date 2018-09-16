@@ -5,6 +5,11 @@ const binance = new Binance().options({
   test: false // If you want to use sandbox mode where orders are simulated
 });
 
+let cancelBinanceData = false;
+function cancelGetBinanceData() {
+  cancelBinanceData = true;
+}
+
 let binanceInstruments = null;
 async function getBinanceInstruments() {
   if (binanceInstruments === null) {
@@ -70,6 +75,9 @@ function getBinanceTicksDb(instrument, timeframe) {
 }
 
 function storeBinanceTicks(instrument, timeframe, data) {
+  if(cancelBinanceData) {
+    return;
+  }
   let dbFilename = getDbFileName('binance', instrument, timeframe);
   let dataDb = new Datastore({
     filename: getAppDataFolder() + '/db/tmp/' + dbFilename,
@@ -207,12 +215,12 @@ function setBinanceCache(instrument, timeframe, startTime, endTime, data) {
   }
 }
 
-async function getBinanceTicks(instrument, timeframe, startTime, endTime) {
+async function getBinanceTicks(instrument, timeframe, startTime, endTime, bt) {
+  cancelBinanceData = false;
   for (let cache of binanceCache) {
     let now = new Date();
     now.setMinutes(now.getMinutes() - 30);
-    if (cache !== null && cache.instrument === instrument && cache.timeframe === timeframe &&
-      cache.startTime.getTime() === startTime.getTime() && cache.endTime.getTime() === endTime.getTime() && now <= cache.time) {
+    if (cache !== null && cache.instrument === instrument && cache.timeframe === timeframe && cache.startTime.getTime() === startTime.getTime() && cache.endTime.getTime() === endTime.getTime() && now <= cache.time) {
       return cache.data;
     }
   }
@@ -232,7 +240,7 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime) {
   let popped = null;
   try {
     if (noData) {
-      let data = await downloadBinanceTicks(instrument, timeframe, startTime, endTime);
+      let data = await downloadBinanceTicks(instrument, timeframe, startTime, endTime, bt);
       if (data !== null && data.length > 0) {
         //TO prevent storing unfinished candle in DB
         await removeDbFile(getDbFileName('binance', instrument, timeframe));
@@ -246,14 +254,14 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime) {
       }
     } else {
       if (leftSite) {
-        let ticksLeft = await downloadBinanceTicks(instrument, timeframe, startTime, result[0].d);
+        let ticksLeft = await downloadBinanceTicks(instrument, timeframe, startTime, result[0].d, bt);
         if (ticksLeft !== null && ticksLeft.length > 0) {
           await storeBinanceTicks(instrument, timeframe, ticksLeft);
         }
       }
       if (rightSite) {
         let tmpDate = getDateWithTickMore(timeframe, result[result.length - 1].d);
-        let ticksRight = await downloadBinanceTicks(instrument, timeframe, tmpDate, endTime);
+        let ticksRight = await downloadBinanceTicks(instrument, timeframe, tmpDate, endTime, bt);
         if (ticksRight !== null && ticksRight.length > 0) {
           //remove
           popped = ticksRight.pop();
@@ -282,10 +290,16 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime) {
   return filteredResult;
 
 }
-async function downloadBinanceTicks(instrument, timeframe, startTime, endTime) {
-  $('#btRunPercent').html('Downloading ' + instrument + ' historical data from Binance. Please wait..');
-  $('#btRunPercent2').show();
-  $('#btRunPercent2').html(timeframe + ' data download progress: 0%');
+async function downloadBinanceTicks(instrument, timeframe, startTime, endTime, bt) {
+  let infoId = bt
+    ? '#btRunPercent'
+    : '#opRunPercent';
+  let infoId2 = bt
+    ? '#btRunPercent2'
+    : '#opRunPercent2';
+  $(infoId).html('Downloading ' + instrument + ' historical data from Binance. Please wait..');
+  $(infoId2).show();
+  $(infoId2).html(timeframe + ' data download progress: 0%');
   let ticks = [];
   try {
     ticks = await getBinanceTicksImpl(instrument, timeframe, startTime, endTime);
@@ -299,7 +313,10 @@ async function downloadBinanceTicks(instrument, timeframe, startTime, endTime) {
   let lastCloseTime = new Date(ticks[ticks.length - 1][6]);
   let tmpIndex = 0;
   while (lastCloseTime < endTime) {
-    $('#btRunPercent2').html(timeframe + ' data download progress: ' + (
+    if(cancelBinanceData) {
+      return null;
+    }
+    $(infoId2).html(timeframe + ' data download progress: ' + (
     ((lastCloseTime.getTime() - startTime.getTime()) / (endTime.getTime() - startTime.getTime())) * 100).toFixed(0) + '%');
     let nextData = [];
     try {

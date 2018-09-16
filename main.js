@@ -1,16 +1,27 @@
 // Modules to control application life and create native browser window
-const {app, BrowserWindow, ipcMain} = require('electron')
+const {app, BrowserWindow, ipcMain, dialog} = require('electron')
 const {download} = require("electron-dl");
 
+global.optimizatin = {
+  timeframe: null,
+  startDate: null,
+  ticks: null,
+  ticks1m: null,
+  strategyVariations:null,
+  results:null
+};
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow
-
+app.disableHardwareAcceleration();
+//app.commandLine.appendSwitch('enable-transparent-visuals');
+//app.commandLine.appendSwitch('disable-gpu');
 function createWindow() {
   // Create the browser window.
+
   mainWindow = new BrowserWindow({
     width: 1300,
-    height: 830,
+    height: 980,
     minWidth: 750,
     minHeight: 300,
     title: "EasyCryptoBot v" + app.getVersion(),
@@ -33,12 +44,19 @@ function createWindow() {
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
     mainWindow = null
+    app.quit();
   })
 
   ipcMain.on("download", (event, info) => {
     download(BrowserWindow.getFocusedWindow(), info.url, info.properties).then(dl => mainWindow.webContents.send("download complete", dl.getSavePath()));
   });
 
+  mainWindow.webContents.on('crashed', (e) => {
+    dialog.showMessageBox({message: "The App has crashed and will be restarted :(", buttons: ["OK"]});
+    console.log(e);
+    app.relaunch();
+    app.quit()
+  });
 }
 
 // This method will be called when Electron has finished
@@ -51,7 +69,7 @@ app.on('window-all-closed', function() {
   // On OS X it is common for applications and their menu bar
   // to stay active until the user quits explicitly with Cmd + Q
   //if (process.platform !== 'darwin') {
-    app.quit()
+  app.quit()
   //}
 })
 
