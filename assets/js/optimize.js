@@ -1,5 +1,5 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
-const os = require('os');
+//const os = require('os');
 
 async function opFillBinanceInstruments() {
   await getBinanceInstruments();
@@ -253,7 +253,7 @@ async function runOptimize() {
     opExecutionCanceled = false;
     opCompleted = 0;
 
-    let cpus = os.cpus().length;
+    /*let cpus = os.cpus().length;
     if ($('#opOptimization1CPU').is(':checked')) {
       maxOpWorkers = 1;
     } else if ($('#opOptimizationHalfCPUs').is(':checked')) {
@@ -264,7 +264,7 @@ async function runOptimize() {
       maxOpWorkers = cpus > 1
         ? cpus - 1
         : 1;
-    }
+    }*/
 
     for (let i = 0; i < Math.min(maxOpWorkers, strategyVariations.length); i++) {
       opExecutionWorkers[workerIndex] = new Worker("./assets/js/optimize-execution.js");
@@ -393,13 +393,13 @@ async function terminateOpWorkers() {
 
     Object.entries(opExecutionWorkers).forEach(([key, value]) => {
       if (value !== undefined) {
-        value.terminate();
+        opExecutionWorkers[key].postMessage(['STOP']);
         opExecutionWorkers[key] = undefined;
       }
     });
 
     $('#opRunPercent').html('Stopping Optimization..');
-    await sleep(500);
+    await sleep(2000);
     $('#runOptBtn').removeClass('disabled');
     $('#opCancelBtn').removeClass('disabled');
   } catch (err) {

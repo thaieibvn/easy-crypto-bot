@@ -30,7 +30,7 @@ self.addEventListener('message', async function(e) {
       while(isRunning) {
         await sleep(500)
       }
-      //await sleep(1000)
+      await sleep(2000)
       self.close();
     } else if (typeof e.data[0] === 'string' && e.data[0].startsWith('STRATEGY')) {
       isRunning = true;
