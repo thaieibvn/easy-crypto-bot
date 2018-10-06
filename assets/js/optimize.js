@@ -63,7 +63,6 @@ async function addOpResult(result) {
     if (result !== null && result.executedTrades > 0) {
       strategyVariationsResults.push(result);
     }
-    strategyVariationsResults.push(result);
     return opCompleted;
   } finally {
     addOpResultMutex.release();
