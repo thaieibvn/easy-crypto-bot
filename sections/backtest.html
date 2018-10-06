@@ -62,7 +62,7 @@
     </div>
 
     <div class="text-center">
-      <a id="runBacktestBtn" href="#/" onclick="runBacktest()" class="button button-big margin-s-b30"><i class="text-green fas fa-play"></i> Run Backtest</a>
+      <a id="runBacktestBtn" href="#/" onkeydown="opKeyDownDoNothing(event)" onclick="runBacktest()" class="button button-big margin-s-b30"><i class="text-green fas fa-play"></i> Run Backtest</a>
     </div>
 
     <div id="btResultDiv" class="display-none">
@@ -75,7 +75,7 @@
         </div>
         <div id="btCancelDiv" class="text-center">
           <br>
-          <a id="btCancelBtn" href="#/" onclick="btCancel()" class="button button-big margin-s-b30"><i class="text-red fas fa-stop"></i> Cancel</a>
+          <a id="btCancelBtn" href="#/" onkeydown="opKeyDownDoNothing(event)" onclick="btCancel()" class="button button-big margin-s-b30"><i class="text-red fas fa-stop"></i> Cancel</a>
         </div>
       </div>
       <div id="btResultNoTrades" class="display-none">

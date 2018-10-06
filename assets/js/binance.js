@@ -75,9 +75,6 @@ function getBinanceTicksDb(instrument, timeframe) {
 }
 
 function storeBinanceTicks(instrument, timeframe, data) {
-  if(cancelBinanceData) {
-    return;
-  }
   let dbFilename = getDbFileName('binance', instrument, timeframe);
   let dataDb = new Datastore({
     filename: getAppDataFolder() + '/db/tmp/' + dbFilename,
@@ -246,6 +243,9 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime, bt) {
         await removeDbFile(getDbFileName('binance', instrument, timeframe));
         let lastValue = data.pop();
         await storeBinanceTicks(instrument, timeframe, data);
+        if (cancelBinanceData) {
+          return null;
+        }
         data.push(lastValue);
         setBinanceCache(instrument, timeframe, startTime, endTime, data);
         return data;
@@ -257,6 +257,9 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime, bt) {
         let ticksLeft = await downloadBinanceTicks(instrument, timeframe, startTime, result[0].d, bt);
         if (ticksLeft !== null && ticksLeft.length > 0) {
           await storeBinanceTicks(instrument, timeframe, ticksLeft);
+          if (cancelBinanceData) {
+            return null;
+          }
         }
       }
       if (rightSite) {
@@ -266,6 +269,9 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime, bt) {
           //remove
           popped = ticksRight.pop();
           await storeBinanceTicks(instrument, timeframe, ticksRight);
+          if (cancelBinanceData) {
+            return null;
+          }
         }
       }
     }
@@ -313,7 +319,7 @@ async function downloadBinanceTicks(instrument, timeframe, startTime, endTime, b
   let lastCloseTime = new Date(ticks[ticks.length - 1][6]);
   let tmpIndex = 0;
   while (lastCloseTime < endTime) {
-    if(cancelBinanceData) {
+    if (cancelBinanceData) {
       return null;
     }
     $(infoId2).html(timeframe + ' data download progress: ' + (

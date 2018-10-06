@@ -1,44 +1,44 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
-function checkTradeRules(rules, historicalData, lastPrice) {
+function checkTradeRules(rules, historicalData) {
   //try {
-  if (rules === null || rules === undefined || rules.length === 0) {
+  if (rules === null || rules === undefined || rules.length === 0 || historicalData.length < 2) {
     return false;
   }
   let rulesMet = 0;
   for (let rule of rules) {
     if (rule.indicator === 'sma' || rule.indicator === 'ema') {
       let ma = rule.indicator === 'sma'
-        ? calculateSMA(rule.period, historicalData, lastPrice)
-        : calculateEMA(rule.period, historicalData, lastPrice);
+        ? calculateSMA(rule.period, historicalData)
+        : calculateEMA(rule.period, historicalData);
       if (ma === null) {
         break;
       }
       if (rule.direction === 'above') {
-        if (lastPrice >= ma[0] * (1 + (rule.value / 100))) {
+        if (historicalData[historicalData.length - 1] >= ma[0] * (1 + (rule.value / 100))) {
           rulesMet++;
           continue;
         }
       } else if (rule.direction === 'bellow') {
-        if (lastPrice <= ma[0] * (1 - (rule.value / 100))) {
+        if (historicalData[historicalData.length - 1] <= ma[0] * (1 - (rule.value / 100))) {
           rulesMet++;
           continue;
         }
       } else if (rule.direction === 'crossing') {
-        if (rule.crossDirection === 'top to bottom' && historicalData[historicalData.length - 1] > ma[1] && lastPrice <= ma[0]) {
+        if (rule.crossDirection === 'top to bottom' && historicalData[historicalData.length - 2] > ma[1] && historicalData[historicalData.length - 1] <= ma[0]) {
           rulesMet++;
           continue;
-        } else if (rule.crossDirection === 'bottom to top' && historicalData[historicalData.length - 1] < ma[1] && lastPrice >= ma[0]) {
+        } else if (rule.crossDirection === 'bottom to top' && historicalData[historicalData.length - 2] < ma[1] && historicalData[historicalData.length - 1] >= ma[0]) {
           rulesMet++;
           continue;
         }
       }
     } else if (rule.indicator === "cma") {
       let ma1 = rule.type === "SMA"
-        ? calculateSMA(rule.period, historicalData, lastPrice)
-        : calculateEMA(rule.period, historicalData, lastPrice);
+        ? calculateSMA(rule.period, historicalData)
+        : calculateEMA(rule.period, historicalData);
       let ma2 = rule.type2 === "SMA"
-        ? calculateSMA(rule.period2, historicalData, lastPrice)
-        : calculateEMA(rule.period2, historicalData, lastPrice);
+        ? calculateSMA(rule.period2, historicalData)
+        : calculateEMA(rule.period2, historicalData);
       if (ma1 === null || ma2 === null) {
         break;
       }
@@ -50,7 +50,7 @@ function checkTradeRules(rules, historicalData, lastPrice) {
         continue;
       }
     } else if (rule.indicator === "rsi") {
-      let rsi = calculateRsi(rule.period, historicalData, lastPrice);
+      let rsi = calculateRsi(rule.period, historicalData);
       if (rsi === null) {
         break;
       }
@@ -74,7 +74,7 @@ function checkTradeRules(rules, historicalData, lastPrice) {
         }
       }
     } else if (rule.indicator === "macd") {
-      let macd = calculateMacd(rule.period, rule.period2, rule.period3, historicalData, lastPrice);
+      let macd = calculateMacd(rule.period, rule.period2, rule.period3, historicalData);
       if (macd === null) {
         break;
       }
@@ -118,30 +118,30 @@ function checkTradeRules(rules, historicalData, lastPrice) {
   //  }
 }
 
-function calculateSMA(smaPeriod, historicalData, lastPrice) {
+function calculateSMA(smaPeriod, historicalData) {
   if (historicalData.length <= smaPeriod) {
     return null;
   }
   let sum = 0;
-  for (let i = historicalData.length - smaPeriod + 1; i < historicalData.length; i++) {
+  for (let i = historicalData.length - smaPeriod; i < historicalData.length-1; i++) {
     sum += historicalData[i]
   }
   return [
-    (sum + lastPrice) / smaPeriod,
+    (sum + historicalData[historicalData.length - 1]) / smaPeriod,
     (sum + historicalData[historicalData.length - smaPeriod]) / smaPeriod
   ];
 }
 
-function calculateEMA(emaPeriod, historicalData, lastPrice) {
+function calculateEMA(emaPeriod, historicalData) {
   if (historicalData.length <= emaPeriod || historicalData.length < 100) {
     return null;
   }
   let multiplier = 2 / (emaPeriod + 1);
   let emaPrev = historicalData[historicalData.length - 100];
-  for (let i = historicalData.length - 99; i < historicalData.length; i++) {
+  for (let i = historicalData.length - 99; i < historicalData.length-1; i++) {
     emaPrev = (historicalData[i] - emaPrev) * multiplier + emaPrev;
   }
-  let ema = (lastPrice - emaPrev) * multiplier + emaPrev;
+  let ema = (historicalData[historicalData.length - 1] - emaPrev) * multiplier + emaPrev;
   return [ema, emaPrev];
 }
 
@@ -155,7 +155,7 @@ function calculateRs(period, array) {
   return ema;
 }
 
-function calculateRsi(rsiPeriod, historicalData, lastPrice) {
+function calculateRsi(rsiPeriod, historicalData) {
   if (historicalData.length <= rsiPeriod || historicalData.length < 100) {
     return null;
   }
@@ -163,7 +163,7 @@ function calculateRsi(rsiPeriod, historicalData, lastPrice) {
   let avgGain = [];
   let avgLoss = [];
   let prevClose = historicalData[historicalData.length - 100];
-  for (let i = historicalData.length - 99; i < historicalData.length; i++) {
+  for (let i = historicalData.length - 99; i < historicalData.length-1; i++) {
     let change = historicalData[i] - prevClose;
     if (change > 0) {
       avgGain.push(change);
@@ -178,7 +178,7 @@ function calculateRsi(rsiPeriod, historicalData, lastPrice) {
   let avgGainFinalPrev = calculateRs(rsiPeriod, avgGain);
   let avgLossFinalPrev = calculateRs(rsiPeriod, avgLoss);
 
-  let change = lastPrice - prevClose;
+  let change = historicalData[historicalData.length - 1] - prevClose;
   if (change > 0) {
     avgGain.push(change);
     avgLoss.push(0);
@@ -197,30 +197,30 @@ function calculateRsi(rsiPeriod, historicalData, lastPrice) {
   return [rsi, rsiPrev];
 }
 
-function calculateEMAFull(emaPeriod, historicalData, lastPrice, count) {
+function calculateEMAFull(emaPeriod, historicalData, count) {
   if (historicalData.length <= emaPeriod || historicalData.length < count) {
     return null;
   }
   let multiplier = 2 / (emaPeriod + 1);
   let emaPrev = historicalData[historicalData.length - count];
   let emas = [];
-  for (let i = historicalData.length - count + 1; i < historicalData.length; i++) {
+  for (let i = historicalData.length - count; i < historicalData.length-1; i++) {
     emaPrev = (historicalData[i] - emaPrev) * multiplier + emaPrev;
     emas.push(emaPrev);
   }
-  if (lastPrice !== null) {
-    let ema = (lastPrice - emaPrev) * multiplier + emaPrev;
+
+    let ema = (historicalData[historicalData.length - 1] - emaPrev) * multiplier + emaPrev;
     emas.push(ema);
-  }
+
   return emas;
 }
 
-function calculateMacd(period, period2, period3, historicalData, lastPrice) {
+function calculateMacd(period, period2, period3, historicalData) {
   let emasCount = period3 === undefined
     ? 100
     : period3 + 70;
-  let fastEma = calculateEMAFull(period, historicalData, lastPrice, emasCount);
-  let slowEma = calculateEMAFull(period2, historicalData, lastPrice, emasCount);
+  let fastEma = calculateEMAFull(period, historicalData, emasCount);
+  let slowEma = calculateEMAFull(period2, historicalData, emasCount);
   if (fastEma === null || slowEma === null || fastEma.length < 1 || slowEma.length < 1) {
     return null;
   }
@@ -239,7 +239,7 @@ function calculateMacd(period, period2, period3, historicalData, lastPrice) {
   macd = macd.reverse();
   let signal = null;
   if (period3 !== undefined) {
-    signal = calculateEMAFull(period3, macd, null, 30);
+    signal = calculateEMAFull(period3, macd, 30);
   }
 
   return [

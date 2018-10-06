@@ -9,7 +9,6 @@ function sleep(ms) {
 }
 
 let ticks = null;
-let ticks1m = null;
 let timeframe = null;
 let startDate = null;
 let id = null;
@@ -24,7 +23,6 @@ self.addEventListener('message', async function(e) {
       timeframe = e.data[2];
       startDate = e.data[3];
       ticks = e.data[4];
-      ticks1m = e.data[5];
       self.postMessage(['STARTED', id]);
     } else if (typeof e.data[0] === 'string' && e.data[0].startsWith('STOP')) {
       opExecutionCanceled = true;
@@ -32,7 +30,7 @@ self.addEventListener('message', async function(e) {
       while(isRunning) {
         await sleep(500)
       }
-      await sleep(5000)
+      //await sleep(1000)
       self.close();
     } else if (typeof e.data[0] === 'string' && e.data[0].startsWith('STRATEGY')) {
       isRunning = true;
@@ -41,7 +39,7 @@ self.addEventListener('message', async function(e) {
         return;
       }
       let strategy = e.data[1];
-      let result = await executeBacktest(strategy, ticks, ticks1m, timeframe, startDate, false)
+      let result = await executeBacktest(strategy, ticks, timeframe, startDate, false)
       if (result !== null && !opExecutionCanceled) {
         self.postMessage([
           'RESULT', id, result[0]

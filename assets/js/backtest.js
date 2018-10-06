@@ -171,19 +171,11 @@ async function runBacktest() {
     $('#btResultDiv').show();
     $('#btStrategiesTable').html('<thead><tr><td>Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead><tbody>');
     let ticks = await getBinanceTicks(instrument, getTimeframe(timeframe), getStartDate(timeframe, startDate), endDate, true);
-    let ticks1m = null;
     if (cancelBt) {
       backtestRunning = false;
       return;
     }
-    if (timeframe !== '1 minute') {
-      ticks1m = await getBinanceTicks(instrument, '1m', startDate, endDate, true);
-    }
-    if (cancelBt) {
-      backtestRunning = false;
-      return;
-    }
-    if (ticks === null || (timeframe !== '1 minute' && ticks1m === null)) {
+    if (ticks === null) {
       $('#runBacktestBtn').removeClass('disabled');
       $('#btRunning').hide();
       $('#btResult').hide();
@@ -195,7 +187,7 @@ async function runBacktest() {
     $('#btRunPercent').html('Backtest Execution: 0%');
     $('#btRunRocket').show();
 
-    let result = await executeBacktest(strategy, ticks, ticks1m, timeframe, startDate, true)
+    let result = await executeBacktest(strategy, ticks, timeframe, startDate, true)
     if (result === null) {
       $('#btRunning').hide();
       $('#runBacktestBtn').removeClass('disabled');

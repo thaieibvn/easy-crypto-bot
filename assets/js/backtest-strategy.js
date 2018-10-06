@@ -1,6 +1,6 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 
-const smallNumber = 0.000001;
+const smallNumber = 0.00001;
 function addBuySpread(price) {
   return price < smallNumber
     ? price + 0.00000001
@@ -12,141 +12,12 @@ function addSellSpread(price) {
     : price * 0.996;
 }
 
-function get1mData(startTime, timeframe, ticks1m, lastIndex) {
-  let endDate = new Date(startTime.getTime());
-  switch (timeframe) {
-    case '3 minutes':
-      endDate.setMinutes(endDate.getMinutes() + 3);
-      break;
-    case '5 minutes':
-      endDate.setMinutes(endDate.getMinutes() + 5);
-      break;
-    case '15 minutes':
-      endDate.setMinutes(endDate.getMinutes() + 15);
-      break;
-    case '30 minutes':
-      endDate.setMinutes(endDate.getMinutes() + 30);
-      break;
-    case '1 hour':
-      endDate.setHours(endDate.getHours() + 1);
-      break;
-    case '2 hours':
-      endDate.setHours(endDate.getHours() + 2);
-      break;
-    case '4 hours':
-      endDate.setHours(endDate.getHours() + 4);
-      break;
-    case '6 hours':
-      endDate.setHours(endDate.getHours() + 6);
-      break;
-    case '12 hours':
-      endDate.setHours(endDate.getHours() + 12);
-      break;
-    case '1 day':
-      endDate.setHours(endDate.getHours() + 24);
-      break;
-  }
-
-  let result = [];
-  for (; lastIndex < ticks1m.length; lastIndex++) {
-    if (startTime <= ticks1m[lastIndex].d && ticks1m[lastIndex].d < endDate) {
-      let closePrice = ticks1m[lastIndex].c;
-      let openPrice = ticks1m[lastIndex].o;
-      let highPrice = ticks1m[lastIndex].h;
-      let lowPrice = ticks1m[lastIndex].l;
-      result.push([
-        ticks1m[lastIndex].d,
-        openPrice,
-        highPrice,
-        lowPrice
-      ]);
-      if (openPrice >= closePrice) {
-        if (highPrice !== openPrice) {
-          result.push([
-            ticks1m[lastIndex].d,
-            highPrice,
-            highPrice,
-            lowPrice
-          ]);
-          result.push([
-            ticks1m[lastIndex].d,
-            openPrice,
-            highPrice,
-            lowPrice
-          ]);
-        }
-        if (closePrice !== openPrice) {
-          result.push([
-            ticks1m[lastIndex].d,
-            closePrice,
-            highPrice,
-            lowPrice
-          ]);
-          if (closePrice !== lowPrice) {
-            result.push([
-              ticks1m[lastIndex].d,
-              lowPrice,
-              highPrice,
-              lowPrice
-            ]);
-            result.push([
-              ticks1m[lastIndex].d,
-              closePrice,
-              highPrice,
-              lowPrice
-            ]);
-          }
-        }
-      } else {
-        if (lowPrice !== openPrice) {
-          result.push([
-            ticks1m[lastIndex].d,
-            lowPrice,
-            highPrice,
-            lowPrice
-          ]);
-          result.push([
-            ticks1m[lastIndex].d,
-            openPrice,
-            highPrice,
-            lowPrice
-          ]);
-        }
-          result.push([
-            ticks1m[lastIndex].d,
-            closePrice,
-            highPrice,
-            lowPrice
-          ]);
-          if (closePrice !== highPrice) {
-            result.push([
-              ticks1m[lastIndex].d,
-              highPrice,
-              highPrice,
-              lowPrice
-            ]);
-            result.push([
-              ticks1m[lastIndex].d,
-              closePrice,
-              lowPrice,
-              lowPrice
-            ]);
-          }
-
-      }
-    }
-    if (ticks1m[lastIndex].d >= endDate) {
-      break;
-    }
-  }
-  return [result, lastIndex];
-}
-
 let cancelBtExecution = false;
 function cancelBacktest() {
   cancelBtExecution = true;
 }
-async function executeBacktest(strategy, ticks, ticks1m, timeframe, startDate, useSleep) {
+
+async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) {
   cancelBtExecution = false;
   let feeRate = 0.1;
   let trades = [];
@@ -155,207 +26,118 @@ async function executeBacktest(strategy, ticks, ticks1m, timeframe, startDate, u
   let target = Number.MAX_VALUE;
   let closePrices = [];
 
-  if (timeframe !== '1 minute') {
-    let lastIndex1m = 0;
-    for (let i = 0; i < ticks.length; i++) {
-      if (cancelBtExecution) {
-        return null;
-      }
-      if (useSleep && i > 100 && i % 100 === 0) {
-        await sleep(0);
-      }
-      let closePrice = ticks[i].c;
-      let curDate = ticks[i].d;
-      if (curDate < startDate) {
-        closePrices.push(closePrice);
-        continue;
-      }
-      let pricesToCheck = get1mData(curDate, timeframe, ticks1m, lastIndex1m);
-      lastIndex1m = pricesToCheck[1];
-      let priceToCheckIndex = 0;
-      for (let priceToCkeckData of pricesToCheck[0]) {
-        if (cancelBtExecution) {
-          return null;
+  for (let i = 0; i < ticks.length; i++) {
+    if (cancelBtExecution) {
+      return null;
+    }
+    if (useSleep && i > 100 && i % 100 === 0) {
+      await sleep(0);
+    }
+    let closePrice = ticks[i].c;
+    let openPrice = ticks[i].o;
+    let highPrice = ticks[i].h;
+    let lowPrice = ticks[i].l;
+    let curDate = ticks[i].d
+    if (curDate < startDate) {
+      closePrices.push(closePrice);
+      continue;
+    }
+    let date = ticks[i].d;
+    if (tradeType === 'buy') {
+      if (checkTradeRules(strategy.buyRules, closePrices)) {
+        let openWithSpread = addBuySpread(openPrice);
+        let trade = {
+          'openDate': date,
+          'openDateOrg': date,
+          'entry': openWithSpread > highPrice
+            ? highPrice
+            : openWithSpread,
+          'result': 0
+        };
+        if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
+          stoploss = trade.entry * (1 - (strategy.stoploss / 100))
         }
-        if (useSleep && priceToCheckIndex > 500 && priceToCheckIndex % 500 === 0) {
-          await sleep(0);
+        if (strategy.target !== null && !isNaN(strategy.target)) {
+          target = trade.entry * (1 + (strategy.target / 100))
         }
-        priceToCheckIndex++;
-        let date = priceToCkeckData[0];
-        if (tradeType === 'buy') {
-          if (trades.length > 0 && curDate.getTime() === trades[trades.length - 1].closeDateOrg.getTime()) {
-            break;
-          }
-          let priceToCkeck = Math.min(addBuySpread(priceToCkeckData[1]), priceToCkeckData[2]);
-          if (priceToCkeck < smallNumber &&  priceToCkeckData[3] === priceToCkeckData[1]) {
-            continue;
-          }
-          if (checkTradeRules(strategy.buyRules, closePrices, priceToCkeck)) {
-            let trade = {
-              'openDate': date,
-              'openDateOrg': curDate,
-              'entry': priceToCkeck,
-              'result': 0
-            };
-            if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
-              stoploss = priceToCkeck * (1 - (strategy.stoploss / 100))
-            }
-            if (strategy.target !== null && !isNaN(strategy.target)) {
-              target = priceToCkeck * (1 + (strategy.target / 100))
-            }
-            trades.push(trade);
-            tradeType = 'sell'
-            continue;
+        trades.push(trade);
+        tradeType = 'sell'
+      }
+    }
+
+    if (tradeType === 'sell') {
+
+      if (stoploss >= lowPrice) {
+        trades[trades.length - 1]['closeDate'] = date;
+        trades[trades.length - 1]['closeDateOrg'] = date;
+        if (openPrice < smallNumber) {
+          if (stoploss >= openPrice) {
+            let openWithSpread = addSellSpread(openPrice);
+            trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
+              ? lowPrice
+              : openWithSpread;
+          } else if (stoploss >= closePrice) {
+            let closeWithSpread = addSellSpread(closePrice);
+            trades[trades.length - 1]['exit'] = closeWithSpread < lowPrice
+              ? lowPrice
+              : closeWithSpread;
+          } else {
+            trades[trades.length - 1]['exit'] = lowPrice
           }
         } else {
-          let priceToCkeck = Math.max(addSellSpread(priceToCkeckData[1]), priceToCkeckData[3]);
-          if (priceToCkeck < smallNumber &&  priceToCkeckData[2] === priceToCkeckData[1]) {
-            continue;
-          }
-          if (stoploss >= priceToCkeck) {
-            trades[trades.length - 1]['closeDate'] = date;
-            trades[trades.length - 1]['closeDateOrg'] = curDate;
-            trades[trades.length - 1]['exit'] = priceToCkeck;
-            trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
-            tradeType = 'buy';
-            continue;
-          }
-          if (target <= priceToCkeck) {
-            trades[trades.length - 1]['closeDate'] = date;
-            trades[trades.length - 1]['closeDateOrg'] = curDate;
-            trades[trades.length - 1]['exit'] = priceToCkeck;
-            trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
-            tradeType = 'buy';
-            continue;
-          }
-          if (strategy.sellRules.length === 0) {
-            continue;
-          }
-
-          if (checkTradeRules(strategy.sellRules, closePrices, priceToCkeck)) {
-            trades[trades.length - 1]['closeDate'] = date;
-            trades[trades.length - 1]['closeDateOrg'] = curDate;
-            trades[trades.length - 1]['exit'] = priceToCkeck;
-            trades[trades.length - 1]['result'] = (((priceToCkeck - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
-            tradeType = 'buy';
-          }
+          trades[trades.length - 1]['exit'] = stoploss > openPrice
+            ? openPrice
+            : stoploss;
         }
-      }
-      closePrices.push(closePrice);
-    }
-  } else {
-    for (let i = 0; i < ticks.length; i++) {
-      if (cancelBtExecution) {
-        return null;
-      }
-      if (useSleep && i > 100 && i % 100 === 0) {
-        await sleep(0);
-      }
-      let closePrice = ticks[i].c;
-      let openPrice = ticks[i].o;
-      let highPrice = ticks[i].h;
-      let lowPrice = ticks[i].l;
-      let curDate = ticks[i].d
-      if (curDate < startDate) {
-        closePrices.push(closePrice);
+        trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+        tradeType = 'buy';
         continue;
       }
-
-      let pricesToCheck = [];
-      pricesToCheck.push(openPrice);
-      if (openPrice >= closePrice) {
-        if (highPrice !== openPrice) {
-          pricesToCheck.push(highPrice);
-          pricesToCheck.push(openPrice);
-        }
-        if (closePrice !== openPrice) {
-          pricesToCheck.push(closePrice);
-          if (closePrice !== lowPrice) {
-            pricesToCheck.push(lowPrice);
-            pricesToCheck.push(closePrice);
-          }
-        }
-      } else {
-        if (lowPrice !== openPrice) {
-          pricesToCheck.push(lowPrice);
-          pricesToCheck.push(openPrice);
-        }
-        pricesToCheck.push(closePrice);
-        if (closePrice !== highPrice) {
-          pricesToCheck.push(highPrice);
-          pricesToCheck.push(closePrice);
-        }
-      }
-
-      for (let priceToCkeck of pricesToCheck) {
-        if (cancelBtExecution) {
-          return null;
-        }
-        let date = ticks[i].d;
-        if (tradeType === 'buy') {
-          //Only one trade per candle for the given timeframe
-          if (trades.length > 0 && date.getTime() === trades[trades.length - 1].closeDateOrg.getTime()) {
-            break;
-          }
-          let priceToCkeckTmp = priceToCkeck;
-          priceToCkeck = Math.min(addBuySpread(priceToCkeck), highPrice);
-          if (priceToCkeck < smallNumber && lowPrice === priceToCkeckTmp) {
-            continue;
-          }
-          if (checkTradeRules(strategy.buyRules, closePrices, priceToCkeck)) {
-            let trade = {
-              'openDate': date,
-              'openDateOrg': date,
-              'entry': priceToCkeck,
-              'result': 0
-            };
-            if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
-              stoploss = priceToCkeck * (1 - (strategy.stoploss / 100))
-            }
-            if (strategy.target !== null && !isNaN(strategy.target)) {
-              target = priceToCkeck * (1 + (strategy.target / 100))
-            }
-            trades.push(trade);
-            tradeType = 'sell'
-            continue;
+      if (target <= highPrice) {
+        trades[trades.length - 1]['closeDate'] = date;
+        trades[trades.length - 1]['closeDateOrg'] = date;
+        if (openPrice < smallNumber) {
+          if (target <= openPrice) {
+            let openWithSpread = addSellSpread(openPrice);
+            trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
+              ? lowPrice
+              : openWithSpread;
+          } else if (target <= closePrice) {
+            let closeWithSpread = addSellSpread(closePrice);
+            trades[trades.length - 1]['exit'] = closeWithSpread < lowPrice
+              ? lowPrice
+              : closeWithSpread;
+          } else {
+            trades[trades.length - 1]['exit'] = lowPrice
           }
         } else {
-          let priceToCkeckTmp = priceToCkeck;
-          priceToCkeck = Math.max(addSellSpread(priceToCkeck), lowPrice);
-          if (priceToCkeck < smallNumber && highPrice === priceToCkeckTmp) {
-            continue;
-          }
-          if (stoploss >= priceToCkeck) {
-            trades[trades.length - 1]['closeDate'] = date;
-            trades[trades.length - 1]['closeDateOrg'] = date;
-            trades[trades.length - 1]['exit'] = priceToCkeck;
-            trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
-            tradeType = 'buy';
-            continue;
-          }
-          if (target <= priceToCkeck) {
-            trades[trades.length - 1]['closeDate'] = date;
-            trades[trades.length - 1]['closeDateOrg'] = date;
-            trades[trades.length - 1]['exit'] = priceToCkeck;
-            trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
-            tradeType = 'buy';
-            continue;
-          }
-          if (strategy.sellRules.length === 0) {
-            continue;
-          }
-          if (checkTradeRules(strategy.sellRules, closePrices, priceToCkeck)) {
-            trades[trades.length - 1]['closeDate'] = date;
-            trades[trades.length - 1]['closeDateOrg'] = date;
-            trades[trades.length - 1]['exit'] = priceToCkeck;
-            trades[trades.length - 1]['result'] = (((priceToCkeck - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
-            tradeType = 'buy';
-          }
+          trades[trades.length - 1]['exit'] = target < openPrice
+            ? openPrice
+            : target;
         }
+
+        trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+        tradeType = 'buy';
+        continue;
       }
-      closePrices.push(closePrice);
+      if (strategy.sellRules.length === 0) {
+        continue;
+      }
+      if (checkTradeRules(strategy.sellRules, closePrices)) {
+        let openWithSpread = addSellSpread(openPrice);
+        trades[trades.length - 1]['closeDate'] = date;
+        trades[trades.length - 1]['closeDateOrg'] = date;
+        trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
+          ? lowPrice
+          : openWithSpread;
+        trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+        tradeType = 'buy';
+      }
+
     }
+    closePrices.push(closePrice);
   }
+
   //END
   let lastTrade = null;
   if (trades.length > 0 && tradeType === 'sell') {

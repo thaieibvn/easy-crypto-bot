@@ -77,14 +77,14 @@ let opExecutionWorkers = {};
 let opExecutedIndex = 0;
 let opCompleted = 0;
 let maxOpWorkers = 1;
-let opRunningWorkers = 0;
-let workerInitializeCompleted = false;
+let optimizationRunning = false;
+let workerIndex = 0;
 const executionOpMutex = new Mutex();
 const addOpResultMutex = new Mutex();
 const opWorkerTerminateMutex = new Mutex();
 
 function isOptimizationRunning() {
-  return opRunningWorkers > 0;
+  return optimizationRunning;
 }
 async function runOptimize() {
   if (isBacktestRunning()) {
@@ -166,10 +166,13 @@ async function runOptimize() {
   }
 
   try {
+    optimizationRunning = true;
+    opExecutionCanceled = false;
     let strategy = await getStrategyByName(strategyName);
     if (strategy === null) {
       openModalInfo('Please Choose a Strategy!');
       $('#opStrategyCombobox').html('Choose Strategy');
+      optimizationRunning = false;
       return;
     }
 
@@ -185,18 +188,17 @@ async function runOptimize() {
     $('#opExecInfo').hide();
     $('#opResultDiv').show();
     $('#opStrategiesTable').html('<thead><tr><td>Strategy</td><td>Total Return</td><td>Max Drawdown</td><td>Winning %</td><td>Avg. Trade</td><td>Best Trade</td><td>Worst Trade</td><td>Trades N.</td><td>Save</td></tr></thead><tbody>');
-
+    $('#opCancelDiv').show();
     let ticks = await getBinanceTicks(instrument, getTimeframe(timeframe), getStartDate(timeframe, startDate), endDate, false);
-    let ticks1m = null;
-    if (timeframe !== '1 minute') {
-      ticks1m = await getBinanceTicks(instrument, '1m', startDate, endDate, false);
+    if (opExecutionCanceled) {
+      return;
     }
-
-    if (ticks === null || (timeframe !== '1 minute' && ticks1m === null)) {
+    if (ticks === null) {
       $('#runOptBtn').removeClass('disabled');
       $('#opRunning').hide();
       $('#opResult').hide();
       openModalInfo('Could not optain data from ' + exchange + ' for the given period. The period may be too long. Please try with smaller period or try later!');
+      optimizationRunning = false;
       return;
     }
     let marketReturn = 0;
@@ -210,36 +212,39 @@ async function runOptimize() {
     $('#opRunPercent2').hide();
     $('#opRunPercent').html('Optimization Execution: 0%');
     $('#opRunRocket').show();
-    $('#opCancelDiv').show();
 
     strategyVariations = [];
     let fullOptimization = $('#opOptimizationFull').is(':checked');
+    let changeStoploss = $('#opChangeStoplossYes').is(':checked');
     let rulesCount = (strategy.buyRules.length + strategy.sellRules.length);
     let maxStrategyVariations = 250000;
     for (let rule of strategy.buyRules) {
       let rulesTmp = fullOptimization
-        ? getFullRulesVariations(rule, rulesCount)
-        : getFineTuneRulesVariations(rule, rulesCount);
+        ? getFullRulesVariations(rule, rulesCount, changeStoploss)
+        : getFineTuneRulesVariations(rule, rulesCount, changeStoploss);
       strategyVariations = await getNewStrategyVariations(rulesTmp, strategyVariations, 'buy', strategy, instrument, getTimeframe(timeframe));
       if (checkTooManyVariations()) {
+        optimizationRunning = false;
         return;
       }
     }
     for (let rule of strategy.sellRules) {
       let rulesTmp = fullOptimization
-        ? getFullRulesVariations(rule, rulesCount)
-        : getFineTuneRulesVariations(rule, rulesCount);
+        ? getFullRulesVariations(rule, rulesCount, changeStoploss)
+        : getFineTuneRulesVariations(rule, rulesCount, changeStoploss);
       strategyVariations = await getNewStrategyVariations(rulesTmp, strategyVariations, 'sell', strategy, instrument, getTimeframe(timeframe));
       if (checkTooManyVariations()) {
+        optimizationRunning = false;
         return;
       }
     }
-    if ($('#opChangeStoplossYes').is(':checked')) {
+    if (changeStoploss) {
       strategyVariations = fullOptimization
         ? await getFullStoplossAndTargetVariations(strategyVariations, rulesCount)
         : await getFineTuneStoplossAndTargetVariations(strategyVariations, strategy, rulesCount);
     }
     if (checkTooManyVariations()) {
+      optimizationRunning = false;
       return;
     }
     //alert(strategyVariations.length);
@@ -261,14 +266,12 @@ async function runOptimize() {
         : 1;
     }
 
-    workerInitializeCompleted = false;
-
-    for (let i = 0; i < maxOpWorkers; i++) {
-      opExecutionWorkers[i] = new Worker("./assets/js/optimize-execution.js");
-      opExecutionWorkers[i].addEventListener('error', async function(e) {
+    for (let i = 0; i < Math.min(maxOpWorkers, strategyVariations.length); i++) {
+      opExecutionWorkers[workerIndex] = new Worker("./assets/js/optimize-execution.js");
+      opExecutionWorkers[workerIndex].addEventListener('error', async function(e) {
         openModalInfo('Internal Error Occurred!<br>' + e.message + '<br>' + e.filename + ' ' + e.lineno);
       }, false);
-      opExecutionWorkers[i].addEventListener("message", async function(e) {
+      opExecutionWorkers[workerIndex].addEventListener("message", async function(e) {
         try {
           if (typeof e.data === 'string' && e.data.startsWith('ERR')) {
             openModalInfo('Internal Error Occurred!<br>' + e.data);
@@ -328,30 +331,22 @@ async function runOptimize() {
           executionOpMutex.release();
         }
       }, false);
-    }
-
-    await sleep(1000);
-    for (let i = 0; i < Math.min(maxOpWorkers, strategyVariations.length); i++) {
       try {
         await opWorkerTerminateMutex.lock();
-        if (opExecutionWorkers[i] !== undefined) {
-          opExecutionWorkers[i].postMessage([
-            'INITIALIZE',
-            i,
-            timeframe,
-            startDate,
-            ticks,
-            ticks1m
-          ]);
+        if (opExecutionCanceled) {
+          optimizationRunning = false;
+          return;
         }
+        opExecutionWorkers[workerIndex].postMessage(['INITIALIZE', workerIndex, timeframe, startDate, ticks]);
       } finally {
         opWorkerTerminateMutex.release();
       }
+      workerIndex++;
     }
-    workerInitializeCompleted = true;
 
   } catch (err) {
     $('#opRunning').hide();
+    optimizationRunning = false;
     await terminateOpWorkers();
     openModalInfo('Internal Error Occurred!<br>' + err);
   }
@@ -391,19 +386,24 @@ function opResultShowRows(from, to) {
 async function terminateOpWorkers() {
   try {
     await opWorkerTerminateMutex.lock();
+    $('#opRunPercent').html('Stopping Optimization..');
+    cancelGetBinanceData();
     opExecutionCanceled = true;
-    await sleep(2000);
-    for (let i = 0; i < maxOpWorkers; i++) {
-      if (opExecutionWorkers[i] !== undefined) {
-        //opExecutionWorkers[i].terminate();
-        opExecutionWorkers[i].postMessage(['STOP']);
-        opExecutionWorkers[i] = undefined;
+    optimizationRunning = false;
+
+    Object.entries(opExecutionWorkers).forEach(([key, value]) => {
+      if (value !== undefined) {
+        value.terminate();
+        opExecutionWorkers[key] = undefined;
       }
-    }
+    });
+
+    $('#opRunPercent').html('Stopping Optimization..');
+    await sleep(500);
     $('#runOptBtn').removeClass('disabled');
     $('#opCancelBtn').removeClass('disabled');
   } catch (err) {
-    //alert(err);
+    alert(err);
   } finally {
     opWorkerTerminateMutex.release();
   }
@@ -411,6 +411,7 @@ async function terminateOpWorkers() {
 
 async function fillOptimizationResult(marketReturn) {
   try {
+    optimizationRunning = false;
     $('#opCancelBtn').addClass('disabled');
 
     strategyVariationsResults.sort(function(a, b) {
@@ -459,7 +460,7 @@ async function fillOptimizationResult(marketReturn) {
   }
 }
 
-function getFineTuneRulesVariations(rule, rulesCount) {
+function getFineTuneRulesVariations(rule, rulesCount, changeStoploss) {
   let rulesTmp = [];
 
   let rP = rule.period;
@@ -499,287 +500,571 @@ function getFineTuneRulesVariations(rule, rulesCount) {
   ];
   let macdStepP3 = [rP3];
   let macdStepV = [rV];
-
-  switch (rulesCount) {
-    case 1:
-      maStepP = [
-        rP - 5,
-        rP - 4,
-        rP - 3,
-        rP - 2,
-        rP - 1,
-        rP,
-        rP + 1,
-        rP + 2,
-        rP + 3,
-        rP + 4,
-        rP + 5
-      ];
-      maStepV = [
-        rV - 3,
-        rV - 2.5,
-        rV - 2,
-        rV - 1.5,
-        rV - 1,
-        rV - 0.5,
-        rV - 0.25,
-        rV,
-        rV + 0.25,
-        rV + 0.5,
-        rV + 1,
-        rV + 1.5,
-        rV + 2,
-        rV + 2.5,
-        rV + 3
-      ];
-      cmaStepP2 = [
-        rP2 - 5,
-        rP2 - 4,
-        rP2 - 3,
-        rP2 - 2,
-        rP2 - 1,
-        rP2,
-        rP2 + 1,
-        rP2 + 2,
-        rP2 + 3,
-        rP2 + 4,
-        rP2 + 5
-      ];
-      cmaStepP = [
-        rP - 5,
-        rP - 4,
-        rP - 3,
-        rP - 2,
-        rP - 1,
-        rP,
-        rP + 1,
-        rP + 2,
-        rP + 3,
-        rP + 4,
-        rP + 5
-      ];
-      rsiStepP = [
-        rP - 5,
-        rP - 4,
-        rP - 3,
-        rP - 2,
-        rP - 1,
-        rP,
-        rP + 1,
-        rP + 2,
-        rP + 3,
-        rP + 4,
-        rP + 5
-      ];
-      rsiStepV = [
-        rV - 10,
-        rV - 7,
-        rV - 5,
-        rV - 3,
-        rV - 2,
-        rV - 1,
-        rV,
-        rV + 1,
-        rV + 2,
-        rV + 3,
-        rV + 5,
-        rV + 7,
-        rV + 10
-      ];
-      macdStepP2 = [
-        rP2 - 2,
-        rP2 - 1,
-        rP2,
-        rP2 + 1,
-        rP2 + 2
-      ];
-      macdStepP = [
-        rP - 2,
-        rP - 1,
-        rP,
-        rP + 1,
-        rP + 2
-      ];
-      macdStepP3 = [
-        rP3 - 2,
-        rP3 - 1,
-        rP3,
-        rP3 + 1,
-        rP3 + 2
-      ];
-      macdStepV = [
-        rV - 1,
-        rV - 0.5,
-        rV,
-        rV + 0.5,
-        rV + 1
-      ];
-      break;
-    case 2:
-      maStepP = [
-        rP - 5,
-        rP - 3,
-        rP - 2,
-        rP,
-        rP + 2,
-        rP + 3,
-        rP + 5
-      ];
-      maStepV = [
-        rV - 1.5,
-        rV - 1,
-        rV - 0.5,
-        rV,
-        rV + 0.5,
-        rV + 1,
-        rV + 1.5
-      ];
-      cmaStepP2 = [
-        rP2 - 3,
-        rP2 - 2,
-        rP2 - 1,
-        rP2,
-        rP2 + 1,
-        rP2 + 2,
-        rP2 + 3
-      ];
-      cmaStepP = [
-        rP - 3,
-        rP - 2,
-        rP - 1,
-        rP,
-        rP + 1,
-        rP + 2,
-        rP + 3
-      ];
-      rsiStepP = [
-        rP - 2,
-        rP - 1,
-        rP,
-        rP + 1,
-        rP + 2
-      ];
-      rsiStepV = [
-        rV - 10,
-        rV - 5,
-        rV - 3,
-        rV - 1,
-        rV,
-        rV + 1,
-        rV + 3,
-        rV + 5,
-        rV + 10
-      ];
-      macdStepP2 = [
-        rP2 - 1,
-        rP2,
-        rP2 + 1
-      ];
-      macdStepP = [
-        rP - 1,
-        rP,
-        rP + 1
-      ];
-      macdStepP3 = [
-        rP3 - 1,
-        rP3,
-        rP3 + 1
-      ];
-      macdStepV = [rV];
-      break;
-    case 3:
-      maStepP = [
-        rP - 3,
-        rP,
-        rP + 3
-      ];
-      maStepV = [
-        rV - 1,
-        rV - 0.5,
-        rV,
-        rV + 0.5,
-        rV + 1
-      ];
-      cmaStepP2 = [
-        rP2 - 2,
-        rP2 - 1,
-        rP2,
-        rP2 + 1,
-        rP2 + 2
-      ];
-      cmaStepP = [
-        rP - 2,
-        rP - 1,
-        rP,
-        rP + 1,
-        rP + 2
-      ];
-      rsiStepP = [
-        rP - 1,
-        rP,
-        rP + 1
-      ];
-      rsiStepV = [
-        rV - 5,
-        rV - 3,
-        rV - 1,
-        rV,
-        rV + 1,
-        rV + 3,
-        rV + 5
-      ];
-      macdStepP2 = [
-        rP2 - 1,
-        rP2,
-        rP2 + 1
-      ];
-      macdStepP = [
-        rP - 1,
-        rP,
-        rP + 1
-      ];
-      macdStepP3 = [
-        rP3 - 1,
-        rP3,
-        rP3 + 1
-      ];
-      macdStepV = [rV];
-      break;
-    case 4:
-      maStepP = [
-        rP - 3,
-        rP,
-        rP + 3
-      ];
-      maStepV = [
-        rV - 1,
-        rV,
-        rV + 1
-      ];
-      cmaStepP2 = [
-        rP2 - 2,
-        rP2 - 1,
-        rP2,
-        rP2 + 1,
-        rP2 + 2
-      ];
-      cmaStepP = [
-        rP - 1,
-        rP,
-        rP + 1
-      ];
-      rsiStepP = [
-        rP - 1,
-        rP,
-        rP + 1
-      ];
-      rsiStepV = [
-        rV - 3,
-        rV,
-        rV + 3
-      ];
-      break;
-    default:
+  if (changeStoploss) {
+    switch (rulesCount) {
+      case 1:
+        maStepP = [
+          rP - 5,
+          rP - 4,
+          rP - 3,
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2,
+          rP + 3,
+          rP + 4,
+          rP + 5
+        ];
+        maStepV = [
+          rV - 3,
+          rV - 2.5,
+          rV - 2,
+          rV - 1.5,
+          rV - 1,
+          rV - 0.5,
+          rV - 0.25,
+          rV,
+          rV + 0.25,
+          rV + 0.5,
+          rV + 1,
+          rV + 1.5,
+          rV + 2,
+          rV + 2.5,
+          rV + 3
+        ];
+        cmaStepP2 = [
+          rP2 - 5,
+          rP2 - 4,
+          rP2 - 3,
+          rP2 - 2,
+          rP2 - 1,
+          rP2,
+          rP2 + 1,
+          rP2 + 2,
+          rP2 + 3,
+          rP2 + 4,
+          rP2 + 5
+        ];
+        cmaStepP = [
+          rP - 5,
+          rP - 4,
+          rP - 3,
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2,
+          rP + 3,
+          rP + 4,
+          rP + 5
+        ];
+        rsiStepP = [
+          rP - 5,
+          rP - 4,
+          rP - 3,
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2,
+          rP + 3,
+          rP + 4,
+          rP + 5
+        ];
+        rsiStepV = [
+          rV - 10,
+          rV - 7,
+          rV - 5,
+          rV - 3,
+          rV - 2,
+          rV - 1,
+          rV,
+          rV + 1,
+          rV + 2,
+          rV + 3,
+          rV + 5,
+          rV + 7,
+          rV + 10
+        ];
+        macdStepP2 = [
+          rP2 - 2,
+          rP2 - 1,
+          rP2,
+          rP2 + 1,
+          rP2 + 2
+        ];
+        macdStepP = [
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2
+        ];
+        macdStepP3 = [
+          rP3 - 2,
+          rP3 - 1,
+          rP3,
+          rP3 + 1,
+          rP3 + 2
+        ];
+        macdStepV = [
+          rV - 1,
+          rV - 0.5,
+          rV,
+          rV + 0.5,
+          rV + 1
+        ];
+        break;
+      case 2:
+        maStepP = [
+          rP - 5,
+          rP - 3,
+          rP - 2,
+          rP,
+          rP + 2,
+          rP + 3,
+          rP + 5
+        ];
+        maStepV = [
+          rV - 1.5,
+          rV - 1,
+          rV - 0.5,
+          rV,
+          rV + 0.5,
+          rV + 1,
+          rV + 1.5
+        ];
+        cmaStepP2 = [
+          rP2 - 3,
+          rP2 - 2,
+          rP2 - 1,
+          rP2,
+          rP2 + 1,
+          rP2 + 2,
+          rP2 + 3
+        ];
+        cmaStepP = [
+          rP - 3,
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2,
+          rP + 3
+        ];
+        rsiStepP = [
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2
+        ];
+        rsiStepV = [
+          rV - 10,
+          rV - 5,
+          rV - 3,
+          rV - 1,
+          rV,
+          rV + 1,
+          rV + 3,
+          rV + 5,
+          rV + 10
+        ];
+        macdStepP2 = [
+          rP2 - 1,
+          rP2,
+          rP2 + 1
+        ];
+        macdStepP = [
+          rP - 1,
+          rP,
+          rP + 1
+        ];
+        macdStepP3 = [
+          rP3 - 1,
+          rP3,
+          rP3 + 1
+        ];
+        macdStepV = [rV];
+        break;
+      case 3:
+        maStepP = [
+          rP - 3,
+          rP,
+          rP + 3
+        ];
+        maStepV = [
+          rV - 1,
+          rV - 0.5,
+          rV,
+          rV + 0.5,
+          rV + 1
+        ];
+        cmaStepP2 = [
+          rP2 - 2,
+          rP2 - 1,
+          rP2,
+          rP2 + 1,
+          rP2 + 2
+        ];
+        cmaStepP = [
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2
+        ];
+        rsiStepP = [
+          rP - 1,
+          rP,
+          rP + 1
+        ];
+        rsiStepV = [
+          rV - 5,
+          rV - 3,
+          rV - 1,
+          rV,
+          rV + 1,
+          rV + 3,
+          rV + 5
+        ];
+        macdStepP2 = [
+          rP2 - 1,
+          rP2,
+          rP2 + 1
+        ];
+        macdStepP = [
+          rP - 1,
+          rP,
+          rP + 1
+        ];
+        macdStepP3 = [
+          rP3 - 1,
+          rP3,
+          rP3 + 1
+        ];
+        macdStepV = [rV];
+        break;
+      case 4:
+        maStepP = [
+          rP - 3,
+          rP,
+          rP + 3
+        ];
+        maStepV = [
+          rV - 1,
+          rV,
+          rV + 1
+        ];
+        cmaStepP2 = [
+          rP2 - 2,
+          rP2 - 1,
+          rP2,
+          rP2 + 1,
+          rP2 + 2
+        ];
+        cmaStepP = [
+          rP - 1,
+          rP,
+          rP + 1
+        ];
+        rsiStepP = [
+          rP - 1,
+          rP,
+          rP + 1
+        ];
+        rsiStepV = [
+          rV - 3,
+          rV,
+          rV + 3
+        ];
+        break;
+      default:
+    }
+  } else {
+    switch (rulesCount) {
+      case 1:
+      case 2:
+        maStepP = [
+          rP - 5,
+          rP - 4,
+          rP - 3,
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2,
+          rP + 3,
+          rP + 4,
+          rP + 5
+        ];
+        maStepV = [
+          rV - 3,
+          rV - 2.5,
+          rV - 2,
+          rV - 1.5,
+          rV - 1,
+          rV - 0.5,
+          rV - 0.25,
+          rV,
+          rV + 0.25,
+          rV + 0.5,
+          rV + 1,
+          rV + 1.5,
+          rV + 2,
+          rV + 2.5,
+          rV + 3
+        ];
+        cmaStepP2 = [
+          rP2 - 5,
+          rP2 - 4,
+          rP2 - 3,
+          rP2 - 2,
+          rP2 - 1,
+          rP2,
+          rP2 + 1,
+          rP2 + 2,
+          rP2 + 3,
+          rP2 + 4,
+          rP2 + 5
+        ];
+        cmaStepP = [
+          rP - 5,
+          rP - 4,
+          rP - 3,
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2,
+          rP + 3,
+          rP + 4,
+          rP + 5
+        ];
+        rsiStepP = [
+          rP - 5,
+          rP - 4,
+          rP - 3,
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2,
+          rP + 3,
+          rP + 4,
+          rP + 5
+        ];
+        rsiStepV = [
+          rV - 10,
+          rV - 7,
+          rV - 5,
+          rV - 3,
+          rV - 2,
+          rV - 1,
+          rV,
+          rV + 1,
+          rV + 2,
+          rV + 3,
+          rV + 5,
+          rV + 7,
+          rV + 10
+        ];
+        macdStepP2 = [
+          rP2 - 2,
+          rP2 - 1,
+          rP2,
+          rP2 + 1,
+          rP2 + 2
+        ];
+        macdStepP = [
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2
+        ];
+        macdStepP3 = [
+          rP3 - 2,
+          rP3 - 1,
+          rP3,
+          rP3 + 1,
+          rP3 + 2
+        ];
+        macdStepV = [
+          rV - 1,
+          rV - 0.5,
+          rV,
+          rV + 0.5,
+          rV + 1
+        ];
+        break;
+      case 3:
+        maStepP = [
+          rP - 5,
+          rP - 3,
+          rP - 2,
+          rP,
+          rP + 2,
+          rP + 3,
+          rP + 5
+        ];
+        maStepV = [
+          rV - 1.5,
+          rV - 1,
+          rV - 0.5,
+          rV,
+          rV + 0.5,
+          rV + 1,
+          rV + 1.5
+        ];
+        cmaStepP2 = [
+          rP2 - 3,
+          rP2 - 2,
+          rP2 - 1,
+          rP2,
+          rP2 + 1,
+          rP2 + 2,
+          rP2 + 3
+        ];
+        cmaStepP = [
+          rP - 3,
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2,
+          rP + 3
+        ];
+        rsiStepP = [
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2
+        ];
+        rsiStepV = [
+          rV - 10,
+          rV - 5,
+          rV - 3,
+          rV - 1,
+          rV,
+          rV + 1,
+          rV + 3,
+          rV + 5,
+          rV + 10
+        ];
+        macdStepP2 = [
+          rP2 - 1,
+          rP2,
+          rP2 + 1
+        ];
+        macdStepP = [
+          rP - 1,
+          rP,
+          rP + 1
+        ];
+        macdStepP3 = [
+          rP3 - 1,
+          rP3,
+          rP3 + 1
+        ];
+        macdStepV = [rV];
+        break;
+      case 4:
+        maStepP = [
+          rP - 3,
+          rP,
+          rP + 3
+        ];
+        maStepV = [
+          rV - 1,
+          rV - 0.5,
+          rV,
+          rV + 0.5,
+          rV + 1
+        ];
+        cmaStepP2 = [
+          rP2 - 2,
+          rP2 - 1,
+          rP2,
+          rP2 + 1,
+          rP2 + 2
+        ];
+        cmaStepP = [
+          rP - 2,
+          rP - 1,
+          rP,
+          rP + 1,
+          rP + 2
+        ];
+        rsiStepP = [
+          rP - 1,
+          rP,
+          rP + 1
+        ];
+        rsiStepV = [
+          rV - 5,
+          rV - 3,
+          rV - 1,
+          rV,
+          rV + 1,
+          rV + 3,
+          rV + 5
+        ];
+        macdStepP2 = [
+          rP2 - 1,
+          rP2,
+          rP2 + 1
+        ];
+        macdStepP = [
+          rP - 1,
+          rP,
+          rP + 1
+        ];
+        macdStepP3 = [
+          rP3 - 1,
+          rP3,
+          rP3 + 1
+        ];
+        macdStepV = [rV];
+        break;
+      case 5:
+        maStepP = [
+          rP - 3,
+          rP,
+          rP + 3
+        ];
+        maStepV = [
+          rV - 1,
+          rV,
+          rV + 1
+        ];
+        cmaStepP2 = [
+          rP2 - 2,
+          rP2 - 1,
+          rP2,
+          rP2 + 1,
+          rP2 + 2
+        ];
+        cmaStepP = [
+          rP - 1,
+          rP,
+          rP + 1
+        ];
+        rsiStepP = [
+          rP - 1,
+          rP,
+          rP + 1
+        ];
+        rsiStepV = [
+          rV - 3,
+          rV,
+          rV + 3
+        ];
+        break;
+      default:
+    }
   }
 
   if (rule.indicator === 'sma' || rule.indicator === 'ema') {
@@ -907,7 +1192,7 @@ function getFineTuneRulesVariations(rule, rulesCount) {
   return rulesTmp;
 }
 
-function getFullRulesVariations(rule, rulesCount) {
+function getFullRulesVariations(rule, rulesCount, changeStoploss) {
   let rulesTmp = [];
 
   let maStepP = [10, 20, 30];
@@ -920,201 +1205,401 @@ function getFullRulesVariations(rule, rulesCount) {
   let macdStepP = [6, 12];
   let macdStepP3 = [5, 9];
   let macdStepV = [1];
-  switch (rulesCount) {
-    case 1:
-      maStepP = [
-        5,
-        8,
-        10,
-        12,
-        15,
-        18,
-        20,
-        25,
-        30,
-        35,
-        40,
-        50
-      ];
-      maStepV = [
-        0.2,
-        0.3,
-        0.5,
-        0.8,
-        1,
-        1.5,
-        2,
-        2.5,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8
-      ];
-      cmaStepP2 = [
-        5,
-        8,
-        10,
-        12,
-        15,
-        18,
-        20,
-        25,
-        30,
-        35,
-        40,
-        45,
-        50
-      ];
-      cmaStepP = [
-        3,
-        5,
-        8,
-        10,
-        12,
-        15,
-        18,
-        20,
-        25,
-        30,
-        35,
-        40
-      ];
-      rsiStepP = [
-        3,
-        5,
-        7,
-        10,
-        12,
-        14,
-        16,
-        18,
-        22
-      ];
-      rsiStepV = [
-        10,
-        15,
-        20,
-        25,
-        30,
-        35,
-        40,
-        50,
-        60,
-        65,
-        70,
-        75,
-        80,
-        85,
-        90
-      ];
-      macdStepP2 = [
-        6,
-        12,
-        18,
-        22,
-        26,
-        32
-      ];
-      macdStepP = [
-        3,
-        6,
-        12,
-        14,
-        18,
-        22
-      ];
-      macdStepP3 = [3, 5, 9, 12];
-      macdStepV = [0.5, 1, 2, 5];
-      break;
-    case 2:
-      maStepP = [
-        5,
-        8,
-        10,
-        15,
-        20,
-        30,
-        40
-      ];
-      maStepV = [
-        0.2,
-        0.5,
-        1,
-        2,
-        5,
-        8
-      ];
-      cmaStepP2 = [
-        5,
-        8,
-        10,
-        12,
-        15,
-        20,
-        30,
-        40,
-        50
-      ];
-      cmaStepP = [
-        3,
-        5,
-        8,
-        10,
-        12,
-        15,
-        20,
-        30
-      ];
-      rsiStepP = [5, 7, 10, 14, 18];
-      rsiStepV = [
-        15,
-        20,
-        30,
-        40,
-        60,
-        70,
-        80,
-        85
-      ];
-      macdStepP2 = [12, 22, 26, 32];
-      macdStepP = [6, 12, 18];
-      macdStepP3 = [5, 9];
-      macdStepV = [0.5, 3];
-      break;
-    case 3:
-      maStepP = [5, 10, 20, 30];
-      maStepV = [0.2, 1, 2, 3, 5];
-      cmaStepP2 = [
-        5,
-        10,
-        20,
-        30,
-        40,
-        50
-      ];
-      cmaStepP = [3, 5, 10, 15, 20];
-      rsiStepP = [7, 10, 14, 18];
-      rsiStepV = [15, 30, 50, 70, 85];
-      macdStepP2 = [12, 22, 26, 32];
-      macdStepP = [6, 12, 18];
-      macdStepP3 = [5, 9];
-      macdStepV = [1];
-      break;
-    case 4:
-      maStepP = [10, 20, 30];
-      maStepV = [0.2, 1, 3];
-      cmaStepP2 = [10, 20, 30, 40];
-      cmaStepP = [5, 10, 20];
-      rsiStepP = [7, 10, 14];
-      rsiStepV = [30, 50, 70];
-      macdStepP2 = [12, 26, 32];
-      macdStepP = [6, 12];
-      macdStepP3 = [5, 9];
-      macdStepV = [1];
-      break;
-    default:
+  if (changeStoploss) {
+    switch (rulesCount) {
+      case 1:
+        maStepP = [
+          5,
+          8,
+          10,
+          12,
+          15,
+          18,
+          20,
+          25,
+          30,
+          35,
+          40,
+          50
+        ];
+        maStepV = [
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1,
+          1.5,
+          2,
+          2.5,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ];
+        cmaStepP2 = [
+          5,
+          8,
+          10,
+          12,
+          15,
+          18,
+          20,
+          25,
+          30,
+          35,
+          40,
+          45,
+          50
+        ];
+        cmaStepP = [
+          3,
+          5,
+          8,
+          10,
+          12,
+          15,
+          18,
+          20,
+          25,
+          30,
+          35,
+          40
+        ];
+        rsiStepP = [
+          3,
+          5,
+          7,
+          10,
+          12,
+          14,
+          16,
+          18,
+          22
+        ];
+        rsiStepV = [
+          10,
+          15,
+          20,
+          25,
+          30,
+          35,
+          40,
+          50,
+          60,
+          65,
+          70,
+          75,
+          80,
+          85,
+          90
+        ];
+        macdStepP2 = [
+          6,
+          12,
+          18,
+          22,
+          26,
+          32
+        ];
+        macdStepP = [
+          3,
+          6,
+          12,
+          14,
+          18,
+          22
+        ];
+        macdStepP3 = [3, 5, 9, 12];
+        macdStepV = [0.5, 1, 2, 5];
+        break;
+      case 2:
+        maStepP = [
+          5,
+          8,
+          10,
+          15,
+          20,
+          30,
+          40
+        ];
+        maStepV = [
+          0.2,
+          0.5,
+          1,
+          2,
+          5,
+          8
+        ];
+        cmaStepP2 = [
+          5,
+          8,
+          10,
+          12,
+          15,
+          20,
+          30,
+          40,
+          50
+        ];
+        cmaStepP = [
+          3,
+          5,
+          8,
+          10,
+          12,
+          15,
+          20,
+          30
+        ];
+        rsiStepP = [5, 7, 10, 14, 18];
+        rsiStepV = [
+          15,
+          20,
+          30,
+          40,
+          60,
+          70,
+          80,
+          85
+        ];
+        macdStepP2 = [12, 22, 26, 32];
+        macdStepP = [6, 12, 18];
+        macdStepP3 = [5, 9];
+        macdStepV = [0.5, 3];
+        break;
+      case 3:
+        maStepP = [5, 10, 20, 30];
+        maStepV = [0.2, 1, 2, 3, 5];
+        cmaStepP2 = [
+          5,
+          10,
+          20,
+          30,
+          40,
+          50
+        ];
+        cmaStepP = [3, 5, 10, 15, 20];
+        rsiStepP = [7, 10, 14, 18];
+        rsiStepV = [15, 30, 50, 70, 85];
+        macdStepP2 = [12, 22, 26, 32];
+        macdStepP = [6, 12, 18];
+        macdStepP3 = [5, 9];
+        macdStepV = [1];
+        break;
+      case 4:
+        maStepP = [10, 20, 30];
+        maStepV = [0.2, 1, 3];
+        cmaStepP2 = [10, 20, 30, 40];
+        cmaStepP = [5, 10, 20];
+        rsiStepP = [7, 10, 14];
+        rsiStepV = [30, 50, 70];
+        macdStepP2 = [12, 26, 32];
+        macdStepP = [6, 12];
+        macdStepP3 = [5, 9];
+        macdStepV = [1];
+        break;
+      default:
+    }
+  } else {
+    switch (rulesCount) {
+      case 1:
+      case 2:
+        maStepP = [
+          5,
+          8,
+          10,
+          12,
+          15,
+          18,
+          20,
+          25,
+          30,
+          35,
+          40,
+          50
+        ];
+        maStepV = [
+          0.2,
+          0.3,
+          0.5,
+          0.8,
+          1,
+          1.5,
+          2,
+          2.5,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ];
+        cmaStepP2 = [
+          5,
+          8,
+          10,
+          12,
+          15,
+          18,
+          20,
+          25,
+          30,
+          35,
+          40,
+          45,
+          50
+        ];
+        cmaStepP = [
+          3,
+          5,
+          8,
+          10,
+          12,
+          15,
+          18,
+          20,
+          25,
+          30,
+          35,
+          40
+        ];
+        rsiStepP = [
+          3,
+          5,
+          7,
+          10,
+          12,
+          14,
+          16,
+          18,
+          22
+        ];
+        rsiStepV = [
+          10,
+          15,
+          20,
+          25,
+          30,
+          35,
+          40,
+          50,
+          60,
+          65,
+          70,
+          75,
+          80,
+          85,
+          90
+        ];
+        macdStepP2 = [
+          6,
+          12,
+          18,
+          22,
+          26,
+          32
+        ];
+        macdStepP = [
+          3,
+          6,
+          12,
+          14,
+          18,
+          22
+        ];
+        macdStepP3 = [3, 5, 9, 12];
+        macdStepV = [0.5, 1, 2, 5];
+        break;
+      case 3:
+        maStepP = [
+          5,
+          8,
+          10,
+          15,
+          20,
+          30,
+          40
+        ];
+        maStepV = [
+          0.2,
+          0.5,
+          1,
+          2,
+          5,
+          8
+        ];
+        cmaStepP2 = [
+          5,
+          8,
+          10,
+          12,
+          15,
+          20,
+          30,
+          40,
+          50
+        ];
+        cmaStepP = [
+          3,
+          5,
+          8,
+          10,
+          12,
+          15,
+          20,
+          30
+        ];
+        rsiStepP = [5, 7, 10, 14, 18];
+        rsiStepV = [
+          15,
+          20,
+          30,
+          40,
+          60,
+          70,
+          80,
+          85
+        ];
+        macdStepP2 = [12, 22, 26, 32];
+        macdStepP = [6, 12, 18];
+        macdStepP3 = [5, 9];
+        macdStepV = [0.5, 3];
+        break;
+      case 4:
+        maStepP = [5, 10, 20, 30];
+        maStepV = [0.2, 1, 2, 3, 5];
+        cmaStepP2 = [
+          5,
+          10,
+          20,
+          30,
+          40,
+          50
+        ];
+        cmaStepP = [3, 5, 10, 15, 20];
+        rsiStepP = [7, 10, 14, 18];
+        rsiStepV = [15, 30, 50, 70, 85];
+        macdStepP2 = [12, 22, 26, 32];
+        macdStepP = [6, 12, 18];
+        macdStepP3 = [5, 9];
+        macdStepV = [1];
+        break;
+      case 5:
+        maStepP = [10, 20, 30];
+        maStepV = [0.2, 1, 3];
+        cmaStepP2 = [10, 20, 30, 40];
+        cmaStepP = [5, 10, 20];
+        rsiStepP = [7, 10, 14];
+        rsiStepV = [30, 50, 70];
+        macdStepP2 = [12, 26, 32];
+        macdStepP = [6, 12];
+        macdStepP3 = [5, 9];
+        macdStepV = [1];
+        break;
+      default:
+    }
   }
 
   if (rule.indicator === 'sma' || rule.indicator === 'ema') {
@@ -1383,7 +1868,7 @@ async function getFullStoplossAndTargetVariations(strategyVariations, rulesCount
     case 3:
     case 4:
       stops = [1, 3, 5];
-      targets = [1, 3, 7, 10];
+      targets = [1, 3, 5, 7];
       break;
     default:
   }
@@ -1391,7 +1876,7 @@ async function getFullStoplossAndTargetVariations(strategyVariations, rulesCount
   let count = 0;
   for (let stoploss of stops) {
     for (let target of targets) {
-      if (stoploss > 3 && target === 0.5) {
+      if (stoploss - 2 >= target) {
         continue;
       }
       for (let strategy of strategyVariations) {
@@ -1429,7 +1914,7 @@ async function getNewStrategyVariations(newRules, strategyVariations, type, stra
         }
         count++;
         let newSstrategy = {};
-        newSstrategy.name = strategy.name + ' (optimized for ' + instrument + ' ' + timeframe + ')';
+        newSstrategy.name = strategy.name + ' (' + instrument + ' ' + timeframe + ')';
         newSstrategy.buyRules = [];
         newSstrategy.sellRules = [];
         newSstrategy.stoploss = strategy.stoploss;
@@ -1491,7 +1976,7 @@ function openOpStrategy(index) {
 }
 
 function opOptInfo() {
-  openModalInfoBig('<div class="text-center">Optimization Type</div>Rough Tune - uses a default wide range of parameters, ingnoring yours.<br>Fine Tune - uses detailed variations around your parameters.');
+  openModalInfoBig('<div class="text-center">Optimization Type</div>Rough Tune - uses a default wide range of parameters, ignoring yours.<br>Fine Tune - uses detailed variations around your parameters.<br>For more details please visit <span class="one-click-select">https://easycryptobot.com/optimization</span>');
 }
 function opCpuInfo() {
   openModalInfoBig('<div class="text-center">CPU Use</div>1 Core - uses only 1 CPU core. Will run slower but will not consume much CPU power.<br>Half Cores - uses half of your CPU cores. Runs faster but you should close some of the running apps.<br>All Cores - uses all of your CPU cores. The fastest but you should close all other apps.');

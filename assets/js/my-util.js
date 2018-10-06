@@ -448,3 +448,7 @@ function chunkArray(myArray, chunkSize) {
   }
   return result;
 }
+
+function opKeyDownDoNothing(e) {
+  e.preventDefault();
+}

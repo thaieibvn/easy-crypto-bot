@@ -81,7 +81,7 @@
     </div>
 
     <div class="text-center">
-      <a id="runOptBtn" href="#/" onclick="runOptimize()" class="button button-big margin-s-b30"><i class="text-green fas fa-play"></i> Optimize</a>
+      <a id="runOptBtn" href="#/" onkeydown="opKeyDownDoNothing(event)" onclick="runOptimize()" class="button button-big margin-s-b30"><i class="text-green fas fa-play"></i> Optimize</a>
     </div>
 
     <div id="opResultDiv" class="display-none">
@@ -94,7 +94,7 @@
         </div>
         <div id="opCancelDiv" class="text-center">
           <br>
-          <a id="opCancelBtn" href="#/" onclick="opCancel()" class="button button-big margin-s-b30"><i class="text-red fas fa-stop"></i> Cancel</a>
+          <a id="opCancelBtn" href="#/" onkeydown="opKeyDownDoNothing(event)" onclick="opCancel()" class="button button-big margin-s-b30"><i class="text-red fas fa-stop"></i> Cancel</a>
         </div>
       </div>
       <div id="opResult" class="display-none">
@@ -109,7 +109,7 @@
     </div>
     <div id="opExecInfo" class="text-center">
       <hr>
-      The optimization execution time depends on the number of rules in your strategy.<br>Using "Change Stoploss and Target" slows additionaly the execution.
+      The optimization execution time depends on the number of rules in your strategy.
     </div>
   </div>
 

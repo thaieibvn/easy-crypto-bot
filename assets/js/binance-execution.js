@@ -24,6 +24,19 @@ function getBidAsk(binance, pair) {
   });
 }
 
+async function getBidPrice(curPrice, binance, instrument) {
+  for (let i = 0; i < 5; i++) {
+    let bidAsk = await getBidAsk(binance, instrument);
+    if (isNaN(bidAsk[0])) {
+      await sleep(100);
+    } else {
+      curPrice = bidAsk[0];
+      break;
+    }
+  }
+  return curPrice;
+}
+
 self.addEventListener('message', function(e) {
   try {
     if (typeof e.data === 'string' && e.data === ('stop')) {
@@ -51,19 +64,21 @@ self.addEventListener('message', function(e) {
     });
 
     let tradeType = 'buy';
+    let alertType = 'buy';
     let stoploss = Number.MIN_VALUE;
     let target = Number.MAX_VALUE;
-    let tickIndex = 0;
-    let buySentIndex = -1;
-    let sellSentIndex = -1;
     const mutex = new Mutex();
+    let lastCheckedData = -1;
+    let firstCande = true;
+
     binance.websockets.chart(execution.instrument, execution.timeframe, async (symbol, interval, chart) => {
       if (!running) {
         return;
       }
       try {
         await mutex.lock();
-        let curDate = new Date(Number.parseFloat(binance.last(chart)));
+        let lastDate = binance.last(chart);
+        let curDate = new Date(Number.parseFloat(lastDate));
         if (!statusSent) {
           let tickTmp = binance.last(chart);
           if (chart[tickTmp] === undefined) {
@@ -77,7 +92,6 @@ self.addEventListener('message', function(e) {
             statusSent = true;
           }
         }
-        tickIndex++;
         let closePrices = [];
         Object.keys(chart).forEach(function(key) {
           try {
@@ -88,63 +102,37 @@ self.addEventListener('message', function(e) {
           } catch (err) {}
         });
         let curPrice = closePrices.pop();
-        if (execution.type === 'Alerts') {
-          if (checkTradeRules(strategy.buyRules, closePrices, curPrice)) {
-            let bidAsk = await getBidAsk(binance, execution.instrument);
-            if (isNaN(bidAsk[1])) {
-              //try once again after 0.5 sec
-              await sleep(500);
-              bidAsk = await getBidAsk(binance, execution.instrument);
-            }
-            if (!isNaN(bidAsk[1]) && checkTradeRules(strategy.buyRules, closePrices, bidAsk[1])) {
-              //To ensure only one post message when rules are met
-              if (tickIndex === buySentIndex + 1) {
-                buySentIndex = tickIndex;
-                return;
-              }
-              buySentIndex = tickIndex;
-              self.postMessage([new Date(), curPrice, 'Buy']);
-            }
-          }
-          if (checkTradeRules(strategy.sellRules, closePrices, curPrice)) {
-            let bidAsk = await getBidAsk(binance, execution.instrument);
-            if (isNaN(bidAsk[1])) {
-              //try once again after 0.5 sec
-              await sleep(500);
-              bidAsk = await getBidAsk(binance, execution.instrument);
-            }
-            if (!isNaN(bidAsk[0]) && checkTradeRules(strategy.sellRules, closePrices, bidAsk[0])) {
-              //To ensure only one post message when rules are met
-              if (tickIndex === sellSentIndex + 1) {
-                sellSentIndex = tickIndex;
-                return;
-              }
-              sellSentIndex = tickIndex;
-              self.postMessage([new Date(), curPrice, 'Sell']);
-            }
-          }
-        } else {
-          if (tradeType === 'buy') {
-            //Only one trade per candle for the given timeframe
-            if (trades.length > 0 && curDate.getTime() === trades[trades.length - 1].closeDateOrg.getTime()) {
-              return;
-            }
-            if (checkTradeRules(strategy.buyRules, closePrices, curPrice)) {
-              //Try if the rules are met with the price that is possible to trade with - the ask price.
-              let bidAsk = await getBidAsk(binance, execution.instrument);
-              if (isNaN(bidAsk[1])) {
-                //try once again after 0.5 sec
-                await sleep(500);
-                bidAsk = await getBidAsk(binance, execution.instrument);
-              }
-              if (!isNaN(bidAsk[1])) {
-                let buyMet = true;
-                if (bidAsk[1] !== curPrice) {
-                  buyMet = checkTradeRules(strategy.buyRules, closePrices, bidAsk[1]);
-                  curPrice = bidAsk[1];
+        let executeRealCloseTrade = false;
+        if (lastDate !== lastCheckedData) {
+          lastCheckedData = lastDate;
+          if (!firstCande) {
+            //check rules here
+            if (execution.type === 'Alerts') {
+              if (alertType === 'buy') {
+                if (checkTradeRules(strategy.buyRules, closePrices)) {
+                  alertType='sell';
+                  self.postMessage([new Date(), curPrice, 'Buy']);
                 }
-                if (buyMet) {
-                  //get ask price and try again
+              } else {
+                if (checkTradeRules(strategy.sellRules, closePrices)) {
+                  alertType='buy';
+                  self.postMessage([new Date(), curPrice, 'Sell']);
+                }
+              }
+            } else {
+              //Real and simulation mod
+              if (tradeType === 'buy') {
+                if (checkTradeRules(strategy.buyRules, closePrices)) {
+
+                  for (let i = 0; i < 5; i++) {
+                    let bidAsk = await getBidAsk(binance, execution.instrument);
+                    if (isNaN(bidAsk[1])) {
+                      await sleep(100);
+                    } else {
+                      curPrice = bidAsk[1];
+                      break;
+                    }
+                  }
                   let trade = {
                     'openDate': new Date(),
                     'entry': curPrice,
@@ -157,6 +145,7 @@ self.addEventListener('message', function(e) {
                   if (strategy.target !== null && !isNaN(strategy.target)) {
                     target = curPrice * (1 + (strategy.target / 100));
                   }
+
                   let tradeIndex = trades.length;
                   trades.push(trade);
                   tradeType = 'sell'
@@ -180,6 +169,13 @@ self.addEventListener('message', function(e) {
                               if (tradePrice !== curPrice) {
                                 trades[tradeIndex].entry = tradePrice;
                                 self.postMessage([tradePrice, 'UpdateOpenPrice', tradeIndex, feeRate]);
+
+                                if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
+                                  stoploss = tradePrice * (1 - (strategy.stoploss / 100));
+                                }
+                                if (strategy.target !== null && !isNaN(strategy.target)) {
+                                  target = tradePrice * (1 + (strategy.target / 100));
+                                }
                               }
                               break;
                             }
@@ -189,63 +185,62 @@ self.addEventListener('message', function(e) {
                     });
                   }
                 }
-              }
-            }
-          } else {
-            let executeRealTrade = false;
-            let tradeIndex = trades.length - 1;
-            if (stoploss >= curPrice || target <= curPrice) {
-              executeRealTrade = true;
-              trades[tradeIndex]['closeDate'] = new Date();
-              trades[tradeIndex]['closeDateOrg'] = curDate;
-              trades[tradeIndex]['exit'] = curPrice;
-              tradeType = 'buy';
-              self.postMessage([trades[tradeIndex], 'Sell', feeRate]);
-            } else if (checkTradeRules(strategy.sellRules, closePrices, curPrice)) {
-              let bidAsk = await getBidAsk(binance, execution.instrument);
-              if (isNaN(bidAsk[0])) {
-                //try once again after 0.5 sec
-                await sleep(500);
-                bidAsk = await getBidAsk(binance, execution.instrument);
-              }
-              if (!isNaN(bidAsk[0])) {
-                let sellMet = true;
-                if (bidAsk[0] !== curPrice) {
-                  sellMet = checkTradeRules(strategy.sellRules, closePrices, bidAsk[0]);
-                  curPrice = bidAsk[0];
-                }
-                if (sellMet) {
-                  executeRealTrade = true;
+              } else {
+                if (checkTradeRules(strategy.sellRules, closePrices)) {
+                  let tradeIndex = trades.length - 1;
+                  curPrice = await getBidPrice(curPrice, binance, execution.instrument);
+                  executeRealCloseTrade = true;
                   trades[tradeIndex]['closeDate'] = new Date();
                   trades[tradeIndex]['closeDateOrg'] = curDate;
                   trades[tradeIndex]['exit'] = curPrice;
                   tradeType = 'buy';
                   self.postMessage([trades[tradeIndex], 'Sell', feeRate]);
                 }
+
               }
             }
-            if (executeRealTrade && execution.type === 'Trading') {
-              binance.marketSell(execution.instrument, execution.positionSize, (error, response) => {
-                if (error !== null) {
-                  self.postMessage([
-                    'Error selling ' + execution.positionSize + ' ' + execution.instrument + '<br>Message from exchange: ' + JSON.parse(error.body).msg,
-                    'Error'
-                  ]);
-                } else {
-                  binance.trades(execution.instrument, (error, tradesTmp, symbol) => {
-                    for (let i = tradesTmp.length - 1; i >= 0; i--) {
-                      if (tradesTmp[i].orderId == response.orderId) {
-                        let tradePrice = Number.parseFloat(tradesTmp[i].price);
-                        self.postMessage([tradePrice, 'UpdateClosePrice', tradeIndex, feeRate]);
-                        break;
-                      }
+          } else {
+            firstCande = false;
+          }
+
+        } else {
+          if (tradeType === 'sell' && (stoploss >= curPrice || target <= curPrice)) {
+            let tradeIndex = trades.length - 1;
+            curPrice = await getBidPrice(curPrice, binance, execution.instrument);
+            executeRealCloseTrade = true;
+            trades[tradeIndex]['closeDate'] = new Date();
+            trades[tradeIndex]['closeDateOrg'] = curDate;
+            trades[tradeIndex]['exit'] = curPrice;
+            tradeType = 'buy';
+            self.postMessage([trades[tradeIndex], 'Sell', feeRate]);
+          }
+        }
+
+        if (executeRealCloseTrade && execution.type === 'Trading') {
+          binance.marketSell(execution.instrument, execution.positionSize, (error, response) => {
+            if (error !== null) {
+              self.postMessage([
+                'Error selling ' + execution.positionSize + ' ' + execution.instrument + '<br>Message from exchange: ' + JSON.parse(error.body).msg,
+                'Error'
+              ]);
+            } else {
+              binance.trades(execution.instrument, (error, tradesTmp, symbol) => {
+                for (let i = tradesTmp.length - 1; i >= 0; i--) {
+                  if (tradesTmp[i].orderId == response.orderId) {
+                    let tradePrice = Number.parseFloat(tradesTmp[i].price);
+                    if (tradePrice !== curPrice) {
+                      let tradeIndex = trades.length - 1;
+                      trades[tradeIndex].exit = tradePrice;
+                      self.postMessage([tradePrice, 'UpdateClosePrice', tradeIndex, feeRate]);
                     }
-                  });
+                    break;
+                  }
                 }
               });
             }
-          }
+          });
         }
+
       } catch (err) {
         self.postMessage('ERR:' + err);
       } finally {
