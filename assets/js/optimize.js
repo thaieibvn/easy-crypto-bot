@@ -1,5 +1,5 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
-const os = require('os');
+//const os = require('os');
 
 async function opFillBinanceInstruments() {
   await getBinanceInstruments();
@@ -252,8 +252,8 @@ async function runOptimize() {
     opExecutionCanceled = false;
     opCompleted = 0;
 
-    let cpus = os.cpus().length;
-    /*if ($('#opOptimization1CPU').is(':checked')) {
+    /*let cpus = os.cpus().length;
+    if ($('#opOptimization1CPU').is(':checked')) {
       maxOpWorkers = 1;
     } else if ($('#opOptimizationHalfCPUs').is(':checked')) {
       maxOpWorkers = cpus > 1
@@ -264,10 +264,6 @@ async function runOptimize() {
         ? cpus - 1
         : 1;
     }*/
-    maxOpWorkers = (cpus / 2) - 1;
-    if (maxOpWorkers < 1) {
-      maxOpWorkers = 1;
-    }
 
     for (let i = 0; i < Math.min(maxOpWorkers, strategyVariations.length); i++) {
       opExecutionWorkers[workerIndex] = new Worker("./assets/js/optimize-execution.js");
