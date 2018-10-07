@@ -79,6 +79,7 @@ let maxOpWorkers = 1;
 let webWorkersInitialized = false;
 let optimizationRunning = false;
 let runningWorkiers = 0;
+let marketReturn;
 const executionOpMutex = new Mutex();
 const addOpResultMutex = new Mutex();
 const opWorkerTerminateMutex = new Mutex();
@@ -152,7 +153,7 @@ async function runOptimize() {
     openModalInfo('Start Date must be before End Date!');
     return;
   }
-  endDate.setHours(0, 0, 0, 0);
+  endDate.setHours(23, 59, 59, 59);
   let endDateTmp = new Date(endDate.getTime());
   endDateTmp.setMonth(endDate.getMonth() - 3);
   endDateTmp.setDate(endDateTmp.getDate() - 1);
@@ -202,7 +203,7 @@ async function runOptimize() {
       optimizationRunning = false;
       return;
     }
-    let marketReturn = 0;
+    marketReturn = 0;
     for (let tick of ticks) {
       if (tick.d >= startDate) {
         marketReturn = ((ticks[ticks.length - 1].c - tick.o) / tick.o) * 100;
