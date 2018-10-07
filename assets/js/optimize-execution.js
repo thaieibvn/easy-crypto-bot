@@ -23,21 +23,26 @@ self.addEventListener('message', async function(e) {
       timeframe = e.data[2];
       startDate = e.data[3];
       ticks = e.data[4];
+      opExecutionCanceled = false;
       self.postMessage(['STARTED', id]);
     } else if (typeof e.data[0] === 'string' && e.data[0].startsWith('STOP')) {
       opExecutionCanceled = true;
       cancelBacktest();
-      while(isRunning) {
+      while (isRunning) {
         await sleep(500)
       }
-      await sleep(2000)
-      self.close();
+      let ticks = null;
+      let timeframe = null;
+      let startDate = null;
+      self.postMessage(['STOPPED', id]);
+      //await sleep(2000)
+      //self.close();
     } else if (typeof e.data[0] === 'string' && e.data[0].startsWith('STRATEGY')) {
-      isRunning = true;
-      if (ticks === null) {
-        self.postMessage('ERR: Worker Not Initialized!');
+      if (ticks === null || opExecutionCanceled) {
+        self.postMessage('ERR: Worker Stopped or Not Initialized!');
         return;
       }
+      isRunning = true;
       let strategy = e.data[1];
       let result = await executeBacktest(strategy, ticks, timeframe, startDate, false)
       if (result !== null && !opExecutionCanceled) {

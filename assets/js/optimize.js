@@ -1,5 +1,5 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
-//const os = require('os');
+const os = require('os');
 
 async function opFillBinanceInstruments() {
   await getBinanceInstruments();
@@ -76,11 +76,13 @@ let opExecutionWorkers = {};
 let opExecutedIndex = 0;
 let opCompleted = 0;
 let maxOpWorkers = 1;
+let webWorkersInitialized = false;
 let optimizationRunning = false;
-let workerIndex = 0;
+let runningWorkiers = 0;
 const executionOpMutex = new Mutex();
 const addOpResultMutex = new Mutex();
 const opWorkerTerminateMutex = new Mutex();
+const runningWorkersMutex = new Mutex();
 
 function isOptimizationRunning() {
   return optimizationRunning;
@@ -252,95 +254,99 @@ async function runOptimize() {
     opExecutionCanceled = false;
     opCompleted = 0;
 
-    /*let cpus = os.cpus().length;
-    if ($('#opOptimization1CPU').is(':checked')) {
-      maxOpWorkers = 1;
-    } else if ($('#opOptimizationHalfCPUs').is(':checked')) {
+    //Initialize webworkers
+    if (!webWorkersInitialized) {
+      let cpus = os.cpus().length;
       maxOpWorkers = cpus > 1
         ? cpus / 2
         : 1;
-    } else {
-      maxOpWorkers = cpus > 1
-        ? cpus - 1
-        : 1;
-    }*/
 
-    for (let i = 0; i < Math.min(maxOpWorkers, strategyVariations.length); i++) {
-      opExecutionWorkers[workerIndex] = new Worker("./assets/js/optimize-execution.js");
-      opExecutionWorkers[workerIndex].addEventListener('error', async function(e) {
-        openModalInfo('Internal Error Occurred!<br>' + e.message + '<br>' + e.filename + ' ' + e.lineno);
-      }, false);
-      opExecutionWorkers[workerIndex].addEventListener("message", async function(e) {
-        try {
-          if (typeof e.data === 'string' && e.data.startsWith('ERR')) {
-            openModalInfo('Internal Error Occurred!<br>' + e.data);
-            return;
-          } else if (e.data instanceof Array && e.data[0] === 'STARTED') {
+      for (let i = 0; i < maxOpWorkers; i++) {
+        opExecutionWorkers[i] = new Worker("./assets/js/optimize-execution.js");
+        opExecutionWorkers[i].addEventListener('error', async function(e) {
+          openModalInfo('Internal Error Occurred!<br>' + e.message + '<br>' + e.filename + ' ' + e.lineno);
+        }, false);
+        opExecutionWorkers[i].addEventListener("message", async function(e) {
+          try {
+            if (typeof e.data === 'string' && e.data.startsWith('ERR')) {
+              openModalInfo('Internal Error Occurred!<br>' + e.data);
+              return;
+            } else if (e.data instanceof Array && e.data[0] === 'STARTED') {
 
-            let nextStrategy = await getNextOpStrategy();
-            if (nextStrategy !== null) {
+              let nextStrategy = await getNextOpStrategy();
+              if (nextStrategy !== null) {
+                try {
+                  await opWorkerTerminateMutex.lock();
+                  if (opExecutionCanceled) {
+                    return;
+                  }
+                  if (opExecutionWorkers[e.data[1]] !== undefined) {
+                    opExecutionWorkers[e.data[1]].postMessage(['STRATEGY', nextStrategy]);
+                  }
+                } finally {
+                  opWorkerTerminateMutex.release();
+                }
+              }
+            } else if (e.data instanceof Array && e.data[0] === 'STOPPED') {
               try {
-                await opWorkerTerminateMutex.lock();
+                await runningWorkersMutex.lock();
+                runningWorkiers--;
+              } finally {
+                runningWorkersMutex.release();
+              }
+            } else if (e.data instanceof Array && e.data[0] === 'RESULT') {
+
+              let nextStrategy = await getNextOpStrategy();
+              if (nextStrategy !== null) {
+                try {
+                  await opWorkerTerminateMutex.lock();
+                  if (opExecutionCanceled) {
+                    return;
+                  }
+                  if (opExecutionWorkers[e.data[1]] !== undefined) {
+                    opExecutionWorkers[e.data[1]].postMessage(['STRATEGY', nextStrategy]);
+                  }
+                } finally {
+                  opWorkerTerminateMutex.release();
+                }
+              }
+              let completed = await addOpResult(e.data[2]);
+
+              $('#opRunPercent').html('Optimization Execution: ' + (
+              (completed / strategyVariations.length) * 100).toFixed(0) + '%');
+
+              if (completed === strategyVariations.length) {
                 if (opExecutionCanceled) {
                   return;
                 }
-                if (opExecutionWorkers[e.data[1]] !== undefined) {
-                  opExecutionWorkers[e.data[1]].postMessage(['STRATEGY', nextStrategy]);
-                }
-              } finally {
-                opWorkerTerminateMutex.release();
+                fillOptimizationResult(marketReturn);
               }
-            }
-          } else if (e.data instanceof Array && e.data[0] === 'STOPPED') {
-            //opExecutionWorkers[e.data[1]].terminate();
-            //opExecutionWorkers[e.data[1]] = undefined;
-          } else if (e.data instanceof Array && e.data[0] === 'RESULT') {
-            let nextStrategy = await getNextOpStrategy();
-            if (nextStrategy !== null) {
-              try {
-                await opWorkerTerminateMutex.lock();
-                if (opExecutionCanceled) {
-                  return;
-                }
-                if (opExecutionWorkers[e.data[1]] !== undefined) {
-                  opExecutionWorkers[e.data[1]].postMessage(['STRATEGY', nextStrategy]);
-                }
-              } finally {
-                opWorkerTerminateMutex.release();
-              }
-            }
-            let completed = await addOpResult(e.data[2]);
 
-            $('#opRunPercent').html('Optimization Execution: ' + (
-            (completed / strategyVariations.length) * 100).toFixed(0) + '%');
-
-            if (completed === strategyVariations.length) {
-              if (opExecutionCanceled) {
-                return;
-              }
-              fillOptimizationResult(marketReturn);
+            } else {
+              openModalInfo('Unexpected Internal Error Occurred!<br>' + e.data);
             }
-
-          } else {
-            openModalInfo('Unexpected Internal Error Occurred!<br>' + e.data);
+          } catch (err) {
+            openModalInfo('Internal Error Occurred!<br>' + err);
+          } finally {
+            executionOpMutex.release();
           }
-        } catch (err) {
-          openModalInfo('Internal Error Occurred!<br>' + err);
-        } finally {
-          executionOpMutex.release();
-        }
-      }, false);
+        }, false);
+      }
+      webWorkersInitialized = true;
+    }
+
+    for (let i = 0; i < maxOpWorkers; i++) {
       try {
         await opWorkerTerminateMutex.lock();
         if (opExecutionCanceled) {
           optimizationRunning = false;
           return;
         }
-        opExecutionWorkers[workerIndex].postMessage(['INITIALIZE', workerIndex, timeframe, startDate, ticks]);
+        opExecutionWorkers[i].postMessage(['INITIALIZE', i, timeframe, startDate, ticks]);
+        runningWorkiers++;
       } finally {
         opWorkerTerminateMutex.release();
       }
-      workerIndex++;
     }
 
   } catch (err) {
@@ -385,20 +391,14 @@ function opResultShowRows(from, to) {
 async function terminateOpWorkers() {
   try {
     await opWorkerTerminateMutex.lock();
-    $('#opRunPercent').html('Stopping Optimization..');
-    cancelGetBinanceData();
     opExecutionCanceled = true;
+    for (let i = 0; i < maxOpWorkers; i++) {
+      opExecutionWorkers[i].postMessage(['STOP']);
+    }
+    while (runningWorkiers > 0) {
+      await sleep(500);
+    }
     optimizationRunning = false;
-
-    Object.entries(opExecutionWorkers).forEach(([key, value]) => {
-      if (value !== undefined) {
-        opExecutionWorkers[key].postMessage(['STOP']);
-        opExecutionWorkers[key] = undefined;
-      }
-    });
-
-    $('#opRunPercent').html('Stopping Optimization..');
-    await sleep(2000);
     $('#runOptBtn').removeClass('disabled');
     $('#opCancelBtn').removeClass('disabled');
   } catch (err) {
@@ -1964,6 +1964,8 @@ async function editOpStrategy() {
 
 async function opCancel() {
   $('#opCancelBtn').addClass('disabled');
+  $('#opRunPercent').html('Stopping Optimization..');
+  cancelGetBinanceData();
   await terminateOpWorkers();
   $('#opResultDiv').hide();
   $('#opExecInfo').show();
