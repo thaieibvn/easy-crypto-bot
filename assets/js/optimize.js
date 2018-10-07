@@ -1,5 +1,5 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
-//const os = require('os');
+const os = require('os');
 
 async function opFillBinanceInstruments() {
   await getBinanceInstruments();
@@ -252,8 +252,8 @@ async function runOptimize() {
     opExecutionCanceled = false;
     opCompleted = 0;
 
-    /*let cpus = os.cpus().length;
-    if ($('#opOptimization1CPU').is(':checked')) {
+    let cpus = os.cpus().length;
+    /*if ($('#opOptimization1CPU').is(':checked')) {
       maxOpWorkers = 1;
     } else if ($('#opOptimizationHalfCPUs').is(':checked')) {
       maxOpWorkers = cpus > 1
@@ -264,6 +264,10 @@ async function runOptimize() {
         ? cpus - 1
         : 1;
     }*/
+    maxOpWorkers = (cpus / 2) - 1;
+    if (maxOpWorkers < 1) {
+      maxOpWorkers = 1;
+    }
 
     for (let i = 0; i < Math.min(maxOpWorkers, strategyVariations.length); i++) {
       opExecutionWorkers[workerIndex] = new Worker("./assets/js/optimize-execution.js");
@@ -1845,13 +1849,12 @@ async function getFineTuneStoplossAndTargetVariations(strategyVariations, strate
 
 async function getFullStoplossAndTargetVariations(strategyVariations, rulesCount) {
   let newStrategyVariations = [];
-  stops = [1, 3, 5];
-  targets = [1, 3, 7];
+  stops = [1, 2, 3];
+  targets = [2, 3, 7];
   switch (rulesCount) {
     case 1:
-      stops = [1, 2, 3, 5];
+      stops = [1, 2, 3, 4, 5];
       targets = [
-        0.5,
         1,
         2,
         3,
@@ -1861,13 +1864,13 @@ async function getFullStoplossAndTargetVariations(strategyVariations, rulesCount
       ];
       break;
     case 2:
-      stops = [1, 3, 5];
-      targets = [1, 3, 5, 7, 10];
+      stops = [1, 2, 3];
+      targets = [2, 3, 5, 7, 10];
       break;
     case 3:
     case 4:
-      stops = [1, 3, 5];
-      targets = [1, 3, 5, 7];
+      stops = [1, 2, 3];
+      targets = [2, 3, 5, 7];
       break;
     default:
   }
