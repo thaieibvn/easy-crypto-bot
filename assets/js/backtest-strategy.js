@@ -45,13 +45,14 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
     let date = ticks[i].d;
     if (tradeType === 'buy') {
       if (checkTradeRules(strategy.buyRules, closePrices)) {
-        let openWithSpread = addBuySpread(openPrice);
+        //let openWithSpread = addBuySpread(openPrice);
         let trade = {
           'openDate': date,
           'openDateOrg': date,
-          'entry': openWithSpread > highPrice
+          'entry': openPrice,
+          /*'entry': openWithSpread > highPrice
             ? highPrice
-            : openWithSpread,
+            : openWithSpread,*/
           'result': 0
         };
         if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
@@ -91,6 +92,7 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
         }
         trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
         tradeType = 'buy';
+        closePrices.push(closePrice);
         continue;
       }
       if (target <= highPrice) {
@@ -118,18 +120,21 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
 
         trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
         tradeType = 'buy';
+        closePrices.push(closePrice);
         continue;
       }
       if (strategy.sellRules.length === 0) {
+        closePrices.push(closePrice);
         continue;
       }
       if (checkTradeRules(strategy.sellRules, closePrices)) {
-        let openWithSpread = addSellSpread(openPrice);
+        //let openWithSpread = addSellSpread(openPrice);
         trades[trades.length - 1]['closeDate'] = date;
         trades[trades.length - 1]['closeDateOrg'] = date;
-        trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
+        trades[trades.length - 1]['exit'] = openPrice;
+        /*trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
           ? lowPrice
-          : openWithSpread;
+          : openWithSpread;*/
         trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
         tradeType = 'buy';
       }
@@ -225,7 +230,7 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
       result.maxDrawdown = drawdowns[i];
     }
   }
-  return [result, trades];
+  return [result, trades, lastTrade];
 }
 
 module.exports = {

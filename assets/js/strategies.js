@@ -189,7 +189,15 @@ async function saveStrategy() {
   }
 
   let stoploss = Number.parseFloat($('#stoploss').val());
+  if (!isNaN(stoploss) && stoploss < 0.2) {
+    openModalInfo('The stoploss cannot be less than 0.2');
+    return;
+  }
   let target = Number.parseFloat($('#target').val());
+  if (!isNaN(target) && target < 0.2) {
+    openModalInfo('The target cannot be less than 0.2');
+    return;
+  }
   try {
     let strategy = {
       name: strategyName,
@@ -524,8 +532,8 @@ function clearStrategyFields() {
   $('#sellRules>ul').html('');
   $('#buyRulesCombobox').html('Sample Moving Average SMA');
   $('#sellRulesCombobox').html('Sample Moving Average SMA');
-  $('#stoploss').val('5');
-  $('#target').val('15');
+  $('#stoploss').val('2');
+  $('#target').val('6');
 
 }
 

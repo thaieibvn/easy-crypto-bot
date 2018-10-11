@@ -14,20 +14,20 @@ function checkTradeRules(rules, historicalData) {
         break;
       }
       if (rule.direction === 'above') {
-        if (historicalData[historicalData.length - 1] >= ma[0] * (1 + (rule.value / 100))) {
+        if (historicalData[historicalData.length - 1] > ma[0] * (1 + (rule.value / 100))) {
           rulesMet++;
           continue;
         }
       } else if (rule.direction === 'bellow') {
-        if (historicalData[historicalData.length - 1] <= ma[0] * (1 - (rule.value / 100))) {
+        if (historicalData[historicalData.length - 1] < ma[0] * (1 - (rule.value / 100))) {
           rulesMet++;
           continue;
         }
       } else if (rule.direction === 'crossing') {
-        if (rule.crossDirection === 'top to bottom' && historicalData[historicalData.length - 2] > ma[1] && historicalData[historicalData.length - 1] <= ma[0]) {
+        if (rule.crossDirection === 'top to bottom' && historicalData[historicalData.length - 2] >= ma[1] && historicalData[historicalData.length - 1] < ma[0]) {
           rulesMet++;
           continue;
-        } else if (rule.crossDirection === 'bottom to top' && historicalData[historicalData.length - 2] < ma[1] && historicalData[historicalData.length - 1] >= ma[0]) {
+        } else if (rule.crossDirection === 'bottom to top' && historicalData[historicalData.length - 2] <= ma[1] && historicalData[historicalData.length - 1] > ma[0]) {
           rulesMet++;
           continue;
         }
@@ -42,10 +42,10 @@ function checkTradeRules(rules, historicalData) {
       if (ma1 === null || ma2 === null) {
         break;
       }
-      if (rule.crossDirection === 'top to bottom' && ma1[1] > ma2[1] && ma1[0] <= ma2[0]) {
+      if (rule.crossDirection === 'top to bottom' && ma1[1] >= ma2[1] && ma1[0] < ma2[0]) {
         rulesMet++;
         continue;
-      } else if (rule.crossDirection === 'bottom to top' && ma1[1] < ma2[1] && ma1[0] >= ma2[0]) {
+      } else if (rule.crossDirection === 'bottom to top' && ma1[1] <= ma2[1] && ma1[0] > ma2[0]) {
         rulesMet++;
         continue;
       }
@@ -55,20 +55,20 @@ function checkTradeRules(rules, historicalData) {
         break;
       }
       if (rule.direction === 'above') {
-        if (rsi[0] >= rule.value) {
+        if (rsi[0] > rule.value) {
           rulesMet++;
           continue;
         }
       } else if (rule.direction === 'bellow') {
-        if (rsi[0] <= rule.value) {
+        if (rsi[0] < rule.value) {
           rulesMet++;
           continue;
         }
       } else if (rule.direction === 'crossing') {
-        if (rule.crossDirection === 'top to bottom' && rsi[1] > rule.value && rsi[0] <= rule.value) {
+        if (rule.crossDirection === 'top to bottom' && rsi[1] >= rule.value && rsi[0] < rule.value) {
           rulesMet++;
           continue;
-        } else if (rule.crossDirection === 'bottom to top' && rsi[1] < rule.value && rsi[0] >= rule.value) {
+        } else if (rule.crossDirection === 'bottom to top' && rsi[1] <= rule.value && rsi[0] > rule.value) {
           rulesMet++;
           continue;
         }
@@ -91,20 +91,20 @@ function checkTradeRules(rules, historicalData) {
       }
 
       if (rule.direction === 'above') {
-        if (macd[0] >= lineValue * (1 + (ruleValue / 100))) {
+        if (macd[0] > lineValue * (1 + (ruleValue / 100))) {
           rulesMet++;
           continue;
         }
       } else if (rule.direction === 'bellow') {
-        if (macd[0] <= lineValue * (1 - (ruleValue / 100))) {
+        if (macd[0] < lineValue * (1 - (ruleValue / 100))) {
           rulesMet++;
           continue;
         }
       } else if (rule.direction === 'crossing') {
-        if (rule.crossDirection === 'top to bottom' && macd[1] > lineValue2 && macd[0] <= lineValue) {
+        if (rule.crossDirection === 'top to bottom' && macd[1] >= lineValue2 && macd[0] < lineValue) {
           rulesMet++;
           continue;
-        } else if (rule.crossDirection === 'bottom to top' && macd[1] < lineValue2 && macd[0] >= lineValue) {
+        } else if (rule.crossDirection === 'bottom to top' && macd[1] <= lineValue2 && macd[0] > lineValue) {
           rulesMet++;
           continue;
         }
@@ -127,22 +127,31 @@ function calculateSMA(smaPeriod, historicalData) {
     sum += historicalData[i]
   }
   return [
-    (sum + historicalData[historicalData.length - 1]) / smaPeriod,
-    (sum + historicalData[historicalData.length - smaPeriod]) / smaPeriod
+    parseFloat(((sum + historicalData[historicalData.length - 1]) / smaPeriod).toFixed(8)),
+    parseFloat(((sum + historicalData[historicalData.length - smaPeriod-1]) / smaPeriod).toFixed(8))
   ];
 }
 
 function calculateEMA(emaPeriod, historicalData) {
-  if (historicalData.length <= emaPeriod || historicalData.length < 100) {
+  let periodsToUse = 300;
+  if (emaPeriod<150) {
+    periodsToUse = 250
+  } else if (emaPeriod<100) {
+    periodsToUse = 200
+  } else if (emaPeriod<50) {
+    periodsToUse = 100
+  }
+
+  if (historicalData.length <= emaPeriod || historicalData.length < periodsToUse) {
     return null;
   }
   let multiplier = 2 / (emaPeriod + 1);
-  let emaPrev = historicalData[historicalData.length - 100];
-  for (let i = historicalData.length - 99; i < historicalData.length-1; i++) {
+  let emaPrev = historicalData[historicalData.length - periodsToUse];
+  for (let i = historicalData.length - (periodsToUse-1); i < historicalData.length-1; i++) {
     emaPrev = (historicalData[i] - emaPrev) * multiplier + emaPrev;
   }
   let ema = (historicalData[historicalData.length - 1] - emaPrev) * multiplier + emaPrev;
-  return [ema, emaPrev];
+  return [parseFloat(ema.toFixed(8)), parseFloat(emaPrev.toFixed(8))];
 }
 
 function calculateRs(period, array) {
@@ -194,7 +203,7 @@ function calculateRsi(rsiPeriod, historicalData) {
   let rsiPrev = 100 - (100 / (1 + (avgGainFinalPrev / avgLossFinalPrev)));
   //let d = new Date(array[index][0])
   //alert(d + ' RSI: ' + rsi+' RSI: ' + rsiPrev);
-  return [rsi, rsiPrev];
+  return [parseFloat(rsi.toFixed(8)), parseFloat(rsiPrev.toFixed(8))];
 }
 
 function calculateEMAFull(emaPeriod, historicalData, count) {
@@ -206,11 +215,11 @@ function calculateEMAFull(emaPeriod, historicalData, count) {
   let emas = [];
   for (let i = historicalData.length - count; i < historicalData.length-1; i++) {
     emaPrev = (historicalData[i] - emaPrev) * multiplier + emaPrev;
-    emas.push(emaPrev);
+    emas.push(parseFloat(emaPrev.toFixed(8)));
   }
 
     let ema = (historicalData[historicalData.length - 1] - emaPrev) * multiplier + emaPrev;
-    emas.push(ema);
+    emas.push(parseFloat(ema.toFixed(8)));
 
   return emas;
 }
@@ -243,8 +252,8 @@ function calculateMacd(period, period2, period3, historicalData) {
   }
 
   return [
-    macd[macd.length - 1],
-    macd[macd.length - 2],
+    parseFloat(macd[macd.length - 1].toFixed(8)),
+    parseFloat(macd[macd.length - 2].toFixed(8)),
     signal
   ];
 }

@@ -265,10 +265,10 @@ async function runBacktest() {
     $('#btRunPercent').html('Backtest Execution: 100%');
     await sleep(500);
     if (result[0].executedTrades > 0) {
-      drawBtResultsChart(startDate, ticks, result[1], strategy, instrument, timeframe, 'btResultsChart', null);
+      drawBtResultsChart(startDate, ticks, result[1], strategy, instrument, timeframe, 'btResultsChart', result[2]);
       $('#btResult').show();
     } else {
-      drawBtResultsChart(startDate, ticks, result[1], strategy, instrument, timeframe, 'btResultsChartNoTrades', null);
+      drawBtResultsChart(startDate, ticks, result[1], strategy, instrument, timeframe, 'btResultsChartNoTrades', result[2]);
       $('#btResult').hide();
       $('#btResultNoTrades').show();
     }

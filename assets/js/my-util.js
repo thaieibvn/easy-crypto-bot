@@ -414,28 +414,28 @@ function getStartDate(value, date) {
       startDate.setDate(startDate.getDate() - 1);
       break;
     case '15 minutes':
-      startDate.setDate(startDate.getDate() - 1);
+      startDate.setDate(startDate.getDate() - 3);
       break;
     case '30 minutes':
-      startDate.setDate(startDate.getDate() - 2);
+      startDate.setDate(startDate.getDate() - 6);
       break;
     case '1 hour':
-      startDate.setDate(startDate.getDate() - 4);
+      startDate.setDate(startDate.getDate() - 12);
       break;
     case '2 hours':
-      startDate.setDate(startDate.getDate() - 8);
-      break;
-    case '4 hours':
-      startDate.setDate(startDate.getDate() - 17);
-      break;
-    case '6 hours':
       startDate.setDate(startDate.getDate() - 25);
       break;
-    case '12 hours':
+    case '4 hours':
       startDate.setDate(startDate.getDate() - 50);
       break;
+    case '6 hours':
+      startDate.setDate(startDate.getDate() - 75);
+      break;
+    case '12 hours':
+      startDate.setDate(startDate.getDate() - 150);
+      break;
     case '1 day':
-      startDate.setDate(startDate.getDate() - 100);
+      startDate.setDate(startDate.getDate() - 300);
       break;
   }
   return startDate;
