@@ -532,9 +532,8 @@ function clearStrategyFields() {
   $('#sellRules>ul').html('');
   $('#buyRulesCombobox').html('Sample Moving Average SMA');
   $('#sellRulesCombobox').html('Sample Moving Average SMA');
-  $('#stoploss').val('2');
-  $('#target').val('6');
-
+  $('#stoploss').val('');
+  $('#target').val('');
 }
 
 function rmStrategy(name) {

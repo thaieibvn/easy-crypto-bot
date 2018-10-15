@@ -25,7 +25,7 @@ function getBidAsk(binance, pair) {
 }
 
 async function getBidPrice(curPrice, binance, instrument) {
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 10; i++) {
     let bidAsk = await getBidAsk(binance, instrument);
     if (isNaN(bidAsk[0])) {
       await sleep(100);
@@ -186,9 +186,17 @@ self.addEventListener('message', function(e) {
                   }
                 }
               } else {
-                if (checkTradeRules(strategy.sellRules, closePrices)) {
+                curPrice = await getBidPrice(curPrice, binance, execution.instrument);
+                if (stoploss >= curPrice || target <= curPrice) {
                   let tradeIndex = trades.length - 1;
-                  curPrice = await getBidPrice(curPrice, binance, execution.instrument);
+                  executeRealCloseTrade = true;
+                  trades[tradeIndex]['closeDate'] = new Date();
+                  trades[tradeIndex]['closeDateOrg'] = curDate;
+                  trades[tradeIndex]['exit'] = curPrice;
+                  tradeType = 'buy';
+                  self.postMessage([trades[tradeIndex], 'Sell', feeRate]);
+                } else if (checkTradeRules(strategy.sellRules, closePrices)) {
+                  let tradeIndex = trades.length - 1;
                   executeRealCloseTrade = true;
                   trades[tradeIndex]['closeDate'] = new Date();
                   trades[tradeIndex]['closeDateOrg'] = curDate;
@@ -204,9 +212,9 @@ self.addEventListener('message', function(e) {
           }
 
         } else {
+          curPrice = await getBidPrice(curPrice, binance, execution.instrument);
           if (tradeType === 'sell' && (stoploss >= curPrice || target <= curPrice)) {
             let tradeIndex = trades.length - 1;
-            curPrice = await getBidPrice(curPrice, binance, execution.instrument);
             executeRealCloseTrade = true;
             trades[tradeIndex]['closeDate'] = new Date();
             trades[tradeIndex]['closeDateOrg'] = curDate;

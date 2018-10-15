@@ -400,7 +400,7 @@ function getTimeframe(value) {
   }
 }
 
-//Add additional 100 ticks to the start date in order to calculate RSIs and EMAs
+//Add additional 300 ticks to the start date in order to calculate RSIs and EMAs
 function getStartDate(value, date) {
   let startDate = new Date(date.getTime());
   switch (value) {
