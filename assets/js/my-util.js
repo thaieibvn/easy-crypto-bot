@@ -348,6 +348,15 @@ function addZero(number) {
     return number;
   }
 }
+const months=['Jan', 'Feb', 'Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function formatDateNoYear(date){
+  if (!(date instanceof Date)) {
+    return '';
+  }
+  var srt = addZero(date.getDate()) + '-' +months[date.getMonth()] + ' ' + addZero(date.getHours()) + ':' + addZero(date.getMinutes()) + ':' + addZero(date.getSeconds());
+  return srt;
+}
+
 function formatDate(date) {
   if (!(date instanceof Date)) {
     return '';

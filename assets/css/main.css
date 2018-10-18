@@ -37,6 +37,10 @@ body {
   -webkit-text-size-adjust: none
 }
 
+#tsStrategiesTable td, #executionHistoryTable td {
+  padding-right:0.25em;
+}
+
 *, *:before, *:after {
   -moz-box-sizing: border-box;
   -webkit-box-sizing: border-box;
@@ -2483,7 +2487,7 @@ body.is-ie #sidebar>.inner {
   border: 0;
   color: rgba(255, 255, 255, 0.35);
   display: block;
-  font-size: 0.6em;
+  font-size: 0.65em;
   font-weight: bold;
   letter-spacing: 0.25em;
   line-height: 1.75;
@@ -2498,7 +2502,7 @@ body.is-ie #sidebar>.inner {
   border-radius: 0.2em;
   bottom: 0;
   content: '';
-  height: 0.2em;
+  height: 0.16em;
   position: absolute;
   right: 0;
   width: 100%

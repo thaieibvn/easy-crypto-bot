@@ -48,10 +48,10 @@ self.addEventListener('message', function(e) {
       return;
     }
 
-    let trades = [];
     let execution = e.data[0];
     let apiKey = e.data[1];
     let apiSecret = e.data[2];
+    let trades = e.data[3];
     let strategy = execution.strategy;
     let testMode = true;
     if (execution.type === 'Trading') {
@@ -63,7 +63,10 @@ self.addEventListener('message', function(e) {
       test: testMode // If you want to use sandbox mode where orders are simulated
     });
 
-    let tradeType = 'buy';
+    let tradeType = 'sell';
+    if (trades.length === 0 || trades[trades.length - 1].exit !== undefined && trades[trades.length - 1].exit !== null) {
+      tradeType = 'buy';
+    }
     let alertType = 'buy';
     let stoploss = Number.MIN_VALUE;
     let target = Number.MAX_VALUE;
@@ -92,6 +95,7 @@ self.addEventListener('message', function(e) {
             statusSent = true;
           }
         }
+        self.postMessage('LastUpdated');
         let closePrices = [];
         Object.keys(chart).forEach(function(key) {
           try {
@@ -110,12 +114,12 @@ self.addEventListener('message', function(e) {
             if (execution.type === 'Alerts') {
               if (alertType === 'buy') {
                 if (checkTradeRules(strategy.buyRules, closePrices)) {
-                  alertType='sell';
+                  alertType = 'sell';
                   self.postMessage([new Date(), curPrice, 'Buy']);
                 }
               } else {
                 if (checkTradeRules(strategy.sellRules, closePrices)) {
-                  alertType='buy';
+                  alertType = 'buy';
                   self.postMessage([new Date(), curPrice, 'Sell']);
                 }
               }
@@ -193,7 +197,9 @@ self.addEventListener('message', function(e) {
                   trades[tradeIndex]['closeDate'] = new Date();
                   trades[tradeIndex]['closeDateOrg'] = curDate;
                   trades[tradeIndex]['exit'] = curPrice;
+                  trades[tradeIndex]['result'] = (((trades[tradeIndex].exit - trades[tradeIndex].entry) / trades[tradeIndex].entry) * 100) - feeRate;
                   tradeType = 'buy';
+
                   self.postMessage([trades[tradeIndex], 'Sell', feeRate]);
                 } else if (checkTradeRules(strategy.sellRules, closePrices)) {
                   let tradeIndex = trades.length - 1;
@@ -201,6 +207,7 @@ self.addEventListener('message', function(e) {
                   trades[tradeIndex]['closeDate'] = new Date();
                   trades[tradeIndex]['closeDateOrg'] = curDate;
                   trades[tradeIndex]['exit'] = curPrice;
+                  trades[tradeIndex]['result'] = (((trades[tradeIndex].exit - trades[tradeIndex].entry) / trades[tradeIndex].entry) * 100) - feeRate;
                   tradeType = 'buy';
                   self.postMessage([trades[tradeIndex], 'Sell', feeRate]);
                 }
@@ -219,6 +226,7 @@ self.addEventListener('message', function(e) {
             trades[tradeIndex]['closeDate'] = new Date();
             trades[tradeIndex]['closeDateOrg'] = curDate;
             trades[tradeIndex]['exit'] = curPrice;
+            trades[tradeIndex]['result'] = (((trades[tradeIndex].exit - trades[tradeIndex].entry) / trades[tradeIndex].entry) * 100) - feeRate;
             tradeType = 'buy';
             self.postMessage([trades[tradeIndex], 'Sell', feeRate]);
           }
