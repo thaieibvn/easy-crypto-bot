@@ -174,8 +174,27 @@ async function downloadUpdates() {
   });
 }
 
+async function dailyCheckForUpdates(appVer) {
+  while (true) {
+    await sleep(1000 * 60* 60 *24);
+    $.ajax({
+      type: 'get',
+      url: 'https://easycryptobot.com/version.html',
+      data: {
+        appVer: appVer
+      },
+      cache: false,
+      success: function(data) {
+        //TODO
+      },
+      error: function() {}
+    });
+  }
+}
+
 async function checkForUpdates() {
   let curVersion = remote.app.getVersion();
+  dailyCheckForUpdates(curVersion);
   $.ajax({
     type: 'get',
     url: 'https://easycryptobot.com/version.html',
@@ -290,7 +309,7 @@ function copyDonationAddress(type) {
   } else if (type === "xmr") {
     clipboard.writeText('472puZHEQRcCvt5MNtp7yg9awPWjywVQS9Vp4nSrBixgdBBQLEi4vZxUTGqUULDF7aWg2xaMcUr9yU2drx7PjDWn2fv65Dj');
     openModalInfo("Monero address is copied to clipboard");
-  } else if(type==="paypal") {
+  } else if (type === "paypal") {
     clipboard.writeText('stefan@easycryptobot.com');
     openModalInfo("Address is copied to clipboard");
   }
@@ -348,12 +367,25 @@ function addZero(number) {
     return number;
   }
 }
-const months=['Jan', 'Feb', 'Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-function formatDateNoYear(date){
+const months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec'
+]
+function formatDateNoYear(date) {
   if (!(date instanceof Date)) {
     return '';
   }
-  var srt = addZero(date.getDate()) + '-' +months[date.getMonth()] + ' ' + addZero(date.getHours()) + ':' + addZero(date.getMinutes()) + ':' + addZero(date.getSeconds());
+  var srt = addZero(date.getDate()) + '-' + months[date.getMonth()] + ' ' + addZero(date.getHours()) + ':' + addZero(date.getMinutes()) + ':' + addZero(date.getSeconds());
   return srt;
 }
 
