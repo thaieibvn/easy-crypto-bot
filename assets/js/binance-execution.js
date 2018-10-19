@@ -63,16 +63,24 @@ self.addEventListener('message', function(e) {
       test: testMode // If you want to use sandbox mode where orders are simulated
     });
 
-    let tradeType = 'sell';
-    if (trades.length === 0 || trades[trades.length - 1].exit !== undefined && trades[trades.length - 1].exit !== null) {
-      tradeType = 'buy';
-    }
-    let alertType = 'buy';
+    let tradeType = 'buy';
     let stoploss = Number.MIN_VALUE;
     let target = Number.MAX_VALUE;
+
+    if (trades.length > 0 && trades[trades.length - 1].exit === undefined && trades[trades.length - 1].exit === null) {
+      tradeType = 'sell';
+      if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
+        stoploss = trades[trades.length - 1].entry * (1 - (strategy.stoploss / 100));
+      }
+      if (strategy.target !== null && !isNaN(strategy.target)) {
+        target = trades[trades.length - 1].entry * (1 + (strategy.target / 100));
+      }
+    }
+    let firstCande = true;
+    let alertType = 'buy';
     const mutex = new Mutex();
     let lastCheckedData = -1;
-    let firstCande = true;
+
 
     binance.websockets.chart(execution.instrument, execution.timeframe, async (symbol, interval, chart) => {
       if (!running) {

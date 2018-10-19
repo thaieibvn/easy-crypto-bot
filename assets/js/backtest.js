@@ -730,7 +730,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
     });
   } catch (err) {
     //TODO
-    alert(err)
+    console.log(err)
   }
 }
 function btResultShowRows(from, to) {

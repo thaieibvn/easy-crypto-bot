@@ -18,7 +18,24 @@ async function getBinanceInstruments() {
         if (error) {
           reject(error);
         } else {
-          binanceInstruments = ticker;
+          if (ticker === null || JSON.stringify(ticker) === '{}') {
+            $.ajax({
+              url: 'https://easycryptobot.com/instruments.php',
+              contentType: 'json',
+              type: 'GET',
+              success: function(data) {
+                let list = JSON.parse(data);
+                binanceInstruments = {}
+                for (let item of list) {
+                  binanceInstruments[''+item+'']=item;
+                }
+              },
+              error: function() {
+              }
+            });
+          } else {
+            binanceInstruments = ticker;
+          }
           resolve(ticker);
         }
       })
