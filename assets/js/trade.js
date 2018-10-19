@@ -289,7 +289,7 @@ async function executeStrategy() {
     addExecutionToDb(curExecution);
     executedStrategies.push(curExecution);
     let resStr = '0.00%';
-    if(type === "Alerts") {
+    if(executionType === "Alerts") {
       resStr='';
     }
     $('#tsStrategiesTable').append('<tr id="executionTableItem' + strategyIndex + '"><td>' + executionType + '</td><td>' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td>' + curExecution.timeframe + '</td><td class="text-center" id="executedTrades' + strategyIndex + '">0</td>' + '<td><span id="executionRes' + strategyIndex + '">'+resStr+'</span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + strategyIndex + '\')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + strategyIndex + '"></td><td id="terminateStrBtn' + strategyIndex + '">Starting..</td></tr>');
