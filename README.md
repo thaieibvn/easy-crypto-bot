@@ -1,6 +1,8 @@
 # easy-crypto-bot
 Cryptocurrency Trading Bot
+
 Check latest new about the project on https://easycryptobot.com/
+
 If you have comments, suggestions, ideas or anything else you can contact me at stefan@easycryptobot.com
 
 Easy Crypto Bot is completely free open source desktop application for Windows, Linux and MacOS.
@@ -16,4 +18,5 @@ If you want to downlaod the source code and start the app please do the followin
 5. Now start the app with "npm start ."
 
 Thanks for the interest in my app!
+
 Happy coding/trading ;)
