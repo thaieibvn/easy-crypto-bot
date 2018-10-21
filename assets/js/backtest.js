@@ -94,7 +94,7 @@ async function runBacktest() {
   }
   cancelBt = false;
   btTradesRows = []
-  let feeRate = 0.1;
+  let feeRate = 0.15;
   let strategyName = $('#btStrategyCombobox').text();
   let exchange = $('#btExchangeCombobox').text();
   let instrument = $('#btInstrumentSearch').val().toUpperCase();
@@ -168,6 +168,7 @@ async function runBacktest() {
     $('#btRunning').show();
     $('#btResult').hide();
     $('#btResultNoTrades').hide();
+    $('#btTrailingStopWarning').hide();
     $('#btResultDiv').show();
     $('#btStrategiesTable').html('<thead><tr><td>Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead><tbody>');
     let ticks = await getBinanceTicks(instrument, getTimeframe(timeframe), getStartDate(timeframe, startDate), endDate, true);
@@ -182,6 +183,9 @@ async function runBacktest() {
       openModalInfo('Could not optain data from ' + exchange + ' for the given period. The period may be too long. Please try with smaller period or try later!');
       backtestRunning = false;
       return;
+    }
+    if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
+      $('#btTrailingStopWarning').show();
     }
     $('#btRunPercent2').hide();
     $('#btRunPercent').html('Backtest Execution: 0%');

@@ -174,31 +174,20 @@ async function downloadUpdates() {
   });
 }
 
-async function dailyCheckForUpdates(appVer) {
+async function dailyCheckForUpdates() {
   while (true) {
-    await sleep(1000 * 60* 60 *24);
-    $.ajax({
-      type: 'get',
-      url: 'https://easycryptobot.com/version.html',
-      data: {
-        appVer: appVer
-      },
-      cache: false,
-      success: function(data) {
-        //TODO
-      },
-      error: function() {}
-    });
+    await sleep(1000 * 60 * 60 * 24); // 1 Day
+    checkForUpdates({type: 'daily-check'});
   }
 }
 
-async function checkForUpdates() {
+async function checkForUpdates(data) {
   let curVersion = remote.app.getVersion();
-  dailyCheckForUpdates(curVersion);
   $.ajax({
     type: 'get',
     url: 'https://easycryptobot.com/version.html',
     cache: false,
+    data: data,
     success: function(data) {
       try {
         if (typeof data === 'string' && data.startsWith('version')) {
@@ -259,7 +248,7 @@ async function checkEulaAccepted() {
         remote.app.quit()
       });
     } else {
-      setTimeout(() => checkForUpdates(), 600);
+      setTimeout(() => checkForUpdates({}), 600);
     }
   } catch (err) {
     openModalInfo("Cannot run the application!<br>Please contact stefan@easycryptobot.com", function() {
@@ -492,4 +481,12 @@ function chunkArray(myArray, chunkSize) {
 
 function opKeyDownDoNothing(e) {
   e.preventDefault();
+}
+
+function stoplossTypeChange(type){
+  if(type ==='sl'){
+    $('#trailingSl').val('');
+  } else {
+    $('#stoploss').val('');
+  }
 }

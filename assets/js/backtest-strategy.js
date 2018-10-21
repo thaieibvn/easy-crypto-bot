@@ -19,11 +19,12 @@ function cancelBacktest() {
 
 async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) {
   cancelBtExecution = false;
-  let feeRate = 0.1;
+  let feeRate = 0.15;
   let trades = [];
   let tradeType = 'buy';
   let stoploss = Number.MIN_VALUE;
   let target = Number.MAX_VALUE;
+  let trailingSlPriceUsed = -1;
   let closePrices = [];
 
   for (let i = 0; i < ticks.length; i++) {
@@ -58,6 +59,10 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
         if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
           stoploss = trade.entry * (1 - (strategy.stoploss / 100))
         }
+        if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
+          trailingSlPriceUsed = trade.entry;
+          stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100))
+        }
         if (strategy.target !== null && !isNaN(strategy.target)) {
           target = trade.entry * (1 + (strategy.target / 100))
         }
@@ -67,7 +72,6 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
     }
 
     if (tradeType === 'sell') {
-
       if (stoploss >= lowPrice) {
         trades[trades.length - 1]['closeDate'] = date;
         trades[trades.length - 1]['closeDateOrg'] = date;
@@ -92,6 +96,10 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
         }
         trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
         tradeType = 'buy';
+        if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+          trailingSlPriceUsed = highPrice;
+          stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+        }
         closePrices.push(closePrice);
         continue;
       }
@@ -120,10 +128,18 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
 
         trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
         tradeType = 'buy';
+        if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+          trailingSlPriceUsed = highPrice;
+          stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+        }
         closePrices.push(closePrice);
         continue;
       }
       if (strategy.sellRules.length === 0) {
+        if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+          trailingSlPriceUsed = highPrice;
+          stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+        }
         closePrices.push(closePrice);
         continue;
       }
@@ -139,6 +155,10 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
         tradeType = 'buy';
       }
 
+    }
+    if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+      trailingSlPriceUsed = highPrice;
+      stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
     }
     closePrices.push(closePrice);
   }

@@ -179,7 +179,7 @@ async function saveStrategy() {
   }
 
   let sellRules = $('#sellRules>ul>li');
-  if (sellRules.length === 0 && $('#target').val().trim().length <= 0) {
+  if (sellRules.length === 0 && $('#target').val().trim().length <= 0 && $('#trailingSl').val().trim().length <= 0) {
     openModalInfo('Please add at least one SELL rule or a Target!');
     return;
   }
@@ -189,13 +189,21 @@ async function saveStrategy() {
   }
 
   let stoploss = Number.parseFloat($('#stoploss').val());
-  if (!isNaN(stoploss) && stoploss < 0.2) {
-    openModalInfo('The stoploss cannot be less than 0.2');
+  if (!isNaN(stoploss) && stoploss < 0.5) {
+    openModalInfo('The stoploss cannot be less than 0.5');
     return;
   }
+  let trailingSl = Number.parseFloat($('#trailingSl').val());
+  if (!isNaN(trailingSl) && trailingSl < 0.5) {
+    openModalInfo('The trailing stoploss cannot be less than 0.5');
+    return;
+  }
+  if (!isNaN(trailingSl)) {
+    stoploss = null;
+  }
   let target = Number.parseFloat($('#target').val());
-  if (!isNaN(target) && target < 0.2) {
-    openModalInfo('The target cannot be less than 0.2');
+  if (!isNaN(target) && target < 0.5) {
+    openModalInfo('The target cannot be less than 0.5');
     return;
   }
   try {
@@ -204,7 +212,8 @@ async function saveStrategy() {
       buyRules: buyRulesList,
       sellRules: sellRulesList,
       stoploss: stoploss,
-      target: target
+      target: target,
+      trailingSl: trailingSl
     };
 
     let srtTmp = await getStrategyByName(strategy.name);
@@ -403,6 +412,7 @@ function openStrategy(strategy) {
 
     $('#strategyName').val(strategy.name);
     $('#stoploss').val(strategy.stoploss);
+    $('#trailingSl').val(strategy.trailingSl);
     $('#target').val(strategy.target);
 
     let buyRuleTypeTmp = buyRuleType;
@@ -533,6 +543,7 @@ function clearStrategyFields() {
   $('#buyRulesCombobox').html('Sample Moving Average SMA');
   $('#sellRulesCombobox').html('Sample Moving Average SMA');
   $('#stoploss').val('');
+  $('#trailingSl').val('');
   $('#target').val('');
 }
 

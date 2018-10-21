@@ -1705,8 +1705,23 @@ function getFullRulesVariations(rule, rulesCount, changeStoploss) {
 async function getFineTuneStoplossAndTargetVariations(strategyVariations, strategy, rulesCount) {
   let newStrategyVariations = [];
 
-  let sl = strategy.stoploss;
-  let tt = strategy.target;
+  let useStoploss = false;
+  let isTrailing = false;
+  let sl = 0;
+  if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
+    sl = strategy.trailingSl;
+    isTrailing = true;
+    useStoploss = true;
+  } else if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
+    sl = strategy.stoploss;
+    useStoploss = true;
+  }
+  let tt = 0;
+  let useTarget = false;
+  if (strategy.target !== null && !isNaN(strategy.target)) {
+    t = strategy.trailingSl;
+    useTarget = true;
+  }
   let stops = [
     sl - 1,
     sl,
@@ -1758,8 +1773,8 @@ async function getFineTuneStoplossAndTargetVariations(strategyVariations, strate
   }
 
   let count = 0;
-  if (strategy.stoploss === null) {
-    if (strategy.target === null) {
+  if (!useStoploss) {
+    if (!useTarget) {
       return strategyVariations;
     } else {
       for (let target of targets) {
@@ -1782,6 +1797,7 @@ async function getFineTuneStoplossAndTargetVariations(strategyVariations, strate
             newSstrategy.sellRules.push(sellRule);
           }
           newSstrategy.stoploss = strategy.stoploss;
+          newSstrategy.trailingSl = strategy.trailingSl;
           newSstrategy.target = target;
           newStrategyVariations.push(newSstrategy)
         }
@@ -1790,10 +1806,10 @@ async function getFineTuneStoplossAndTargetVariations(strategyVariations, strate
   } else {
     count = 0;
     for (let stoploss of stops) {
-      if (target < 0.5) {
+      if (stoploss < 0.5) {
         continue;
       }
-      if (strategy.target === null) {
+      if (!useTarget) {
         for (let strategy of strategyVariations) {
           if (count > 1000 && count % 1000 === 0) {
             await sleep(0);
@@ -1809,7 +1825,13 @@ async function getFineTuneStoplossAndTargetVariations(strategyVariations, strate
           for (let sellRule of strategy.sellRules) {
             newSstrategy.sellRules.push(sellRule);
           }
-          newSstrategy.stoploss = stoploss;
+          newSstrategy.stoploss = strategy.stoploss;
+          newSstrategy.trailingSl = strategy.trailingSl;
+          if (isTrailing) {
+            newSstrategy.trailingSl = stoploss;
+          } else {
+            newSstrategy.stoploss = stoploss;
+          }
           newSstrategy.target = strategy.target;
           newStrategyVariations.push(newSstrategy)
         }
@@ -1833,7 +1855,13 @@ async function getFineTuneStoplossAndTargetVariations(strategyVariations, strate
             for (let sellRule of strategy.sellRules) {
               newSstrategy.sellRules.push(sellRule);
             }
-            newSstrategy.stoploss = stoploss;
+            newSstrategy.stoploss = strategy.stoploss;
+            newSstrategy.trailingSl = strategy.trailingSl;
+            if (isTrailing) {
+              newSstrategy.trailingSl = stoploss;
+            } else {
+              newSstrategy.stoploss = stoploss;
+            }
             newSstrategy.target = target;
             newStrategyVariations.push(newSstrategy)
           }
@@ -1893,7 +1921,13 @@ async function getFullStoplossAndTargetVariations(strategyVariations, rulesCount
         for (let sellRule of strategy.sellRules) {
           newSstrategy.sellRules.push(sellRule);
         }
-        newSstrategy.stoploss = stoploss;
+
+        if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
+          newSstrategy.trailingSl = stoploss;
+        } else {
+          newSstrategy.stoploss = stoploss;
+        }
+
         newSstrategy.target = target;
         newStrategyVariations.push(newSstrategy)
       }
@@ -1917,6 +1951,7 @@ async function getNewStrategyVariations(newRules, strategyVariations, type, stra
         newSstrategy.buyRules = [];
         newSstrategy.sellRules = [];
         newSstrategy.stoploss = strategy.stoploss;
+        newSstrategy.trailingSl = strategy.trailingSl;
         newSstrategy.target = strategy.target;
 
         for (let buyRuleTmp of strategyTmp.buyRules) {
@@ -1938,6 +1973,7 @@ async function getNewStrategyVariations(newRules, strategyVariations, type, stra
       newSstrategy.buyRules = [];
       newSstrategy.sellRules = [];
       newSstrategy.stoploss = strategy.stoploss;
+      newSstrategy.trailingSl = strategy.trailingSl;
       newSstrategy.target = strategy.target;
       if (type === 'buy') {
         newSstrategy.buyRules.push(newRule);
@@ -1966,6 +2002,7 @@ async function editOpStrategy() {
 async function opCancel() {
   $('#opCancelBtn').addClass('disabled');
   $('#opRunPercent').html('Stopping Optimization..');
+  await sleep(1000);
   cancelGetBinanceData();
   await terminateOpWorkers();
   $('#opResultDiv').hide();

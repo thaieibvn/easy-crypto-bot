@@ -2502,7 +2502,7 @@ body.is-ie #sidebar>.inner {
   border-radius: 0.2em;
   bottom: 0;
   content: '';
-  height: 0.16em;
+  height: 0.18em;
   position: absolute;
   right: 0;
   width: 100%
@@ -2686,6 +2686,39 @@ body.is-loading #sidebar nav ul li {
   padding: 0 !important;
   margin: 0;
   vertical-align: middle;
+}
+
+.modal input[type="checkbox"]+label {
+  color: #1170c4 !important;
+}
+
+.modal  input[type="checkbox"]+label:before{
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.25em;
+  border: solid 1px #1170c4;
+  content: '';
+  display: inline-block;
+  height: 1.65em;
+  left: 0;
+  line-height: 1.58125em;
+  position: absolute;
+  text-align: center;
+  top: 0;
+  width: 1.65em
+}
+
+.modal input[type="checkbox"]:checked+label:before {
+  background: #fff;
+  border-color: #1170c4;
+  color: #1170c4;
+  font-family: 'Font Awesome\ 5 Free';
+  font-weight: 900;
+  content: "\f00c"
+}
+
+.modal input[type="checkbox"]:focus+label:before{
+  border-color: #1170c4;
+  box-shadow: 0 0 0 1px #1170c4
 }
 
 input[type="text"], input[type="number"], input[type="date"] {

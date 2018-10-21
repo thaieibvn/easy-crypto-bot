@@ -47,8 +47,6 @@ function checkApiKey(exchange) {
     }, function() {
       $('#tsExchangeCombobox').html('Choose Exchange');
     });
-  } else {
-    //alert(exchangesApiKeys[exchange].key + ' ' + exchangesApiKeys[exchange].secret)
   }
 }
 async function tsFillBinanceInstruments() {
@@ -161,15 +159,13 @@ async function fillMaxLossDetails() {
   }
 }
 
-let executedStrategies = [];
-let executionWorkers = {};
-
+let executionWorkers = [];
+const maxExecutions = 20;
 const executionMutex = new Mutex();
-const maxExecutions = 15;
 function hasTradingStrategies() {
   let has = false;
-  for (let execution of executedStrategies) {
-    if (execution.status === 'running') {
+  for (let worker of executionWorkers) {
+    if (worker.status !== 'free') {
       has = true;
       break;
     }
@@ -179,12 +175,7 @@ function hasTradingStrategies() {
 async function executeStrategy() {
   try {
     await executionMutex.lock();
-    let runningExecutions = 0;
-    for (let execution of executedStrategies) {
-      if (execution.status !== 'removed') {
-        runningExecutions++;
-      }
-    }
+    let runningExecutions = $('#tsStrategiesTable tr').length - 1; //First tr is the header
     if (runningExecutions >= maxExecutions) {
       openModalInfo('The maximum executions number is ' + maxExecutions + '. Please remove an execution before starting new one!');
       return;
@@ -238,6 +229,7 @@ async function executeStrategy() {
         openModalInfo('Position Size cannot be less than 0 !');
         return;
       }
+
       let lotSizeInfo = null;
       if (exchange === 'Binance') {
         lotSizeInfo = await getBinanceLotSizeInfo(instrument);
@@ -255,6 +247,7 @@ async function executeStrategy() {
         openModalInfo('Position Size for ' + instrument + ' must be a multiple of ' + lotSizeInfo[2] + ' on ' + exchange + ' exchange! ');
         return;
       }
+
       let maxLossTmp = Number.parseFloat($('#tsMaxLoss').val());
       if (!isNaN(maxLossTmp) && maxLossTmp !== 0) {
         maxLoss = (-1) * Math.abs(maxLossTmp);
@@ -270,11 +263,9 @@ async function executeStrategy() {
       execTmp = await getExecutionById(dbId);
     }
     let date = new Date();
-    let strategyIndex = executedStrategies.length;
     let curExecution = {
       id: dbId,
       date: date.getTime(),
-      index: strategyIndex,
       type: executionType,
       name: strategyName,
       strategy: strategy,
@@ -284,17 +275,17 @@ async function executeStrategy() {
       positionSize: positionSize,
       status: 'starting',
       maxLoss: maxLoss,
-      trades: []
+      trades: [],
+      trailingSlPriceUsed: null
     }
     addExecutionToDb(curExecution);
-    executedStrategies.push(curExecution);
     let resStr = '0.00%';
-    if(executionType === "Alerts") {
-      resStr='';
+    if (executionType === "Alerts") {
+      resStr = '';
     }
-    $('#tsStrategiesTable').append('<tr id="executionTableItem' + strategyIndex + '"><td>' + executionType + '</td><td>' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td>' + curExecution.timeframe + '</td><td class="text-center" id="executedTrades' + strategyIndex + '">0</td>' + '<td><span id="executionRes' + strategyIndex + '">'+resStr+'</span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + strategyIndex + '\')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + strategyIndex + '"></td><td id="terminateStrBtn' + strategyIndex + '">Starting..</td></tr>');
+    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td>' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td>' + curExecution.timeframe + '</td><td class="text-center" id="executedTrades' + dbId + '">0</td>' + '<td><span id="executionRes' + dbId + '">' + resStr + '</span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + dbId + '\')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + dbId + '"></td><td id="terminateStrBtn' + dbId + '">Starting..</td></tr>');
 
-    runStrategy(strategyIndex);
+    await runStrategy(dbId);
 
   } catch (err) {
     openModalInfo('Internal Error Occurred!<br>' + err);
@@ -304,23 +295,25 @@ async function executeStrategy() {
   }
 }
 
-function fillExecResInTable(trades, index) {
+function fillExecResInTable(trades, id) {
   let result = 0;
   for (let trade of trades) {
     result += trade.result;
   }
-  $('#executionRes' + index).removeClass('text-green');
-  $('#executionRes' + index).removeClass('text-red');
-  $('#executionRes' + index).html(result.toFixed(2) + '%');
-  $('#executionRes' + index).addClass(
+  $('#executionRes' + id).removeClass('text-green');
+  $('#executionRes' + id).removeClass('text-red');
+  $('#executionRes' + id).html(result.toFixed(2) + '%');
+  $('#executionRes' + id).addClass(
     result > 0
-    ? 'text-green' : result < 0 ?
-    'text-red' : '');
+    ? 'text-green'
+    : result < 0
+      ? 'text-red'
+      : '');
 }
 
-function checkMaxLossReached(index) {
-  let execution = executedStrategies[index];
-  if (execution.maxLoss === null || executedStrategies[index].status !== 'running') {
+async function checkMaxLossReached(id) {
+  let execution = await getExecutionById(id);
+  if (execution.maxLoss === null) {
     return;
   }
 
@@ -330,122 +323,31 @@ function checkMaxLossReached(index) {
   }
   let totalGainLoss = execution.positionSize * (result / 100);
   if (totalGainLoss <= execution.maxLoss) {
-    stopStrategyExecution(index);
+    stopStrategyExecution(id);
     openModalInfo('Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' on ' + execution.timeframe + ' has reached the maximum loss.<br>The execution was stopped.');
   }
 }
 
-function runStrategy(index) {
+async function runStrategy(id) {
   try {
-    $('#terminateStrBtn' + index).html('Starting..');
-    let execution = executedStrategies[index];
+    $('#terminateStrBtn' + id).html('Starting..');
+    let execution = await getExecutionById(id);
     if (execution.type === 'Trading') {
       if (exchangesApiKeys[execution.exchange] === undefined) {
         openModalConfirm('<div class="text-justify">Please provide your API key for ' + execution.exchange + '. </div><br><div class="text-left"><span class="inline-block min-width5">API Key:&nbsp;</span><input class="min-width20" id="exchangeApiKey" type="text" placeholder="API KEY" /><br>' + '<span class="inline-block min-width5">Secret:&nbsp;</span><input class="min-width20" id="exchangeApiSecret" type="text" placeholder="Secret" /></div><br><div class="text-justify">Your key and secret are not stored anywhere by this application.</div>', async function() {
           let result = await verifyKeyAndSecret(execution.exchange);
           if (result) {
-            runStrategy(index);
+            runStrategy(id);
           } else {
-            $('#terminateStrBtn' + index).html('Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(\'' + index + '\')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(\'' + index + '\')"><i class="fas fa-times"></i></a>');
+            $('#terminateStrBtn' + id).html('Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
           }
         }, function() {
           openModalInfoBig("Cannot run strategy in Real Trading mode without connection to the exchange via your API Key and Secret!");
-          $('#terminateStrBtn' + index).html('Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(\'' + index + '\')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(\'' + index + '\')"><i class="fas fa-times"></i></a>');
+          $('#terminateStrBtn' + id).html('Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
         });
         return;
       }
     }
-
-    let wk = null;
-    if (execution.exchange === 'Binance') {
-      wk = new Worker("./assets/js/binance-execution.js");
-    }
-    wk.addEventListener('error', function(e) {
-      openModalInfo('Internal Error Occurred!<br>' + execution.type + ' ' + e.message + '<br>' + e.filename + ' ' + e.lineno);
-    }, false);
-
-    const runMutex = new Mutex();
-    wk.addEventListener("message", async function(e) {
-      try {
-        await runMutex.lock();
-        if (typeof e.data === 'string' && e.data.startsWith('ERR')) {
-          openModalInfo('Internal Error Occurred!<br>' + e.data);
-          return;
-        }
-        if (typeof e.data === 'string' && e.data.startsWith('started')) {
-          execution.status = 'running';
-          $('#terminateStrBtn' + index).html('Running&nbsp;<a class="stop-stgy-exec text-red" title="Stop Execution" href="#/" onclick="stopStrategyExecution(\'' + index + '\')"><i class="fas fa-pause"></i></a>');
-          return;
-        }
-        if (typeof e.data === 'string' && e.data.startsWith('LastUpdated')) {
-          $('#lastUpdatedExecution' + index).html(formatDateNoYear(new Date()));
-          return;
-        }
-        if (typeof e.data === 'string' && e.data.startsWith('stopped')) {
-          $('#executeStrategyBtn').removeClass('disabled');
-          openModalInfo('Execution of strategy ' + execution.name + ' on exchang ' + execution.exchange + ' for instrument ' + execution.instrument + ' has failed to start!');
-          $('#terminateStrBtn' + index).html('Failed&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(\'' + index + '\')"><i class="fas fa-times"></i></a>');
-          executedStrategies[index].status = 'failed';
-          return;
-        }
-        if (execution.type === 'Alerts') {
-          let date = e.data[0];
-          let price = e.data[1];
-          let type = e.data[2];
-          openModalInfo(type + ' Alert!<br><div class="text-left">Strategy: ' + execution.name + '<br>Exchange: ' + execution.exchange + '<br>Instrument: ' + execution.instrument + '<br>Date: ' + formatDateFull(date) + '<br>Entry Price: ' + price);
-          execution.trades.push({type: type, date: date, entry: price});
-          await removeExecutionFromDb(execution.id);
-          await addExecutionToDb(execution);
-          $('#executedTrades' + index).html(execution.trades.length);
-        } else {
-          let trade = e.data[0];
-          let type = e.data[1];
-          if (type === 'Buy') {
-            execution.trades.push(trade);
-            await removeExecutionFromDb(execution.id);
-            await addExecutionToDb(execution);
-            $('#executedTrades' + index).html(execution.trades.length);
-          } else if (execution.trades.length > 0 && type === 'Sell') {
-            let feeRate = e.data[2];
-            execution.trades[execution.trades.length - 1] = trade;
-            fillExecResInTable(execution.trades, index);
-            await removeExecutionFromDb(execution.id);
-            await addExecutionToDb(execution);
-            checkMaxLossReached(index);
-          } else if (type === 'Error') {
-            execution.trades.pop();
-            $('#executedTrades' + index).html(execution.trades.length);
-            openModalInfo(trade + '<br><br>The execution of the strategy is stopped!');
-            stopStrategyExecution(index);
-            await removeExecutionFromDb(execution.id);
-            await addExecutionToDb(execution);
-          } else if (type === 'UpdateOpenPrice') {
-            let tradeIndex = e.data[2];
-            let feeRate = e.data[3];
-            execution.trades[tradeIndex] = trade;
-            await removeExecutionFromDb(execution.id);
-            await addExecutionToDb(execution);
-            if (execution.trades[tradeIndex].exit !== undefined && execution.trades[tradeIndex].exit !== null) {
-              fillExecResInTable(execution.trades, index);
-              checkMaxLossReached(index);
-            }
-          } else if (type === 'UpdateClosePrice') {
-            let tradeIndex = e.data[2];
-            let feeRate = e.data[3];
-            $('#executionFeeRate').html(feeRate / 2);
-            execution.trades[tradeIndex] = trade;
-            await removeExecutionFromDb(execution.id);
-            await addExecutionToDb(execution);
-            fillExecResInTable(execution.trades, index);
-            checkMaxLossReached(index);
-          }
-        }
-      } catch (err) {
-        openModalInfo('Internal Error Occurred!<br>' + err);
-      } finally {
-        runMutex.release();
-      }
-    }, false);
 
     let apiKey = 'api-key';
     let apiSecret = 'api-secret';
@@ -453,50 +355,144 @@ function runStrategy(index) {
       apiKey = exchangesApiKeys[execution.exchange].key;
       apiSecret = exchangesApiKeys[execution.exchange].secret;
     }
-    if (executionWorkers[execution.index] !== undefined) {
-      executionWorkers[execution.index].terminate();
-      executionWorkers[execution.index] = undefined;
+
+    let hasFreeWorker = false;
+    for (let worker of executionWorkers) {
+      if (worker.status === 'free') {
+        worker.status = 'running';
+        worker.execId = id;
+        hasFreeWorker = true;
+        worker.wk.postMessage([execution, apiKey, apiSecret]);
+        break;
+      }
     }
 
-    executionWorkers[execution.index] = wk;
-    wk.postMessage([execution, apiKey, apiSecret, execution.trades]);
+    if (!hasFreeWorker) {
+      let wk = null;
+      if (execution.exchange === 'Binance') {
+        wk = new Worker("./assets/js/binance-execution.js");
+      }
+      wk.addEventListener('error', function(e) {
+        openModalInfo('Internal Error Occurred!!<br>' + execution.type + ' ' + e.message + '<br>' + e.filename + ' ' + e.lineno);
+      }, false);
+
+      const runMutex = new Mutex();
+      wk.addEventListener("message", async function(e) {
+        try {
+          await runMutex.lock();
+          let id = e.data[0];
+          let execution = await getExecutionById(id);
+          let type = e.data[1];
+          let data = e.data[2];
+          let additionalData = e.data[3];
+          switch (type) {
+            case 'STARTED':
+              $('#terminateStrBtn' + id).html('Running&nbsp;<a class="stop-stgy-exec text-red" title="Stop Execution" href="#/" onclick="stopStrategyExecution(' + id + ')"><i class="fas fa-pause"></i></a>');
+              break;
+            case 'STOPPED':
+              $('#executeStrategyBtn').removeClass('disabled');
+              openModalInfoBig('Execution of strategy ' + execution.name + ' on exchang ' + execution.exchange + ' for instrument ' + execution.instrument + ' has failed to start!');
+              $('#terminateStrBtn' + id).html('Failed&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
+              break;
+            case 'ERROR':
+              let errorMsg = data + '<br><br>The execution of the strategy is stopped!'
+              openModalInfoBig(errorMsg);
+              stopStrategyExecution(id, errorMsg);
+              break;
+            case 'LAST_UPDATED':
+              $('#lastUpdatedExecution' + id).html(formatDateNoYear(new Date()));
+              break;
+            case 'MSG':
+              openModalInfoBig(data);
+              break;
+            case 'TRAILING_STOP_PRICE':
+              execution.trailingSlPriceUsed = data;
+              await updateExecutionDb(execution);
+              break;
+            case 'BUY':
+              if (execution.type === 'Alerts') {
+                execution.trades.push({type: 'Buy', date: additionalData, entry: data});
+                openModalInfo('BUY Alert!<br><div class="text-left">Strategy: ' + execution.name + '<br>Exchange: ' + execution.exchange + '<br>Instrument: ' + execution.instrument + '<br>Date: ' + formatDateFull(additionalData) + '<br>Entry Price: ' + data);
+              } else {
+                execution.trades.push(data);
+              }
+              await updateExecutionDb(execution);
+              $('#executedTrades' + id).html(execution.trades.length);
+              break;
+            case 'SELL':
+              if (execution.type === 'Alerts') {
+                execution.trades.push({type: 'Sell', date: additionalData, entry: data});
+                await updateExecutionDb(execution, execution.trades);
+                $('#executedTrades' + id).html(execution.trades.length);
+                openModalInfo('SELL Alert!<br><div class="text-left">Strategy: ' + execution.name + '<br>Exchange: ' + execution.exchange + '<br>Instrument: ' + execution.instrument + '<br>Date: ' + formatDateFull(additionalData) + '<br>Entry Price: ' + data);
+              } else {
+                let feeRate = additionalData;
+                execution.trades[execution.trades.length - 1] = data;
+                await updateExecutionDb(execution);
+                fillExecResInTable(execution.trades, id);
+                await checkMaxLossReached(id);
+              }
+              break;
+            default:
+          };
+        } catch (err) {
+          openModalInfo('Internal Error Occurred!!!<br>' + err);
+        } finally {
+          runMutex.release();
+        }
+      }, false);
+
+      wk.postMessage([execution, apiKey, apiSecret]);
+      executionWorkers.push({status: 'running', execId: id, wk: wk});
+    }
   } catch (err) {
-    openModalInfo('Internal Error Occurred!<br>' + err);
+    openModalInfo('Internal Error Occurred!!!!<br>' + err);
   }
 }
 
-function rmExecutionFromTable(index) {
-  openModalConfirm("Remove " + executedStrategies[index].name + " execution?", function() {
-    executedStrategies[index].status = 'removed';
-    removeExecutionFromDb(executedStrategies[index].id);
-    if (executionWorkers[index] !== undefined) {
-      executionWorkers[index].terminate();
-      executionWorkers[index] = undefined;
+async function rmExecutionFromTable(id) {
+  let execution = await getExecutionById(id);
+  openModalConfirm("Remove " + execution.name + " execution?", function() {
+    removeExecutionFromDb(id);
+    for (let worker of executionWorkers) {
+      if (worker.execId == id) {
+        worker.wk.postMessage('TERMINATE');
+        worker.status = 'free';
+        break;
+      }
     }
-    $('#executionTableItem' + index).remove();
+    $('#executionTableItem' + id).remove();
   });
 }
 
-function resumeExecution(index) {
-  if (executionWorkers[index] !== undefined) {
-    $('#terminateStrBtn' + index).html('Starting..');
-    executedStrategies[index].status = 'starting';
-    executionWorkers[index].postMessage('resume');
-  } else {
-    openModalInfo('Cannot resume the strategy. Please try later!');
+function resumeExecution(id) {
+  for (let worker of executionWorkers) {
+    if (worker.execId == id) {
+      worker.wk.postMessage('RESUME');
+      worker.status = 'running';
+      break;
+    }
   }
+  $('#terminateStrBtn' + id).html('Starting..');
 }
 
-function stopStrategyExecution(index) {
-  if (executionWorkers[index] !== undefined) {
-    executionWorkers[index].postMessage('stop');
-    $('#terminateStrBtn' + index).html('Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="resumeExecution(\'' + index + '\')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(\'' + index + '\')"><i class="fas fa-times"></i></a>');
-    executedStrategies[index].status = 'stopped';
+function stopStrategyExecution(id, errorMsg) {
+  for (let worker of executionWorkers) {
+    if (worker.execId == id) {
+      worker.wk.postMessage('PAUSE');
+      worker.status = 'paused';
+      break;
+    }
   }
+  let status = 'Stopped';
+  if (errorMsg !== null && errorMsg !== undefined) {
+    status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + errorMsg + '\')"><i class="fas fa-question-circle"></i></a>';
+  }
+  $('#terminateStrBtn' + id).html(status + '&nbsp;<a title="Resume Execution" href="#/" onclick="resumeExecution(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
 }
 
-function showExecutionResult(index) {
-  let execution = executedStrategies[index];
+async function showExecutionResult(id) {
+  let execution = await getExecutionById(id);
   $('#executionStrategiesTable').html('<thead><tr><td class="text-left">Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead>');
 
   if (execution.type === 'Alerts') {
@@ -654,6 +650,7 @@ function getExecutionsDb() {
       filename: getAppDataFolder() + '/db/executions.db',
       autoload: true
     });
+    executionsDb.persistence.setAutocompactionInterval(1000 * 60 * 5); //Every 5 minutes
   }
   return executionsDb;
 }
@@ -664,13 +661,10 @@ async function fillOldExecutions() {
     executionFilled = true;
     let executions = await getExecutionsFromDb();
     if (executions !== null && executions.length > 0) {
-      for (let i = 0; i < executions.length; i++) {
-        executions[i].index = i;
-        executions[i].status = 'stopped';
-        executedStrategies.push(executions[i]);
-        $('#tsStrategiesTable').append('<tr id="executionTableItem' + executions[i].index + '"><td>' + executions[i].type + '</td><td>' + executions[i].name + '</td><td>' + executions[i].exchange + '</td><td>' + executions[i].instrument + '</td><td>' + executions[i].timeframe + '</td><td class="text-center" id="executedTrades' + executions[i].index + '">' + executions[i].trades.length + '</td>' + '<td><span id="executionRes' + executions[i].index + '"></span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + executions[i].index + '\')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + executions[i].index + '"></td><td id="terminateStrBtn' + executions[i].index + '">Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(\'' + executions[i].index + '\')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(\'' + executions[i].index + '\')"><i class="fas fa-times"></i></a></td></tr>');
-        if (executions[i].type !== 'Alerts') {
-          fillExecResInTable(executions[i].trades, executions[i].index);
+      for (let execution of executions) {
+        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td>' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td>' + execution.timeframe + '</td><td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td>' + '<td><span id="executionRes' + execution.id + '"></span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + execution.id + '\')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + execution.id + '"></td><td id="terminateStrBtn' + execution.id + '">Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(\'' + execution.id + '\')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(\'' + execution.id + '\')"><i class="fas fa-times"></i></a></td></tr>');
+        if (execution.type !== 'Alerts') {
+          fillExecResInTable(execution.trades, execution.id);
         }
       }
       $('#tsResultDiv').show();
@@ -691,6 +685,9 @@ function getExecutionsFromDb() {
 }
 
 function getExecutionById(id) {
+  if (typeof id === 'string') {
+    id = Number(id);
+  }
   return new Promise((resolve, reject) => {
     getExecutionsDb().findOne({
       id: id
@@ -714,6 +711,19 @@ function addExecutionToDb(execution) {
       }
     })
   });
+}
+
+const executionDbUpdateMutex = new Mutex();
+
+async function updateExecutionDb(execution) {
+  try {
+    await executionDbUpdateMutex.lock();
+    await removeExecutionFromDb(execution.id);
+    await addExecutionToDb(execution);
+    //getExecutionsDb().persistence.compactDatafile();
+  } finally {
+    executionDbUpdateMutex.release();
+  }
 }
 
 function removeExecutionFromDb(id) {

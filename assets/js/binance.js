@@ -27,11 +27,10 @@ async function getBinanceInstruments() {
                 let list = JSON.parse(data);
                 binanceInstruments = {}
                 for (let item of list) {
-                  binanceInstruments[''+item+'']=item;
+                  binanceInstruments['' + item + ''] = item;
                 }
               },
-              error: function() {
-              }
+              error: function() {}
             });
           } else {
             binanceInstruments = ticker;
@@ -43,6 +42,18 @@ async function getBinanceInstruments() {
   } else {
     return Promise.resolve(binanceInstruments);
   }
+}
+
+function getLastBinancePrice(instrument) {
+  return new Promise((resolve, reject) => {
+    binance.prices(instrument, (error, ticker) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(ticker[instrument]);
+      }
+    })
+  });
 }
 
 function getBinanceTicksImpl(instrument, timeframe, startTime, endTime) {
@@ -445,4 +456,40 @@ function getBinanceBidAsk(pair) {
       ]);
     });
   });
+}
+
+let binanceInstrumentsInfo = null;
+async function fillBinanceInstrumentsInfo() {
+  if (binanceInstrumentsInfo === null) {
+    binanceInstrumentsInfo = {};
+    return new Promise((resolve, reject) => {
+      binance.exchangeInfo(function(error, data) {
+        for (let obj of data.symbols) {
+          let item = {};
+          for (let filter of obj.filters) {
+            if (filter.filterType == "MIN_NOTIONAL") {
+              item.minNotional = filter.minNotional;
+            } else if (filter.filterType == "LOT_SIZE") {
+              item.stepSize = filter.stepSize;
+              item.minQty = filter.minQty;
+              item.maxQty = filter.maxQty;
+            }
+          }
+          item.orderTypes = obj.orderTypes;
+          binanceInstrumentsInfo[obj.symbol] = item;
+        }
+        resolve(binanceInstrumentsInfo);
+      });
+    });
+  } else {
+    return binanceInstrumentsInfo;
+  }
+}
+
+async function getBinanceInstrumentsInfo(instrument) {
+  return await binanceInstrumentsInfo[instrument.toUpperCase()];
+}
+
+function binanceRoundAmmount(amount, stepSize) {
+  return binance.roundStep(amount, stepSize);
 }

@@ -52,7 +52,7 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('crashed', (e) => {
-    dialog.showMessageBox({message: "The App has crashed and will be restarted :(", buttons: ["OK"]});
+    dialog.showErrorBox('The App has crashed and will be restarted :(','Please contact me at stefan@easycryptobot.com with details what happened so I can fix it! Thanks!');
     console.log(e);
     app.relaunch();
     app.quit()
