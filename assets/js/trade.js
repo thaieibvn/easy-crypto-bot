@@ -452,8 +452,7 @@ async function runStrategy(id) {
 
 async function rmExecutionFromTable(id) {
   let execution = await getExecutionById(id);
-  openModalConfirm("Remove " + execution.name + " execution?", function() {
-    removeExecutionFromDb(id);
+  openModalConfirm("Remove " + execution.name + " execution?", async function() {
     for (let worker of executionWorkers) {
       if (worker.execId == id) {
         worker.wk.postMessage('TERMINATE');
@@ -462,6 +461,8 @@ async function rmExecutionFromTable(id) {
       }
     }
     $('#executionTableItem' + id).remove();
+    await sleep(100);
+    await removeExecutionFromDb(id);
   });
 }
 
@@ -662,7 +663,7 @@ async function fillOldExecutions() {
     let executions = await getExecutionsFromDb();
     if (executions !== null && executions.length > 0) {
       for (let execution of executions) {
-        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td>' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td>' + execution.timeframe + '</td><td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td>' + '<td><span id="executionRes' + execution.id + '"></span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + execution.id + '\')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + execution.id + '"></td><td id="terminateStrBtn' + execution.id + '">Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(\'' + execution.id + '\')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(\'' + execution.id + '\')"><i class="fas fa-times"></i></a></td></tr>');
+        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td>' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td>' + execution.timeframe + '</td><td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td>' + '<td><span id="executionRes' + execution.id + '"></span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + execution.id + ')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + execution.id + '"></td><td id="terminateStrBtn' + execution.id + '">Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(' + execution.id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + execution.id + ')"><i class="fas fa-times"></i></a></td></tr>');
         if (execution.type !== 'Alerts') {
           fillExecResInTable(execution.trades, execution.id);
         }
