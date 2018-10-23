@@ -1969,7 +1969,7 @@ async function getNewStrategyVariations(newRules, strategyVariations, type, stra
       }
     } else {
       let newSstrategy = {};
-      newSstrategy.name = strategy.name + ' (optimized for ' + instrument + ' ' + timeframe + ')';
+      newSstrategy.name = strategy.name + ' (' + instrument + ' ' + timeframe + ')';
       newSstrategy.buyRules = [];
       newSstrategy.sellRules = [];
       newSstrategy.stoploss = strategy.stoploss;

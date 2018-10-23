@@ -49,7 +49,6 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
         //let openWithSpread = addBuySpread(openPrice);
         let trade = {
           'openDate': date,
-          'openDateOrg': date,
           'entry': openPrice,
           /*'entry': openWithSpread > highPrice
             ? highPrice
@@ -74,17 +73,16 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
     if (tradeType === 'sell') {
       if (stoploss >= lowPrice) {
         trades[trades.length - 1]['closeDate'] = date;
-        trades[trades.length - 1]['closeDateOrg'] = date;
         if (openPrice < smallNumber) {
           if (stoploss >= openPrice) {
             let openWithSpread = addSellSpread(openPrice);
             trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
-              ? lowPrice
+              ? openPrice
               : openWithSpread;
           } else if (stoploss >= closePrice) {
             let closeWithSpread = addSellSpread(closePrice);
             trades[trades.length - 1]['exit'] = closeWithSpread < lowPrice
-              ? lowPrice
+              ? closePrice
               : closeWithSpread;
           } else {
             trades[trades.length - 1]['exit'] = lowPrice
@@ -105,20 +103,22 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
       }
       if (target <= highPrice) {
         trades[trades.length - 1]['closeDate'] = date;
-        trades[trades.length - 1]['closeDateOrg'] = date;
         if (openPrice < smallNumber) {
           if (target <= openPrice) {
             let openWithSpread = addSellSpread(openPrice);
             trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
-              ? lowPrice
+              ? openPrice
               : openWithSpread;
           } else if (target <= closePrice) {
             let closeWithSpread = addSellSpread(closePrice);
             trades[trades.length - 1]['exit'] = closeWithSpread < lowPrice
-              ? lowPrice
+              ? closePrice
               : closeWithSpread;
           } else {
-            trades[trades.length - 1]['exit'] = lowPrice
+            let highWithSpread = addSellSpread(highPrice);
+            trades[trades.length - 1]['exit'] = highWithSpread < lowPrice
+              ? highPrice
+              : highWithSpread;
           }
         } else {
           trades[trades.length - 1]['exit'] = target < openPrice
@@ -146,7 +146,6 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
       if (checkTradeRules(strategy.sellRules, closePrices)) {
         //let openWithSpread = addSellSpread(openPrice);
         trades[trades.length - 1]['closeDate'] = date;
-        trades[trades.length - 1]['closeDateOrg'] = date;
         trades[trades.length - 1]['exit'] = openPrice;
         /*trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
           ? lowPrice

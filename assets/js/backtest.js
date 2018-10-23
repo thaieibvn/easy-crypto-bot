@@ -534,12 +534,12 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
     let tradeCount = 1;
     for (let trade of trades) {
       openTrades.push({
-        x: trade.openDateOrg.getTime(),
+        x: trade.openDate.getTime(),
         y: trade.entry,
         title: 'Open Trade ' + tradeCount + '<br>Date: ' + formatDateFull(trade.openDate) + '<br>Price: ' + trade.entry.toFixed(8)
       });
       closeTrades.push({
-        x: trade.closeDateOrg.getTime(),
+        x: trade.closeDate.getTime(),
         y: trade.exit,
         title: 'Close Trade ' + tradeCount + '<br>Date: ' + formatDateFull(trade.closeDate) + '<br>Price: ' + trade.entry.toFixed(8) + '<br>Result: ' + trade.result.toFixed(2) + '%'
       });
@@ -547,7 +547,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
     }
     if (lastTrade !== null) {
       openTrades.push({
-        x: lastTrade.openDateOrg.getTime(),
+        x: lastTrade.openDate.getTime(),
         y: lastTrade.entry,
         title: 'Open Trade ' + tradeCount + '<br>Date: ' + formatDateFull(lastTrade.openDate) + '<br>Price: ' + lastTrade.entry.toFixed(8)
       });
