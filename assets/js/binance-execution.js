@@ -249,6 +249,7 @@ function startBinanceWebsocket() {
     } finally {
       mutex.release();
     }
+
   });
 }
 

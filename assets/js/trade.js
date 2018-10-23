@@ -487,7 +487,7 @@ function stopStrategyExecution(id, errorMsg) {
   }
   let status = 'Stopped';
   if (errorMsg !== null && errorMsg !== undefined) {
-    status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + errorMsg + '\')"><i class="fas fa-question-circle"></i></a>';
+    status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + errorMsg.replace("'","") + '\')"><i class="fas fa-question-circle"></i></a>';
   }
   $('#terminateStrBtn' + id).html(status + '&nbsp;<a title="Resume Execution" href="#/" onclick="resumeExecution(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
 }
