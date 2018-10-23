@@ -172,7 +172,7 @@ function startBinanceWebsocket() {
                     self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
                   }
                   if (strategy.target !== null && !isNaN(strategy.target)) {
-                    let target = execution.trades[execution.trades.length - 1].entry * (1 + (strategy.target / 100));
+                    target = execution.trades[execution.trades.length - 1].entry * (1 + (strategy.target / 100));
                   }
                 } //Real trading - market buy
                 tradeType = 'sell';
