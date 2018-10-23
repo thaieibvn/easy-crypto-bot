@@ -156,6 +156,10 @@ function startBinanceWebsocket() {
                     'result': 0
                   };
                   execution.trades.push(trade);
+                  if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
+                    timeClose = new Date(trade.openDate.getTime());
+                    timeClose.setHours(timeClose.getHours() + strategy.timeClose);
+                  }
                   self.postMessage([execId, 'BUY', trade]);
                 } else {
                   //Real trading - market buy
@@ -173,6 +177,10 @@ function startBinanceWebsocket() {
                   }
                   if (strategy.target !== null && !isNaN(strategy.target)) {
                     target = execution.trades[execution.trades.length - 1].entry * (1 + (strategy.target / 100));
+                  }
+                  if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
+                    timeClose = new Date(execution.trades[execution.trades.length - 1].openDate.getTime());
+                    timeClose.setHours(timeClose.getHours() + strategy.timeClose);
                   }
                 } //Real trading - market buy
                 tradeType = 'sell';
@@ -230,7 +238,7 @@ function startBinanceWebsocket() {
               break;
             }
           }
-          if ((stoploss !== null && stoploss >= curPrice) || (target !== null && target <= curPrice)) {
+          if ((stoploss !== null && stoploss >= curPrice) || (target !== null && target <= curPrice) || (timeClose !== null && timeClose <= new Date())) {
             if (execution.type === 'Simulation') {
               let tradeIndex = execution.trades.length - 1;
               execution.trades[tradeIndex]['closeDate'] = new Date();
@@ -262,6 +270,7 @@ let testMode = true;
 let tradeType = 'buy';
 let stoploss = null;
 let target = null;
+let timeClose = null;
 let trailingSlPriceUsed = -1;
 let alertType = 'buy';
 let feeRate = 0.15;
@@ -289,6 +298,7 @@ self.addEventListener('message', async function(e) {
       tradeType = 'buy';
       stoploss = null;
       target = null;
+      timeClose = null;
       trailingSlPriceUsed = -1;
       alertType = 'buy';
       feeRate = 0.15;
@@ -331,6 +341,10 @@ self.addEventListener('message', async function(e) {
       }
       if (strategy.target !== null && !isNaN(strategy.target)) {
         target = execution.trades[execution.trades.length - 1].entry * (1 + (strategy.target / 100));
+      }
+      if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
+        timeClose = new Date(execution.trades[execution.trades.length - 1].openDate.getTime());
+        timeClose.setHours(timeClose.getHours() + strategy.timeClose);
       }
     }
     startBinanceWebsocket();

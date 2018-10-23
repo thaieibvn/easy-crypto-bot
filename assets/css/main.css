@@ -2913,6 +2913,10 @@ span.caret {
   min-width: 5.4em !important;
 }
 
+.min-width7 {
+  min-width: 7em !important;
+}
+
 .min-width10 {
   min-width: 9em !important;
 }

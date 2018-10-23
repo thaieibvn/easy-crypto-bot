@@ -206,6 +206,16 @@ async function saveStrategy() {
     openModalInfo('The target cannot be less than 0.5');
     return;
   }
+
+  let timeClose = Number.parseFloat($('#timeClose').val());
+  if (!isNaN(timeClose) && timeClose < 1) {
+    openModalInfo('The Rime Close cannot be less than 1');
+    return;
+  }
+  if(!isNaN(timeClose) ){
+    timeClose = Number.parseInt(timeClose.toFixed(0));
+  }
+
   try {
     let strategy = {
       name: strategyName,
@@ -213,7 +223,8 @@ async function saveStrategy() {
       sellRules: sellRulesList,
       stoploss: stoploss,
       target: target,
-      trailingSl: trailingSl
+      trailingSl: trailingSl,
+      timeClose: timeClose
     };
 
     let srtTmp = await getStrategyByName(strategy.name);
@@ -260,6 +271,14 @@ async function saveStrategy() {
     closeNewStrategy();
   } catch (err) {
     //alert(err)
+  }
+}
+
+function stoplossTypeChange(type){
+  if(type ==='sl'){
+    $('#trailingSl').val('');
+  } else {
+    $('#stoploss').val('');
   }
 }
 
@@ -313,6 +332,10 @@ function cmaInfo() {
 
 function rsiInfo() {
   openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">Relative Strength Index - RSI is a momentum indicator which provides a relative evaluation of the strength of the recent price performance." + " RSI values range from 0 to 100. " + "<br><br>A RSI reading of 70 or above is commonly interpreted as indicating an overbought or overvalued condition that may signal a trend change or corrective price reversal to the downside." + "<br><br>A RSI reading of 30 or below is commonly interpreted as indicating an oversold or undervalued condition that may signal a trend change or corrective price reversal to the upside." + "</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/rsi-info.png\" alt=\"\">");
+}
+
+function timeCloseInfo() {
+  openModalInfoBig("The Time Close field will close each position if your selling rules were not met or if the stoploss and the target were not reached within the provided timeframe. For example if you put '24' in this field all your positions will be closed 24 hours after they were opened automatically even the selling rules were not met. Should be whole hour - cannot have decimals and will be rounded.");
 }
 
 function indicatorCommingSoon(name) {
@@ -414,6 +437,8 @@ function openStrategy(strategy) {
     $('#stoploss').val(strategy.stoploss);
     $('#trailingSl').val(strategy.trailingSl);
     $('#target').val(strategy.target);
+    $('#timeClose').val(strategy.timeClose);
+
 
     let buyRuleTypeTmp = buyRuleType;
     strategy.buyRules.forEach(rule => {
@@ -545,6 +570,7 @@ function clearStrategyFields() {
   $('#stoploss').val('');
   $('#trailingSl').val('');
   $('#target').val('');
+  $('#timeClose').val('');
 }
 
 function rmStrategy(name) {

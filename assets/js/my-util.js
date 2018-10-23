@@ -482,11 +482,3 @@ function chunkArray(myArray, chunkSize) {
 function opKeyDownDoNothing(e) {
   e.preventDefault();
 }
-
-function stoplossTypeChange(type){
-  if(type ==='sl'){
-    $('#trailingSl').val('');
-  } else {
-    $('#stoploss').val('');
-  }
-}

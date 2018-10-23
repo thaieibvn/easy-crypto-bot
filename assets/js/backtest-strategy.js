@@ -24,6 +24,7 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
   let tradeType = 'buy';
   let stoploss = Number.MIN_VALUE;
   let target = Number.MAX_VALUE;
+  let timeClose = null;
   let trailingSlPriceUsed = -1;
   let closePrices = [];
 
@@ -38,12 +39,11 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
     let openPrice = ticks[i].o;
     let highPrice = ticks[i].h;
     let lowPrice = ticks[i].l;
-    let curDate = ticks[i].d
-    if (curDate < startDate) {
+    let date = ticks[i].d;
+    if (date < startDate) {
       closePrices.push(closePrice);
       continue;
     }
-    let date = ticks[i].d;
     if (tradeType === 'buy') {
       if (checkTradeRules(strategy.buyRules, closePrices)) {
         //let openWithSpread = addBuySpread(openPrice);
@@ -64,6 +64,10 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
         }
         if (strategy.target !== null && !isNaN(strategy.target)) {
           target = trade.entry * (1 + (strategy.target / 100))
+        }
+        if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
+          timeClose = new Date(date.getTime());
+          timeClose.setHours(timeClose.getHours() + strategy.timeClose);
         }
         trades.push(trade);
         tradeType = 'sell'
@@ -135,6 +139,15 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
         closePrices.push(closePrice);
         continue;
       }
+      if (timeClose !== null && timeClose <= date) {
+        trades[trades.length - 1]['closeDate'] = date;
+        trades[trades.length - 1]['exit'] = openPrice;
+        trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+        tradeType = 'buy';
+        closePrices.push(closePrice);
+        continue;
+      }
+
       if (strategy.sellRules.length === 0) {
         if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
           trailingSlPriceUsed = highPrice;

@@ -93,12 +93,14 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 					<hr />
 					<div class="text-center">
 						<h3 class="text-center">3. Set Stoploss and Target: Sell if the price moves against you or if your target is met:</h3>
-						<span class="min-width5 inline-block text-left">Stoploss:&nbsp;</span>
+						<span class="min-width7 inline-block text-left">Stoploss:&nbsp;</span>
 						<input id="stoploss" onkeydown="stoplossTypeChange('sl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
-						<span class="min-width5 inline-block text-left">Trailing SL:&nbsp;</span>
+						<span class="min-width7 inline-block text-left">Trailing SL:&nbsp;</span>
 						<input id="trailingSl" onkeydown="stoplossTypeChange('tsl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
-						<span class="min-width5 inline-block text-left">Target:&nbsp;</span>
+						<span class="min-width7 inline-block text-left">Target:&nbsp;</span>
 						<input id="target" style="width:10em;" type="number" value="" />&nbsp;%<br>
+						<span style="margin-left:1.6em;" class="min-width7 inline-block text-left">Time Close <a title="Info" onclick="timeCloseInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>:&nbsp;</span>
+						<input id="timeClose" style="width:10em;" type="number" value="" />&nbsp;hours<br>
 						<span style="font-size:small">If you don't want Stoloss or Target, leave them empty.</span>
 					</div>
 					<hr />
