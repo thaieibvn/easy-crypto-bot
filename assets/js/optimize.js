@@ -1902,17 +1902,16 @@ async function getFullStoplossAndTargetVariations(strategyVariations, rulesCount
       break;
     default:
   }
-
-  if (strategyVariations[0].stoploss === null && strategyVariations[0].trailingSl === null) {
+  if ((strategyVariations[0].stoploss === null || isNaN(strategyVariations[0].stoploss)) && (strategyVariations[0].trailingSl === null || isNaN(strategyVariations[0].trailingSl))) {
     stops = [null];
   }
-  if (strategyVariations[0].target === null ) {
+  if (strategyVariations[0].target === null || isNaN(strategyVariations[0].target)) {
     targets = [null];
   }
   let count = 0;
   for (let stoploss of stops) {
     for (let target of targets) {
-      if (stoploss!== null && target!== null && stoploss - 2 >= target) {
+      if (stoploss !== null && target !== null && stoploss - 2 >= target) {
         continue;
       }
       for (let strategy of strategyVariations) {
