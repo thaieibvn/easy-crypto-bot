@@ -165,7 +165,7 @@ const executionMutex = new Mutex();
 function hasTradingStrategies() {
   let has = false;
   for (let worker of executionWorkers) {
-    if (worker.status !== 'free') {
+    if (worker.status === 'running') {
       has = true;
       break;
     }
