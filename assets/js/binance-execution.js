@@ -23,14 +23,21 @@ function getBidAsk(binance, pair) {
 function getOrderTradePrice(binance, instrument, orderId) {
   return new Promise((resolve, reject) => {
     binance.trades(instrument, (error, tradesTmp, symbol) => {
+      let qty = 0;
+      let sum = 0;
       for (let i = tradesTmp.length - 1; i >= 0; i--) {
         if (tradesTmp[i].orderId == orderId) {
+          sum += Number.parseFloat(tradesTmp[i].price) * Number.parseFloat(tradesTmp[i].qty);
+          qty += Number.parseFloat(tradesTmp[i].qty);
           if (tradesTmp[i].commissionAsset !== 'BNB') {
             feeRate = 0.2;
           }
-          resolve(Number.parseFloat(tradesTmp[i].price));
-          return;
         }
+      }
+      if (qty !== 0) {
+        resolve(Number.parseFloat((sum / qty).toFixed(8)));
+      } else {
+        resolve(0);
       }
     })
   });

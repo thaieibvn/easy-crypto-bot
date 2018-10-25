@@ -1788,6 +1788,7 @@ async function getFineTuneStoplossAndTargetVariations(strategyVariations, strate
           count++;
           let newSstrategy = {};
           newSstrategy.name = strategy.name;
+          newSstrategy.timeClose = strategy.timeClose;
           newSstrategy.buyRules = [];
           newSstrategy.sellRules = [];
           for (let buyRule of strategy.buyRules) {
@@ -1817,6 +1818,7 @@ async function getFineTuneStoplossAndTargetVariations(strategyVariations, strate
           count++;
           let newSstrategy = {};
           newSstrategy.name = strategy.name;
+          newSstrategy.timeClose = strategy.timeClose;
           newSstrategy.buyRules = [];
           newSstrategy.sellRules = [];
           for (let buyRule of strategy.buyRules) {
@@ -1847,6 +1849,7 @@ async function getFineTuneStoplossAndTargetVariations(strategyVariations, strate
             count++;
             let newSstrategy = {};
             newSstrategy.name = strategy.name;
+            newSstrategy.timeClose = strategy.timeClose;
             newSstrategy.buyRules = [];
             newSstrategy.sellRules = [];
             for (let buyRule of strategy.buyRules) {
@@ -1913,6 +1916,7 @@ async function getFullStoplossAndTargetVariations(strategyVariations, rulesCount
         count++;
         let newSstrategy = {};
         newSstrategy.name = strategy.name;
+        newSstrategy.timeClose = strategy.timeClose;
         newSstrategy.buyRules = [];
         newSstrategy.sellRules = [];
         for (let buyRule of strategy.buyRules) {
@@ -1948,6 +1952,7 @@ async function getNewStrategyVariations(newRules, strategyVariations, type, stra
         count++;
         let newSstrategy = {};
         newSstrategy.name = strategy.name + ' (' + instrument + ' ' + timeframe + ')';
+        newSstrategy.timeClose = strategy.timeClose;
         newSstrategy.buyRules = [];
         newSstrategy.sellRules = [];
         newSstrategy.stoploss = strategy.stoploss;
@@ -1970,6 +1975,7 @@ async function getNewStrategyVariations(newRules, strategyVariations, type, stra
     } else {
       let newSstrategy = {};
       newSstrategy.name = strategy.name + ' (' + instrument + ' ' + timeframe + ')';
+      newSstrategy.timeClose = strategy.timeClose;
       newSstrategy.buyRules = [];
       newSstrategy.sellRules = [];
       newSstrategy.stoploss = strategy.stoploss;
