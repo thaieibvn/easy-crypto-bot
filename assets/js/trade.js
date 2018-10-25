@@ -90,7 +90,7 @@ async function tsInstrumentKeyup() {
   } catch (err) {}
 }
 
-function getBaseCurrency(pair) {
+function getQuotedCurrency(pair) {
   if (pair.toLowerCase().endsWith("btc")) {
     return "BTC";
   } else if (pair.toLowerCase().endsWith("eth")) {
@@ -104,7 +104,7 @@ function getBaseCurrency(pair) {
   }
 }
 
-function getQuotedCurrency(pair) {
+function getBaseCurrency(pair) {
   if (pair.toLowerCase().endsWith("btc")) {
     return pair.substring(0, pair.toLowerCase().lastIndexOf("btc")).toUpperCase();
   } else if (pair.toLowerCase().endsWith("eth")) {
@@ -127,34 +127,34 @@ async function tsFillInstrument(name) {
 
 async function fillPosSizeDetails() {
   let instrument = $('#tsInstrumentSearch').val().toUpperCase();
-  if (instrument.length <= 0 || getBaseCurrency(instrument) === '' || getQuotedCurrency(instrument) === '') {
+  if (instrument.length <= 0 || getQuotedCurrency(instrument) === '' || getBaseCurrency(instrument) === '') {
     $('#tsQuotedCurrency').html('');
     return;
   }
-  $('#tsQuotedCurrency').html(getQuotedCurrency(instrument));
+  $('#tsQuotedCurrency').html(getBaseCurrency(instrument));
 
   let value = $('#tsPosSize').val();
   if (value.length > 0 && Number.parseFloat(value) > 0) {
-    let ustdValue = await getBinanceUSDTValue(Number.parseFloat(value), instrument, getBaseCurrency(instrument));
+    let ustdValue = await getBinanceUSDTValue(Number.parseFloat(value), instrument, getQuotedCurrency(instrument));
     if (!isNaN(ustdValue) && $('#tsPosSize').val() == value) {
-      $('#tsQuotedCurrency').html(getQuotedCurrency(instrument) + ' ($' + ustdValue.toFixed(2) + ')');
+      $('#tsQuotedCurrency').html(getBaseCurrency(instrument) + ' ($' + ustdValue.toFixed(2) + ')');
     }
   }
 }
 
 async function fillMaxLossDetails() {
   let instrument = $('#tsInstrumentSearch').val().toUpperCase();
-  if (instrument.length <= 0 || getBaseCurrency(instrument) === '' || getQuotedCurrency(instrument) === '') {
+  if (instrument.length <= 0 || getQuotedCurrency(instrument) === '' || getBaseCurrency(instrument) === '') {
     $('#tsMaxLossCurrency').html('');
     return;
   }
-  $('#tsMaxLossCurrency').html(getQuotedCurrency(instrument));
+  $('#tsMaxLossCurrency').html(getBaseCurrency(instrument));
 
   let value = $('#tsMaxLoss').val();
   if (value.length > 0 && Number.parseFloat(value) > 0) {
-    let ustdValue = await getBinanceUSDTValue(Number.parseFloat(value), instrument, getBaseCurrency(instrument));
+    let ustdValue = await getBinanceUSDTValue(Number.parseFloat(value), instrument, getQuotedCurrency(instrument));
     if (!isNaN(ustdValue) && $('#tsMaxLoss').val() == value) {
-      $('#tsMaxLossCurrency').html(getQuotedCurrency(instrument) + ' ($' + ustdValue.toFixed(2) + ')');
+      $('#tsMaxLossCurrency').html(getBaseCurrency(instrument) + ' ($' + ustdValue.toFixed(2) + ')');
     }
   }
 }
@@ -409,6 +409,10 @@ async function runStrategy(id) {
               execution.trailingSlPriceUsed = data;
               await updateExecutionDb(execution);
               break;
+              case 'CH_POS_SIZE':
+                execution.positionSize = data;
+                await updateExecutionDb(execution);
+                break;
             case 'BUY':
               if (execution.type === 'Alerts') {
                 execution.trades.push({type: 'Buy', date: additionalData, entry: data});
@@ -580,7 +584,7 @@ async function showExecutionResult(id) {
     $('#executionWinLoss').html(winLossRatio.toFixed(2));
     $('#executionAvgWinLossPerTrade').html(avgGainLossPerTrade.toFixed(2) + '%');
 
-    $('#executionResultWithUsd').html(resultWithUSD.toFixed(8) + '&nbsp;' + getQuotedCurrency(execution.instrument));
+    $('#executionResultWithUsd').html(resultWithUSD.toFixed(8) + '&nbsp;' + getBaseCurrency(execution.instrument));
     $('#executionExecutedTrades').html(executedTrades);
 
     $('#executionWinningTradesP').html(winningPercent.toFixed(2) + '%');
@@ -594,10 +598,10 @@ async function showExecutionResult(id) {
     $('#executionBiggestLost').html(biggestLost.toFixed(2) + '%');
 
     $('#executionPosSizeResDiv').show();
-    $('#executionPosSizeRes').html(execution.positionSize + ' ' + getQuotedCurrency(execution.instrument));
+    $('#executionPosSizeRes').html(execution.positionSize + ' ' + getBaseCurrency(execution.instrument));
     if (execution.maxLoss !== null) {
       $('#executionMaxLossResDiv').show();
-      $('#executionMasLossRes').html(Math.abs(execution.maxLoss) + ' ' + getQuotedCurrency(execution.instrument));
+      $('#executionMasLossRes').html(Math.abs(execution.maxLoss) + ' ' + getBaseCurrency(execution.instrument));
     } else {
       $('#executionMaxLossResDiv').hide();
     }
@@ -624,14 +628,14 @@ async function showExecutionResult(id) {
 }
 
 async function fillUSDFields(resultWithUSD, posSize, maxLoss, instrument) {
-  let ustdValue = await getBinanceUSDTValue(resultWithUSD, instrument, getBaseCurrency(instrument));
-  $('#executionResultWithUsd').html(resultWithUSD.toFixed(8) + '&nbsp;' + getQuotedCurrency(instrument) + ' ( ~' + ustdValue.toFixed(2) + '$ )');
+  let ustdValue = await getBinanceUSDTValue(resultWithUSD, instrument, getQuotedCurrency(instrument));
+  $('#executionResultWithUsd').html(resultWithUSD.toFixed(8) + '&nbsp;' + getBaseCurrency(instrument) + ' ( ~' + ustdValue.toFixed(2) + '$ )');
 
-  let posSizeUsd = await getBinanceUSDTValue(posSize, instrument, getBaseCurrency(instrument));
-  $('#executionPosSizeRes').html(execution.positionSize + '&nbsp;' + getQuotedCurrency(execution.instrument) + ' ( ~' + posSizeUsd.toFixed(2) + '$ )');
+  let posSizeUsd = await getBinanceUSDTValue(posSize, instrument, getQuotedCurrency(instrument));
+  $('#executionPosSizeRes').html(execution.positionSize + '&nbsp;' + getBaseCurrency(execution.instrument) + ' ( ~' + posSizeUsd.toFixed(2) + '$ )');
   if (maxLoss !== null) {
-    let maxLossUsd = await getBinanceUSDTValue(resultWithUSD, instrument, getBaseCurrency(instrument));
-    $('#executionMasLossRes').html(Math.abs(execution.maxLoss) + '&nbsp;' + getQuotedCurrency(execution.instrument) + ' ( ~' + maxLossUsd.toFixed(2) + '$ )');
+    let maxLossUsd = await getBinanceUSDTValue(resultWithUSD, instrument, getQuotedCurrency(instrument));
+    $('#executionMasLossRes').html(Math.abs(execution.maxLoss) + '&nbsp;' + getBaseCurrency(execution.instrument) + ' ( ~' + maxLossUsd.toFixed(2) + '$ )');
   }
 }
 

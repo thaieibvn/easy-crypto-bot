@@ -459,7 +459,7 @@ function getBinanceBidAsk(pair) {
 }
 
 let binanceInstrumentsInfo = null;
-async function fillBinanceInstrumentsInfo() {
+async function getBinanceInstrumentsInfo(instrument) {
   if (binanceInstrumentsInfo === null) {
     binanceInstrumentsInfo = {};
     return new Promise((resolve, reject) => {
@@ -478,16 +478,12 @@ async function fillBinanceInstrumentsInfo() {
           item.orderTypes = obj.orderTypes;
           binanceInstrumentsInfo[obj.symbol] = item;
         }
-        resolve(binanceInstrumentsInfo);
+        resolve(binanceInstrumentsInfo[instrument.toUpperCase()]);
       });
     });
   } else {
-    return binanceInstrumentsInfo;
+    return binanceInstrumentsInfo[instrument.toUpperCase()];
   }
-}
-
-async function getBinanceInstrumentsInfo(instrument) {
-  return await binanceInstrumentsInfo[instrument.toUpperCase()];
 }
 
 function binanceRoundAmmount(amount, stepSize) {
