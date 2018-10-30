@@ -464,6 +464,9 @@ async function getBinanceInstrumentsInfo(instrument) {
     binanceInstrumentsInfo = {};
     return new Promise((resolve, reject) => {
       binance.exchangeInfo(function(error, data) {
+        if (error) {
+          resolve(null);
+        }
         for (let obj of data.symbols) {
           let item = {};
           for (let filter of obj.filters) {
@@ -476,6 +479,7 @@ async function getBinanceInstrumentsInfo(instrument) {
             }
           }
           item.orderTypes = obj.orderTypes;
+          item.precision = obj.baseAssetPrecision;
           binanceInstrumentsInfo[obj.symbol] = item;
         }
         resolve(binanceInstrumentsInfo[instrument.toUpperCase()]);
@@ -487,5 +491,5 @@ async function getBinanceInstrumentsInfo(instrument) {
 }
 
 function binanceRoundAmmount(amount, stepSize) {
-  return binance.roundStep(amount, stepSize);
+  return Number.parseFloat(binance.roundStep(amount, stepSize));
 }

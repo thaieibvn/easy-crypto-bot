@@ -231,10 +231,49 @@ async function executeStrategy() {
       }
 
       let lotSizeInfo = null;
+      let instrumentInfo = null;
       if (exchange === 'Binance') {
-        lotSizeInfo = await getBinanceLotSizeInfo(instrument);
+        instrumentInfo = await getBinanceInstrumentsInfo(instrument);
+        //lotSizeInfo = await getBinanceLotSizeInfo(instrument);
       }
-      if (lotSizeInfo === null || lotSizeInfo[0] === null) {
+      if (instrumentInfo === null || instrumentInfo === undefined) {
+        openModalInfo('Cannot obtain information for ' + instrument + ' from ' + exchange + ' exchange. Plase try later!');
+        return;
+      } else if (positionSize < instrumentInfo.minQty) {
+        openModalInfo('Position Size for ' + instrument + ' cannot be less than ' + instrumentInfo.minQty + ' on ' + exchange + ' exchange!');
+        return;
+      } else if (positionSize > instrumentInfo.maxQty) {
+        openModalInfo('Position Size for ' + instrument + ' cannot be greater than ' + instrumentInfo.maxQty + ' on ' + exchange + ' exchange!');
+        return;
+      }
+      let curPrice = null;
+      (instrument);
+
+      for (let i = 0; i < 10; i++) {
+        let bidAsk = await getBinanceBidAsk(instrument);
+        if (isNaN(bidAsk[0])) {
+          await sleep(100);
+        } else {
+          curPrice = bidAsk[0];
+          break;
+        }
+      }
+      if (curPrice !== null && curPrice * positionSize < instrumentInfo.minNotional) {
+        openModalInfo('Position Size for ' + instrument + ' does not meet Binance requirement for minimum trading amount! Try with bigger size than ' + (
+        instrumentInfo.minNotional / curPrice).toFixed(8));
+        return;
+      }
+
+      let newAmount = binanceRoundAmmount(positionSize, instrumentInfo.stepSize);
+      if (newAmount.toFixed(8) !== positionSize.toFixed(8)) {
+        openModalInfo('The position size will be rounded to ' + newAmount + ' to meet Binance requirements.');
+        positionSize = newAmount;
+        $('#tsPosSize').val(positionSize)
+        return;
+      } else {
+        positionSize = newAmount;
+      }
+      /*if (lotSizeInfo === null || lotSizeInfo[0] === null) {
         openModalInfo('Cannot obtain information for ' + instrument + ' from ' + exchange + ' exchange. Plase try later!');
         return;
       } else if (positionSize < lotSizeInfo[0]) {
@@ -246,7 +285,7 @@ async function executeStrategy() {
       } else if (Math.round(Math.round(positionSize * 10000000) % Math.round(lotSizeInfo[2] * 10000000)) / 10000000 !== 0) {
         openModalInfo('Position Size for ' + instrument + ' must be a multiple of ' + lotSizeInfo[2] + ' on ' + exchange + ' exchange! ');
         return;
-      }
+      }*/
 
       let maxLossTmp = Number.parseFloat($('#tsMaxLoss').val());
       if (!isNaN(maxLossTmp) && maxLossTmp !== 0) {
@@ -406,19 +445,24 @@ async function runStrategy(id) {
               openModalInfoBig(data);
               break;
             case 'TRAILING_STOP_PRICE':
-              execution.trailingSlPriceUsed = data;
+              execution.takeProfitOrderId = data;
               await updateExecutionDb(execution);
               break;
-              case 'CH_POS_SIZE':
-                execution.positionSize = data;
-                await updateExecutionDb(execution);
-                break;
+            case 'CH_POS_SIZE':
+              execution.positionSize = data;
+              await updateExecutionDb(execution);
+              break;
+            case 'TAKE_PROFIT_ORDER_ID':
+              execution.takeProfitOrderId = data;
+              await updateExecutionDb(execution);
+              break;
             case 'BUY':
               if (execution.type === 'Alerts') {
                 execution.trades.push({type: 'Buy', date: additionalData, entry: data});
                 openModalInfo('BUY Alert!<br><div class="text-left">Strategy: ' + execution.name + '<br>Exchange: ' + execution.exchange + '<br>Instrument: ' + execution.instrument + '<br>Date: ' + formatDateFull(additionalData) + '<br>Entry Price: ' + data);
               } else {
                 execution.trades.push(data);
+                $('#executionFeeRate').html((additionalData / 2).toFixed(3));
               }
               await updateExecutionDb(execution);
               $('#executedTrades' + id).html(execution.trades.length);
@@ -430,8 +474,8 @@ async function runStrategy(id) {
                 $('#executedTrades' + id).html(execution.trades.length);
                 openModalInfo('SELL Alert!<br><div class="text-left">Strategy: ' + execution.name + '<br>Exchange: ' + execution.exchange + '<br>Instrument: ' + execution.instrument + '<br>Date: ' + formatDateFull(additionalData) + '<br>Entry Price: ' + data);
               } else {
-                let feeRate = additionalData;
                 execution.trades[execution.trades.length - 1] = data;
+                execution.takeProfitOrderId = null;
                 await updateExecutionDb(execution);
                 fillExecResInTable(execution.trades, id);
                 await checkMaxLossReached(id);
@@ -491,7 +535,7 @@ function stopStrategyExecution(id, errorMsg) {
   }
   let status = 'Stopped';
   if (errorMsg !== null && errorMsg !== undefined) {
-    status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + errorMsg.replace("'","") + '\')"><i class="fas fa-question-circle"></i></a>';
+    status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + errorMsg.replace("'", "") + '\')"><i class="fas fa-question-circle"></i></a>';
   }
   $('#terminateStrBtn' + id).html(status + '&nbsp;<a title="Resume Execution" href="#/" onclick="resumeExecution(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
 }
@@ -514,7 +558,6 @@ async function showExecutionResult(id) {
         : 'text-red';
       $('#executionStrategiesTable').append('<tr><td class="text-left ' + classColor + '">' + trade.type + '</td><td>' + formatDateFull(trade.date) + '</td><td>' + trade.entry.toFixed(8) + '</td></tr>');
     }
-
   } else {
     let totalReturn = 0;
     let winLossRatio = 0;
