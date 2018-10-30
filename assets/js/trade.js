@@ -352,8 +352,8 @@ function fillExecResInTable(trades, id) {
 
 async function checkMaxLossReached(id) {
   let execution = await getExecutionById(id);
-  if (execution.maxLoss === null) {
-    return;
+  if (execution.maxLoss === null || execution.maxLoss === undefined) {
+    return false;
   }
 
   let result = 0;
@@ -362,14 +362,24 @@ async function checkMaxLossReached(id) {
   }
   let totalGainLoss = execution.positionSize * (result / 100);
   if (totalGainLoss <= execution.maxLoss) {
-    stopStrategyExecution(id);
+    stopStrategyExecution(id, 'The maximum loss for this strategy was reached!');
     openModalInfo('Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' on ' + execution.timeframe + ' has reached the maximum loss.<br>The execution was stopped.');
+    return true;
   }
+  return false;
+}
+
+function maxLossInfo() {
+  openModalInfoBig('If the total result of all closed trades exeeds the defined Maximum Loss the execution of the strategy will stop automatically.<br>Please take in mind that this is not a single trade stoploss and only fully closed trades are used for the calculation. This means that if an open trade exeeds the Maximum loss the execution will not be stopped until the trade is closed and the total loss may exeeds the defined Max Loss value! You can define a single trade stoploss in your strategy.');
 }
 
 async function runStrategy(id) {
   try {
     $('#terminateStrBtn' + id).html('Starting..');
+    let maxLossReached = await checkMaxLossReached(id);
+    if (maxLossReached) {
+      return;
+    }
     let execution = await getExecutionById(id);
     if (execution.type === 'Trading') {
       if (exchangesApiKeys[execution.exchange] === undefined) {
@@ -514,7 +524,11 @@ async function rmExecutionFromTable(id) {
   });
 }
 
-function resumeExecution(id) {
+async function resumeExecution(id) {
+  let maxLossReached = await checkMaxLossReached(id);
+  if (maxLossReached) {
+    return;
+  }
   for (let worker of executionWorkers) {
     if (worker.execId == id) {
       worker.wk.postMessage('RESUME');
