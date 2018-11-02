@@ -20,6 +20,18 @@ function getBidAsk(pair) {
   });
 }
 
+function getPrecisionFromTickSize(tickSize) {
+  if (tickSize === null || tickSize === undefined) {
+    return 8;
+  }
+  let startIndex = tickSize.indexOf('.');
+  let endIndex = tickSize.indexOf('1');
+  if (startIndex !== -1 && endIndex !== -1) {
+    return tickSize.substring(startIndex, endIndex).length;
+  }
+  return 8;
+}
+
 async function getBinanceInstrumentsInfo(instrument) {
   if (binanceInstrumentsInfo === null) {
     binanceInstrumentsInfo = {};
@@ -34,10 +46,12 @@ async function getBinanceInstrumentsInfo(instrument) {
               item.stepSize = filter.stepSize;
               item.minQty = filter.minQty;
               item.maxQty = filter.maxQty;
+            } else if (filter.filterType == "PRICE_FILTER") {
+              item.tickSize = filter.tickSize;
             }
           }
           item.orderTypes = obj.orderTypes;
-          item.precision = obj.baseAssetPrecision;
+          item.precision = getPrecisionFromTickSize(item.tickSize);
           binanceInstrumentsInfo[obj.symbol] = item;
         }
         resolve(binanceInstrumentsInfo[instrument.toUpperCase()]);
@@ -54,6 +68,7 @@ function getBalance(instrument) {
       binance.balance((error, balances) => {
         if (error) {
           resolve(0);
+          return;
         }
         resolve(balances[getBaseCurrency(instrument)].available);
       })
@@ -184,6 +199,7 @@ function placeTakeProfitLimit(execution, target) {
           execId, 'ERROR', 'Error placing TAKE_PROFIT_LIMIT order for instrument ' + execution.instrument + '<br>Please take in mind that the strategy has bought and hasn\'t sell. You should manually sell on Binance the ammount or place the limit take profit order.<br>Error message from Binance: ' + JSON.parse(error.body).msg
         ]);
         resolve(null);
+        return;
       }
       resolve(response.orderId);
     });

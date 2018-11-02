@@ -476,10 +476,12 @@ async function getBinanceInstrumentsInfo(instrument) {
               item.stepSize = filter.stepSize;
               item.minQty = filter.minQty;
               item.maxQty = filter.maxQty;
+            } else if (filter.filterType == "PRICE_FILTER") {
+              item.tickSize = filter.tickSize;
             }
           }
           item.orderTypes = obj.orderTypes;
-          item.precision = obj.baseAssetPrecision;
+          item.precision = getPrecisionFromTickSize(item.tickSize);
           binanceInstrumentsInfo[obj.symbol] = item;
         }
         resolve(binanceInstrumentsInfo[instrument.toUpperCase()]);
@@ -492,4 +494,13 @@ async function getBinanceInstrumentsInfo(instrument) {
 
 function binanceRoundAmmount(amount, stepSize) {
   return Number.parseFloat(binance.roundStep(amount, stepSize));
+}
+
+function getPrecisionFromTickSize(tickSize) {
+  let startIndex = tickSize.indexOf('.');
+  let endIndex = tickSize.indexOf('1');
+  if(startIndex!==-1 && endIndex!==-1) {
+    return tickSize.substring(startIndex, endIndex).length;
+  }
+  return 8;
 }
