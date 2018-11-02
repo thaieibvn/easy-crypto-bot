@@ -3057,6 +3057,7 @@ a.active {
 }
 
 #updateAvailable {
+  display: none;
   position: fixed;
   top: 1.8em;
   top: 7.5em;

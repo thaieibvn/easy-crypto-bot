@@ -44,121 +44,121 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 				<a class="close-modal" onclick="closeNewStrategy()" href="#/"><i class="text-red fas fa-times"></i></a>
 				<div>
 					<div class="text-center">
-						<h2 id="newStrategyLabel">Create New Strategy</h2> Name: <input id="strategyName" style="width:46em;" type="text" />
-						&nbsp;<a id="duplicateStrategyBtn" href="#/" onclick="duplicateStrategy()" class="button2 display-none"><i class="fas fa-copy"></i> Duplicate</a></div>
-					</div>
-					<hr />
-					<h3 class="text-center">1. Open Position: BUY when all of the following rules are met:</h3>
-					<div class="text-center margin-b10">
-						<div class="inline" id="buyRulesDiv">
-							Add new Rule with
-							<div class="drop-down">
-								<a href="#/" onclick="dropDown('#buyRulesDiv')"><span id="buyRulesCombobox" class="name">Simple Moving Average SMA</span> <span	class="caret"></span></a>
-								<ul>
-									<li><a href="#/" onclick="dropDownItem('Simple Moving Average SMA', '#buyRulesDiv', function(){buyRuleType='sma'})">Simple Moving Average SMA</a></li>
-									<li><a href="#/" onclick="dropDownItem('Exponential Moving Average EMA', '#buyRulesDiv', function(){buyRuleType='ema'})">Exponential Moving Average EMA</a></li>
-									<li><a href="#/" onclick="dropDownItem('Crossing Moving Averages', '#buyRulesDiv', function(){buyRuleType='cma'})">Crossing Moving Averages</a></li>
-									<li><a href="#/" onclick="dropDownItem('Relative Strength Index RSI', '#buyRulesDiv', function(){buyRuleType='rsi'})">Relative Strength Index RSI</a></li>
-									<li><a href="#/" onclick="dropDownItem('MACD', '#buyRulesDiv', function(){buyRuleType='macd'})">MACD</a></li>
-									<li><a href="#/" onclick="dropDownItem('Bollinger Band', '#buyRulesDiv', function(){buyRuleType='Bollinger Band'})">Bollinger Band</a></li>
-								</ul>
-							</div>
-						</div>
-						&nbsp;<a id="newBuyRuleBtn" href="#/" onclick="newBuyRule()" class="button2"><i class="text-green fa fa-plus"></i> Add</a></div>
-					<div id="buyRules">
-						<ul>
-						</ul>
-					</div>
-					<hr />
-					<h3 class="text-center">2. Close Position: Sell when all of the following rules are met:</h3>
-					<div class="text-center margin-b10">
-						<div class="inline" id="sellRulesDiv">
-							Add new Rule with
-							<div class="drop-down">
-								<a href="#/" onclick="dropDown('#sellRulesDiv')"><span id="sellRulesCombobox" class="name">Simple Moving Average SMA</span> <span	class="caret"></span></a>
-								<ul>
-									<li><a href="#/" onclick="dropDownItem('Simple Moving Average SMA', '#sellRulesDiv', function(){sellRuleType='sma'})">Simple Moving Average SMA</a></li>
-									<li><a href="#/" onclick="dropDownItem('Exponential Moving Average EMA', '#sellRulesDiv', function(){sellRuleType='ema'})">Exponential Moving Average EMA</a></li>
-									<li><a href="#/" onclick="dropDownItem('Crossing Moving Averages', '#sellRulesDiv', function(){sellRuleType='cma'})">Crossing Moving Averages</a></li>
-									<li><a href="#/" onclick="dropDownItem('Relative Strength Index RSI', '#sellRulesDiv', function(){sellRuleType='rsi'})">Relative Strength Index RSI</a></li>
-									<li><a href="#/" onclick="dropDownItem('MACD', '#sellRulesDiv', function(){sellRuleType='macd'})">MACD</a></li>
-									<li><a href="#/" onclick="dropDownItem('Bollinger Band', '#sellRulesDiv', function(){sellRuleType='Bollinger Band'})">Bollinger Band</a></li>
-								</ul>
-							</div>
-						</div>
-						&nbsp;<a id="newSellRuleBtn" href="#/" onclick="newSellRule()" class="button2"><i class="text-green fa fa-plus"></i> Add</a></div>
-					<div id="sellRules">
-						<ul>
-						</ul>
-					</div>
-					<hr />
-					<div class="text-center">
-						<h3 class="text-center">3. Set Stoploss and Target: Sell if the price moves against you or if your target is met:</h3>
-						<span class="min-width7 inline-block text-left">Stoploss:&nbsp;</span>
-						<input id="stoploss" onkeydown="stoplossTypeChange('sl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
-						<span class="min-width7 inline-block text-left">Trailing SL:&nbsp;</span>
-						<input id="trailingSl" onkeydown="stoplossTypeChange('tsl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
-						<span class="min-width7 inline-block text-left">Target:&nbsp;</span>
-						<input id="target" style="width:10em;" type="number" value="" />&nbsp;%<br>
-						<span style="margin-left:1.6em;" class="min-width7 inline-block text-left">Time Close <a title="Info" onclick="timeCloseInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>:&nbsp;</span>
-						<input id="timeClose" style="width:10em;" type="number" value="" />&nbsp;hours<br>
-						<span style="font-size:small">If you don't want Stoloss or Target, leave them empty.</span>
-					</div>
-					<hr />
-
-					<div class="text-center margin-s-b30">
-						<a href="#/" onclick="saveStrategy()" class="button2" style="width:12em;margin:0 1em">Save</a>
-						<a href="#/" onclick="closeNewStrategy()" class="button2" style="width:12em;margin:0 1em">Cancel</a>
-					</div>
+						<h2 id="newStrategyLabel">Create New Strategy</h2> Name: <input id="strategyName" style="width:46em;" type="text" /> &nbsp;
+						<a id="duplicateStrategyBtn" href="#/" onclick="duplicateStrategy()" class="button2 display-none"><i class="fas fa-copy"></i> Duplicate</a></div>
 				</div>
-			</div>
-		</div>
-
-		<div id="executionResultsWindow" class="modal">
-			<div>
-				<a class="close-modal" onclick="closeExecutionWindow()" href="#/"><i class="text-red fas fa-times"></i></a>
+				<hr />
+				<h3 class="text-center">1. Open Position: BUY when all of the following rules are met:</h3>
+				<div class="text-center margin-b10">
+					<div class="inline" id="buyRulesDiv">
+						Add new Rule with
+						<div class="drop-down">
+							<a href="#/" onclick="dropDown('#buyRulesDiv')"><span id="buyRulesCombobox" class="name">Simple Moving Average SMA</span> <span	class="caret"></span></a>
+							<ul>
+								<li><a href="#/" onclick="dropDownItem('Simple Moving Average SMA', '#buyRulesDiv', function(){buyRuleType='sma'})">Simple Moving Average SMA</a></li>
+								<li><a href="#/" onclick="dropDownItem('Exponential Moving Average EMA', '#buyRulesDiv', function(){buyRuleType='ema'})">Exponential Moving Average EMA</a></li>
+								<li><a href="#/" onclick="dropDownItem('Crossing Moving Averages', '#buyRulesDiv', function(){buyRuleType='cma'})">Crossing Moving Averages</a></li>
+								<li><a href="#/" onclick="dropDownItem('Relative Strength Index RSI', '#buyRulesDiv', function(){buyRuleType='rsi'})">Relative Strength Index RSI</a></li>
+								<li><a href="#/" onclick="dropDownItem('MACD', '#buyRulesDiv', function(){buyRuleType='macd'})">MACD</a></li>
+								<li><a href="#/" onclick="dropDownItem('Bollinger Band', '#buyRulesDiv', function(){buyRuleType='Bollinger Band'})">Bollinger Band</a></li>
+							</ul>
+						</div>
+					</div>
+					&nbsp;<a id="newBuyRuleBtn" href="#/" onclick="newBuyRule()" class="button2"><i class="text-green fa fa-plus"></i> Add</a></div>
+				<div id="buyRules">
+					<ul>
+					</ul>
+				</div>
+				<hr />
+				<h3 class="text-center">2. Close Position: Sell when all of the following rules are met:</h3>
+				<div class="text-center margin-b10">
+					<div class="inline" id="sellRulesDiv">
+						Add new Rule with
+						<div class="drop-down">
+							<a href="#/" onclick="dropDown('#sellRulesDiv')"><span id="sellRulesCombobox" class="name">Simple Moving Average SMA</span> <span	class="caret"></span></a>
+							<ul>
+								<li><a href="#/" onclick="dropDownItem('Simple Moving Average SMA', '#sellRulesDiv', function(){sellRuleType='sma'})">Simple Moving Average SMA</a></li>
+								<li><a href="#/" onclick="dropDownItem('Exponential Moving Average EMA', '#sellRulesDiv', function(){sellRuleType='ema'})">Exponential Moving Average EMA</a></li>
+								<li><a href="#/" onclick="dropDownItem('Crossing Moving Averages', '#sellRulesDiv', function(){sellRuleType='cma'})">Crossing Moving Averages</a></li>
+								<li><a href="#/" onclick="dropDownItem('Relative Strength Index RSI', '#sellRulesDiv', function(){sellRuleType='rsi'})">Relative Strength Index RSI</a></li>
+								<li><a href="#/" onclick="dropDownItem('MACD', '#sellRulesDiv', function(){sellRuleType='macd'})">MACD</a></li>
+								<li><a href="#/" onclick="dropDownItem('Bollinger Band', '#sellRulesDiv', function(){sellRuleType='Bollinger Band'})">Bollinger Band</a></li>
+							</ul>
+						</div>
+					</div>
+					&nbsp;<a id="newSellRuleBtn" href="#/" onclick="newSellRule()" class="button2"><i class="text-green fa fa-plus"></i> Add</a></div>
+				<div id="sellRules">
+					<ul>
+					</ul>
+				</div>
+				<hr />
 				<div class="text-center">
-					<h2 id="executionDetailsLabel" class="text-center ">Execution Details</h2>
-					<div id="executionDetailsLabel2" class="margin-s-b10">The commissions are included in all results. Commission rate: <span id="executionFeeRate">0.075</span>% per single trade</div>
-					<div class="features">
-						<div class="section trade-section">
-							<h3><i class=" fas fa-rocket"></i>&nbsp;Performance</h3> Total Return:&nbsp;
-							<span class="bold" id="executionTotalReturn"></span><br> Win/Loss Ratio:&nbsp;
-							<span class="bold" id="executionWinLoss"></span><br> Average gain/loss per trade:&nbsp;
-							<span class="bold" id="executionAvgWinLossPerTrade"></span><br>Net Gain/Loss:&nbsp;
-							<span class="bold" id="executionResultWithUsd"></span><br> Executed Trades:&nbsp;
-							<span class="bold" id="executionExecutedTrades"></span><br>
-						</div>
-						<div class="section">
-							<h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> Strategy:&nbsp;
-							<span class="bold" id="executionStrategyRes"></span><br> Exchange:&nbsp;
-							<span class="bold" id="executionExchangeRes"></span><br> Instrument:&nbsp;
-							<span class="bold" id="executionInstrumentRes"></span><br> Timeframe:&nbsp;
-							<span class="bold" id="executionTimeframeRes"></span>
-							<div id="executionPosSizeResDiv" class="inline"><br> Position Size:&nbsp;
-								<span class="bold" id="executionPosSizeRes"></span></div>
-							<div id="executionMaxLossResDiv" class="inline"><br> Maximum Execution Loss:&nbsp;
-								<span class="bold" id="executionMasLossRes"></span></div>
-						</div>
-						<div class="section trade-section">
-							<h3><i class=" fas fa-thumbs-up"></i>&nbsp;Winning Trades</h3> Win Rate:&nbsp;<span class="bold" id="executionWinningTradesP"></span><br> Winning trades count:&nbsp;<span class="bold" id="executionWinningCount"></span><br> Average gain per trade:&nbsp;<span class="bold" id="executionAvgGainPerWinning"></span><br>							Biggest gain:&nbsp;<span class="bold" id="executionBiggestGain"></span><br>
-						</div>
-						<div class="section trade-section">
-							<h3><i class=" fas fa-thumbs-down"></i>&nbsp;Loosing Trades</h3> Loose Rate:&nbsp;<span class="bold" id="executionLoosingTradesP"></span><br> Loosing trades count:&nbsp;<span class="bold" id="executionLoosingCount"></span><br> Average loss per trade:&nbsp;<span class="bold" id="executionAvgLostPerWinning"></span><br>							Biggest loss:&nbsp;<span class="bold" id="executionBiggestLost"></span><br>
-						</div>
-					</div>
+					<h3 class="text-center">3. Set Stoploss and Target: Sell if the price moves against you or if your target is met:</h3>
+					<span class="min-width7 inline-block text-left">Stoploss:&nbsp;</span>
+					<input id="stoploss" onkeydown="stoplossTypeChange('sl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
+					<span class="min-width7 inline-block text-left">Trailing SL:&nbsp;</span>
+					<input id="trailingSl" onkeydown="stoplossTypeChange('tsl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
+					<span class="min-width7 inline-block text-left">Target:&nbsp;</span>
+					<input id="target" style="width:10em;" type="number" value="" />&nbsp;%<br>
+					<span style="margin-left:1.6em;" class="min-width7 inline-block text-left">Time Close <a title="Info" onclick="timeCloseInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>:&nbsp;</span>
+					<input id="timeClose" style="width:10em;" type="number" value="" />&nbsp;hours<br>
+					<span style="font-size:small">If you don't want Stoloss or Target, leave them empty.</span>
+				</div>
+				<hr />
 
-					<h3 id="executionTableLabel" class="text-center margin-s-b10">Executed Trades</h3>
-					<div class="table-wrapper">
-						<table id="executionStrategiesTable">
-						</table>
-					</div>
-					<div class="text-center margin-s-b30">
-						<a href="#/" onclick="closeExecutionWindow()" class="button2" style="width:12em;margin:0 1em">Close</a>
-					</div>
+				<div class="text-center margin-s-b30">
+					<a href="#/" onclick="saveStrategy()" class="button2" style="width:12em;margin:0 1em">Save</a>
+					<a href="#/" onclick="closeNewStrategy()" class="button2" style="width:12em;margin:0 1em">Cancel</a>
 				</div>
 			</div>
 		</div>
+	</div>
+
+	<div id="executionResultsWindow" class="modal">
+		<div>
+			<a class="close-modal" onclick="closeExecutionWindow()" href="#/"><i class="text-red fas fa-times"></i></a>
+			<div class="text-center">
+				<h2 id="executionDetailsLabel" class="text-center ">Execution Details</h2>
+				<div id="executionDetailsLabel2" class="margin-s-b10">The commissions are included in all results. Commission rate: <span id="executionFeeRate">0.075</span>% per single trade</div>
+				<div class="features">
+					<div class="section trade-section">
+						<h3><i class=" fas fa-rocket"></i>&nbsp;Performance</h3> Total Return:&nbsp;
+						<span class="bold" id="executionTotalReturn"></span><br> Win/Loss Ratio:&nbsp;
+						<span class="bold" id="executionWinLoss"></span><br> Average gain/loss per trade:&nbsp;
+						<span class="bold" id="executionAvgWinLossPerTrade"></span><br>Net Gain/Loss:&nbsp;
+						<span class="bold" id="executionResultWithUsd"></span><br> Executed Trades:&nbsp;
+						<span class="bold" id="executionExecutedTrades"></span><br>
+					</div>
+					<div class="section">
+						<h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> Strategy:&nbsp;
+						<span class="bold" id="executionStrategyRes"></span><br> Exchange:&nbsp;
+						<span class="bold" id="executionExchangeRes"></span><br> Instrument:&nbsp;
+						<span class="bold" id="executionInstrumentRes"></span><br> Timeframe:&nbsp;
+						<span class="bold" id="executionTimeframeRes"></span>
+						<div id="executionPosSizeResDiv" class="inline"><br> Position Size:&nbsp;
+							<span class="bold" id="executionPosSizeRes"></span></div>
+						<div id="executionMaxLossResDiv" class="inline"><br> Maximum Execution Loss:&nbsp;
+							<span class="bold" id="executionMasLossRes"></span></div>
+					</div>
+					<div class="section trade-section">
+						<h3><i class=" fas fa-thumbs-up"></i>&nbsp;Winning Trades</h3> Win Rate:&nbsp;<span class="bold" id="executionWinningTradesP"></span><br> Winning trades count:&nbsp;<span class="bold" id="executionWinningCount"></span><br> Average gain per trade:&nbsp;<span class="bold" id="executionAvgGainPerWinning"></span><br>						Biggest gain:&nbsp;<span class="bold" id="executionBiggestGain"></span><br>
+					</div>
+					<div class="section trade-section">
+						<h3><i class=" fas fa-thumbs-down"></i>&nbsp;Loosing Trades</h3> Loose Rate:&nbsp;<span class="bold" id="executionLoosingTradesP"></span><br> Loosing trades count:&nbsp;<span class="bold" id="executionLoosingCount"></span><br> Average loss per trade:&nbsp;<span class="bold" id="executionAvgLostPerWinning"></span><br>						Biggest loss:&nbsp;<span class="bold" id="executionBiggestLost"></span><br>
+					</div>
+				</div>
+
+				<h3 id="executionTableLabel" class="text-center margin-s-b10">Executed Trades</h3>
+				<div class="table-wrapper">
+					<table id="executionStrategiesTable">
+					</table>
+				</div>
+				<div class="text-center margin-s-b30">
+					<a href="#/" onclick="closeExecutionWindow()" class="button2" style="width:12em;margin:0 1em">Close</a>
+				</div>
+			</div>
+		</div>
+	</div>
 
 	</div>
 
@@ -251,6 +251,13 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 				modalInfoFunc();
 				modalInfoFunc = null;
 			}
+		});
+
+		$(document).ready(function() {
+			setTimeout(function() {
+				// Display the div containing the class "bottomdiv"
+				$("#updateAvailable").fadeIn();
+			}, 1000 * 1.8);
 		});
 	</script>
 </body>
