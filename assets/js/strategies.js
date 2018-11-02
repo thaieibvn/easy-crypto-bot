@@ -565,8 +565,8 @@ function clearStrategyFields() {
   sellRuleType = 'sma';
   $('#buyRules>ul').html('');
   $('#sellRules>ul').html('');
-  $('#buyRulesCombobox').html('Sample Moving Average SMA');
-  $('#sellRulesCombobox').html('Sample Moving Average SMA');
+  $('#buyRulesCombobox').html('Simple Moving Average SMA');
+  $('#sellRulesCombobox').html('Simple Moving Average SMA');
   $('#stoploss').val('');
   $('#trailingSl').val('');
   $('#target').val('');

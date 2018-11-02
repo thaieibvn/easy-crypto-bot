@@ -261,7 +261,7 @@ async function executeStrategy() {
       if (curPrice !== null && curPrice * positionSize < instrumentInfo.minNotional) {
         openModalInfo('Position Size for ' + instrument + ' does not meet Binance requirement for minimum trading amount! Try with bigger size than ' + (
         instrumentInfo.minNotional / curPrice).toFixed(8));
-        return;
+      return;
       }
 
       let newAmount = binanceRoundAmmount(positionSize, instrumentInfo.stepSize);
@@ -273,19 +273,6 @@ async function executeStrategy() {
       } else {
         positionSize = newAmount;
       }
-      /*if (lotSizeInfo === null || lotSizeInfo[0] === null) {
-        openModalInfo('Cannot obtain information for ' + instrument + ' from ' + exchange + ' exchange. Plase try later!');
-        return;
-      } else if (positionSize < lotSizeInfo[0]) {
-        openModalInfo('Position Size for ' + instrument + ' cannot be less than ' + lotSizeInfo[0] + ' on ' + exchange + ' exchange!');
-        return;
-      } else if (positionSize > lotSizeInfo[1]) {
-        openModalInfo('Position Size for ' + instrument + ' cannot be more than ' + lotSizeInfo[1] + ' on ' + exchange + ' exchange!');
-        return;
-      } else if (Math.round(Math.round(positionSize * 10000000) % Math.round(lotSizeInfo[2] * 10000000)) / 10000000 !== 0) {
-        openModalInfo('Position Size for ' + instrument + ' must be a multiple of ' + lotSizeInfo[2] + ' on ' + exchange + ' exchange! ');
-        return;
-      }*/
 
       let maxLossTmp = Number.parseFloat($('#tsMaxLoss').val());
       if (!isNaN(maxLossTmp) && maxLossTmp !== 0) {

@@ -120,7 +120,7 @@ function marketBuy(execution, strategy) {
     binance.marketBuy(execution.instrument, execution.positionSize, async (error, response) => {
       if (error !== null) {
         self.postMessage([
-          execId, 'ERROR', 'Error buying ' + execution.positionSize + ' ' + execution.instrument + '<br>Message from exchange: ' + JSON.parse(error.body).msg
+          execId, 'ERROR', 'Error buying ' + execution.positionSize + ' ' + execution.instrument + '.<br>Error message from Binance: ' + JSON.parse(error.body).msg
         ]);
         resolve(false);
       } else {
@@ -149,7 +149,7 @@ async function marketSell(execution) {
     binance.marketSell(execution.instrument, positionSize, async (error, response) => {
       if (error !== null) {
         self.postMessage([
-          execId, 'ERROR', 'Error selling ' + positionSize + ' ' + execution.instrument + '<br>Message from exchange: ' + JSON.parse(error.body).msg
+          execId, 'ERROR', 'Error selling ' + positionSize + ' ' + execution.instrument + '.<br>Error message from Binance: ' + JSON.parse(error.body).msg
         ]);
         resolve(false);
       } else {
@@ -181,7 +181,7 @@ function placeTakeProfitLimit(execution, target) {
     }, (error, response) => {
       if (error) {
         self.postMessage([
-          execId, 'ERROR', 'Error placing TAKE_PROFIT_LIMIT order for instrument ' + execution.instrument + '<br>Please take in mind that the strategy has bought and hasn\'t sell. You should manually sell the ammount on the Binance exchenge. Details: ' + alert(JSON.parse(error.body).msg)
+          execId, 'ERROR', 'Error placing TAKE_PROFIT_LIMIT order for instrument ' + execution.instrument + '<br>Please take in mind that the strategy has bought and hasn\'t sell. You should manually sell on Binance the ammount or place the limit take profit order.<br>Error message from Binance: ' + JSON.parse(error.body).msg
         ]);
         resolve(null);
       }

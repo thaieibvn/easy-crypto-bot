@@ -52,9 +52,9 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 						<div class="inline" id="buyRulesDiv">
 							Add new Rule with
 							<div class="drop-down">
-								<a href="#/" onclick="dropDown('#buyRulesDiv')"><span id="buyRulesCombobox" class="name">Sample Moving Average SMA</span> <span	class="caret"></span></a>
+								<a href="#/" onclick="dropDown('#buyRulesDiv')"><span id="buyRulesCombobox" class="name">Simple Moving Average SMA</span> <span	class="caret"></span></a>
 								<ul>
-									<li><a href="#/" onclick="dropDownItem('Sample Moving Average SMA', '#buyRulesDiv', function(){buyRuleType='sma'})">Sample Moving Average SMA</a></li>
+									<li><a href="#/" onclick="dropDownItem('Simple Moving Average SMA', '#buyRulesDiv', function(){buyRuleType='sma'})">Simple Moving Average SMA</a></li>
 									<li><a href="#/" onclick="dropDownItem('Exponential Moving Average EMA', '#buyRulesDiv', function(){buyRuleType='ema'})">Exponential Moving Average EMA</a></li>
 									<li><a href="#/" onclick="dropDownItem('Crossing Moving Averages', '#buyRulesDiv', function(){buyRuleType='cma'})">Crossing Moving Averages</a></li>
 									<li><a href="#/" onclick="dropDownItem('Relative Strength Index RSI', '#buyRulesDiv', function(){buyRuleType='rsi'})">Relative Strength Index RSI</a></li>
@@ -74,9 +74,9 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 						<div class="inline" id="sellRulesDiv">
 							Add new Rule with
 							<div class="drop-down">
-								<a href="#/" onclick="dropDown('#sellRulesDiv')"><span id="sellRulesCombobox" class="name">Sample Moving Average SMA</span> <span	class="caret"></span></a>
+								<a href="#/" onclick="dropDown('#sellRulesDiv')"><span id="sellRulesCombobox" class="name">Simple Moving Average SMA</span> <span	class="caret"></span></a>
 								<ul>
-									<li><a href="#/" onclick="dropDownItem('Sample Moving Average SMA', '#sellRulesDiv', function(){sellRuleType='sma'})">Sample Moving Average SMA</a></li>
+									<li><a href="#/" onclick="dropDownItem('Simple Moving Average SMA', '#sellRulesDiv', function(){sellRuleType='sma'})">Simple Moving Average SMA</a></li>
 									<li><a href="#/" onclick="dropDownItem('Exponential Moving Average EMA', '#sellRulesDiv', function(){sellRuleType='ema'})">Exponential Moving Average EMA</a></li>
 									<li><a href="#/" onclick="dropDownItem('Crossing Moving Averages', '#sellRulesDiv', function(){sellRuleType='cma'})">Crossing Moving Averages</a></li>
 									<li><a href="#/" onclick="dropDownItem('Relative Strength Index RSI', '#sellRulesDiv', function(){sellRuleType='rsi'})">Relative Strength Index RSI</a></li>
@@ -208,6 +208,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 		fillDefaultStrategies();
 		checkEulaAccepted();
 		dailyCheckForUpdates();
+		getInteractiveContent();
 		//removeTmpFiles();
 		enablePowerSaveBlocker();
 

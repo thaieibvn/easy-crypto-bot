@@ -1065,6 +1065,10 @@ input[type="submit"]:hover:active:after, input[type="reset"]:hover:active:after,
   margin-bottom: .625em
 }
 
+.margin-s-b20 {
+  margin-bottom: 1.2em
+}
+
 .text-center {
   text-align: center
 }

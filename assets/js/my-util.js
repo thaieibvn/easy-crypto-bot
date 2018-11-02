@@ -211,6 +211,22 @@ async function checkForUpdates(data) {
   });
 }
 
+async function getInteractiveContent() {
+  $.ajax({
+    type: 'get',
+    url: 'https://easycryptobot.com/interactive.html',
+    cache: false,
+    data: {},
+    success: function(data) {
+      if (typeof data === 'string' && data.startsWith('<!--interactive-->')) {
+        $('#interactive').html(data);
+        $('#interactive').slideDown("slow");
+      }
+    },
+    error: function() {}
+  });
+}
+
 function enablePowerSaveBlocker() {
   try {
     const id = remote.powerSaveBlocker.start("prevent-app-suspension");
