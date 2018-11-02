@@ -38,7 +38,7 @@ body {
 }
 
 #tsStrategiesTable td, #executionHistoryTable td {
-  padding-right:0.25em;
+  padding-right: 0.25em;
 }
 
 *, *:before, *:after {
@@ -2221,6 +2221,9 @@ body.is-ie .wrapper.fullscreen {
     margin-left: 0;
     padding-top: 3.5em
   }
+  #updateAvailable {
+    top: 1.8em !important;
+  }
 }
 
 #header+#wrapper>.wrapper>.inner {
@@ -2696,7 +2699,7 @@ body.is-loading #sidebar nav ul li {
   color: #1170c4 !important;
 }
 
-.modal  input[type="checkbox"]+label:before{
+.modal input[type="checkbox"]+label:before {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 0.25em;
   border: solid 1px #1170c4;
@@ -2720,7 +2723,7 @@ body.is-loading #sidebar nav ul li {
   content: "\f00c"
 }
 
-.modal input[type="checkbox"]:focus+label:before{
+.modal input[type="checkbox"]:focus+label:before {
   border-color: #1170c4;
   box-shadow: 0 0 0 1px #1170c4
 }
@@ -3051,4 +3054,27 @@ input[type="text"] {
 
 a.active {
   color: white;
+}
+
+#updateAvailable {
+  display: none;
+  position: fixed;
+  top: 1.8em;
+  top: 7.5em;
+  left: 3.75em;
+  z-index: 9999;
+  font-size: 0.65em;
+  font-weight: bold;
+  letter-spacing: 0.25em;
+}
+
+.blink {
+  animation: blinker 2s linear infinite;
+  color: #fff;
+}
+
+@keyframes blinker {
+  50% {
+    opacity: 0.25;
+  }
 }

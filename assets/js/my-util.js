@@ -177,11 +177,32 @@ async function downloadUpdates() {
 async function dailyCheckForUpdates() {
   while (true) {
     await sleep(1000 * 60 * 60 * 24); // 1 Day
-    checkForUpdates({type: 'daily-check'});
+    checkForUpdates({
+      type: 'daily-check'
+    }, true);
   }
 }
 
-async function checkForUpdates(data) {
+async function hourlyCheckForUpdates() {
+  while (true) {
+    await sleep(1000 * 60 * 60 * 4); // 4 Hours
+    checkForUpdates({
+      type: 'hourly-check'
+    }, false);
+  }
+}
+
+function showUpdateMsg(isAutomatic) {
+  if (isAutomatic) {
+    openModalConfirm('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>Update now?', function() {
+      downloadUpdates()
+    });
+  } else {
+    openModalInfo('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>No automatic update is available for this version, so in order to update, you need to download again the app from <span class="one-click-select">https://easycryptobot.com/</span>. After the download you can extract the app at a new location and start it from there.')
+  }
+}
+
+async function checkForUpdates(data, showMsg) {
   let curVersion = remote.app.getVersion();
   $.ajax({
     type: 'get',
@@ -196,13 +217,13 @@ async function checkForUpdates(data) {
           if (latestVersion != curVersion) {
             let latestSplited = latestVersion.split('.');
             let curSplited = curVersion.split('.');
-            if (latestSplited[0] !== curSplited[0]) {
-              openModalInfo('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>No automatic update is available for this version, so in order to update, you need to download again the app from <span class="one-click-select">https://easycryptobot.com/</span>. After the download you can extract the app at a new location and start it from there.')
-            } else {
-              openModalConfirm('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>Update now?', function() {
-                downloadUpdates()
-              });
+            if (showMsg) {
+              showUpdateMsg(latestSplited[0] === curSplited[0])
             }
+            $('#updateBtn').click(function() {
+              showUpdateMsg(latestSplited[0] === curSplited[0])
+            });
+            $('#updateAvailable').show();
           }
         }
       } catch (err) {}
@@ -264,7 +285,7 @@ async function checkEulaAccepted() {
         remote.app.quit()
       });
     } else {
-      setTimeout(() => checkForUpdates({}), 600);
+      setTimeout(() => checkForUpdates({}, true), 600);
     }
   } catch (err) {
     openModalInfo("Cannot run the application!<br>Please contact stefan@easycryptobot.com", function() {
