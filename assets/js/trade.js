@@ -261,7 +261,7 @@ async function executeStrategy() {
       if (curPrice !== null && curPrice * positionSize < instrumentInfo.minNotional) {
         openModalInfo('Position Size for ' + instrument + ' does not meet Binance requirement for minimum trading amount! Try with bigger size than ' + (
         instrumentInfo.minNotional / curPrice).toFixed(8));
-      return;
+        return;
       }
 
       let newAmount = binanceRoundAmmount(positionSize, instrumentInfo.stepSize);
@@ -349,8 +349,11 @@ async function checkMaxLossReached(id) {
   }
   let totalGainLoss = execution.positionSize * (result / 100);
   if (totalGainLoss <= execution.maxLoss) {
-    stopStrategyExecution(id, 'The maximum loss for this strategy was reached!');
-    openModalInfo('Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' on ' + execution.timeframe + ' has reached the maximum loss.<br>The execution was stopped.');
+    let errorMsg = 'Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' on ' + execution.timeframe + ' has reached the maximum loss.<br>The execution was stopped.';
+    stopStrategyExecution(id, errorMsg);
+    openModalInfo(errorMsg);
+    execution.error = errorMsg;
+    await updateExecutionDb(execution);
     return true;
   }
   return false;
@@ -363,10 +366,6 @@ function maxLossInfo() {
 async function runStrategy(id) {
   try {
     $('#terminateStrBtn' + id).html('Starting..');
-    let maxLossReached = await checkMaxLossReached(id);
-    if (maxLossReached) {
-      return;
-    }
     let execution = await getExecutionById(id);
     if (execution.type === 'Trading') {
       if (exchangesApiKeys[execution.exchange] === undefined) {
@@ -431,9 +430,11 @@ async function runStrategy(id) {
               $('#terminateStrBtn' + id).html('Failed&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
               break;
             case 'ERROR':
-              let errorMsg = data + '<br><br>The execution of the strategy is stopped!'
+              let errorMsg = data.replace("'", "") + '<br><br>The execution of the strategy was stopped!'
               openModalInfoBig(errorMsg);
               stopStrategyExecution(id, errorMsg);
+              execution.error = errorMsg;
+              await updateExecutionDb(execution);
               break;
             case 'LAST_UPDATED':
               $('#lastUpdatedExecution' + id).html(formatDateNoYear(new Date()));
@@ -512,10 +513,6 @@ async function rmExecutionFromTable(id) {
 }
 
 async function resumeExecution(id) {
-  let maxLossReached = await checkMaxLossReached(id);
-  if (maxLossReached) {
-    return;
-  }
   for (let worker of executionWorkers) {
     if (worker.execId == id) {
       worker.wk.postMessage('RESUME');
@@ -536,9 +533,11 @@ function stopStrategyExecution(id, errorMsg) {
   }
   let status = 'Stopped';
   if (errorMsg !== null && errorMsg !== undefined) {
-    status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + errorMsg.replace("'", "") + '\')"><i class="fas fa-question-circle"></i></a>';
+    status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + errorMsg + '\')"><i class="fas fa-question-circle"></i></a>';
+    $('#terminateStrBtn' + id).html('Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + errorMsg.replace("'", "") + '\')"><i class="fas fa-question-circle"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
+  } else {
+    $('#terminateStrBtn' + id).html('Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="resumeExecution(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
   }
-  $('#terminateStrBtn' + id).html(status + '&nbsp;<a title="Resume Execution" href="#/" onclick="resumeExecution(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
 }
 
 async function showExecutionResult(id) {
@@ -711,7 +710,12 @@ async function fillOldExecutions() {
     let executions = await getExecutionsFromDb();
     if (executions !== null && executions.length > 0) {
       for (let execution of executions) {
-        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td>' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td>' + execution.timeframe + '</td><td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td>' + '<td><span id="executionRes' + execution.id + '"></span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + execution.id + ')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + execution.id + '"></td><td id="terminateStrBtn' + execution.id + '">Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(' + execution.id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + execution.id + ')"><i class="fas fa-times"></i></a></td></tr>');
+
+        let status = 'Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(' + execution.id + ')"><i class="fas fa-play"></i></a>';
+        if (execution.error !== null && execution.error !== undefined) {
+          status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + execution.error + '\')"><i class="fas fa-question-circle"></i></a>'
+        }
+        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td>' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td>' + execution.timeframe + '</td><td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td>' + '<td><span id="executionRes' + execution.id + '"></span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + execution.id + ')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + execution.id + '"></td><td id="terminateStrBtn' + execution.id + '">' + status + '&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + execution.id + ')"><i class="fas fa-times"></i></a></td></tr>');
         if (execution.type !== 'Alerts') {
           fillExecResInTable(execution.trades, execution.id);
         }

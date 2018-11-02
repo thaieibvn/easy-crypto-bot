@@ -2222,7 +2222,7 @@ body.is-ie .wrapper.fullscreen {
     padding-top: 3.5em
   }
   #updateAvailable {
-    top: 1.8em !important;
+    top: 0em !important;
   }
 }
 
