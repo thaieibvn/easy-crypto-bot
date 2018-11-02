@@ -179,7 +179,7 @@ async function dailyCheckForUpdates() {
     await sleep(1000 * 60 * 60 * 24); // 1 Day
     checkForUpdates({
       type: 'daily-check'
-    }, true);
+    }, true, false);
   }
 }
 
@@ -188,7 +188,7 @@ async function hourlyCheckForUpdates() {
     await sleep(1000 * 60 * 60 * 4); // 4 Hours
     checkForUpdates({
       type: 'hourly-check'
-    }, false);
+    }, false, false);
   }
 }
 
@@ -202,7 +202,7 @@ function showUpdateMsg(isAutomatic) {
   }
 }
 
-async function checkForUpdates(data, showMsg) {
+async function checkForUpdates(data, showUpdate, showNoUpdate) {
   let curVersion = remote.app.getVersion();
   $.ajax({
     type: 'get',
@@ -217,14 +217,19 @@ async function checkForUpdates(data, showMsg) {
           if (latestVersion != curVersion) {
             let latestSplited = latestVersion.split('.');
             let curSplited = curVersion.split('.');
-            if (showMsg) {
-              showUpdateMsg(latestSplited[0] === curSplited[0])
+            if (showUpdate) {
+              showUpdateMsg(latestSplited[0] === curSplited[0]);
             }
             $('#updateBtn').click(function() {
               showUpdateMsg(latestSplited[0] === curSplited[0])
             });
-            $('#updateAvailable').show();
+            $('#checkForUpdateBtn').hide();
+            $('#updateBtn').show();
+          } else if (showNoUpdate) {
+            openModalInfo('No update is available.')
           }
+        } else if (showNoUpdate) {
+          openModalInfo('No update is available.')
         }
       } catch (err) {}
     },
@@ -285,7 +290,7 @@ async function checkEulaAccepted() {
         remote.app.quit()
       });
     } else {
-      setTimeout(() => checkForUpdates({}, true), 600);
+      setTimeout(() => checkForUpdates({}, true, false), 600);
     }
   } catch (err) {
     openModalInfo("Cannot run the application!<br>Please contact stefan@easycryptobot.com", function() {

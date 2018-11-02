@@ -20,7 +20,8 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 </head>
 
 <body>
-	<div id="updateAvailable"><a id="updateBtn" class="blink" href="#">UPDATE AVAILABLE</a></div>
+	<div id="updateAvailable"><a id="updateBtn" class="blink display-none" href="#">UPDATE AVAILABLE</a>
+		<a id="checkForUpdateBtn" onclick="checkForUpdates({type: 'manual-check'}, true, true)" href="#">CHECK FOR UPDATE</a></div>
 	<!-- Sidebar -->
 	<section id="sidebar">
 		<div class="inner">
