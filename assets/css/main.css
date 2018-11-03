@@ -2809,7 +2809,7 @@ input[type="number"] {
   text-align: center
 }
 
-#btInstrumentSearch, #tsInstrumentSearch, #tsPosSize, #tsMaxLoss, #opInstrumentSearch {
+#btInstrumentSearch, #tsInstrumentSearch, #tsPosSize, #tsMaxLoss, #opInstrumentSearch, #emailBox {
   display: inline-block;
   min-width: 34em;
   background-color: transparent;

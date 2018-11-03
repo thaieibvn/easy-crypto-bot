@@ -5,10 +5,13 @@ function tsExecTypeChange() {
   if ($('#trExecTypeSignals').is(':checked')) {
     $('#tsPosSizeDiv').hide();
     $('#tsMaxLossDiv').hide();
+    $('#emailDiv').show();
   } else if ($('#trExecTypeSim').is(':checked')) {
+    $('#emailDiv').hide();
     $('#tsPosSizeDiv').show();
     $('#tsMaxLossDiv').show();
   } else if ($('#trExecTypeTrade').is(':checked')) {
+    $('#emailDiv').hide();
     $('#tsPosSizeDiv').show();
     $('#tsMaxLossDiv').show();
     let exchange = $('#tsExchangeCombobox').text();
@@ -183,9 +186,13 @@ async function executeStrategy() {
 
     $('#executeStrategyBtn').addClass('disabled');
     let strategyName = $('#tsStrategyCombobox').text();
+    let email = $('#emailBox').val();
     let exchange = $('#tsExchangeCombobox').text();
     let instrument = $('#tsInstrumentSearch').val().toUpperCase();
     let timeframe = $('#tsTimeframeCombobox').text();
+    if (email.indexOf('@') === -1) {
+      email = null;
+    }
     if (strategyName === 'Choose Strategy') {
       openModalInfo('Please Choose a Strategy!');
       return;
@@ -247,7 +254,6 @@ async function executeStrategy() {
         return;
       }
       let curPrice = null;
-      (instrument);
 
       for (let i = 0; i < 10; i++) {
         let bidAsk = await getBinanceBidAsk(instrument);
@@ -302,7 +308,8 @@ async function executeStrategy() {
       status: 'starting',
       maxLoss: maxLoss,
       trades: [],
-      trailingSlPriceUsed: null
+      trailingSlPriceUsed: null,
+      email: email
     }
     addExecutionToDb(curExecution);
     let resStr = '0.00%';
@@ -458,6 +465,7 @@ async function runStrategy(id) {
               if (execution.type === 'Alerts') {
                 execution.trades.push({type: 'Buy', date: additionalData, entry: data});
                 openModalInfo('BUY Alert!<br><div class="text-left">Strategy: ' + execution.name + '<br>Exchange: ' + execution.exchange + '<br>Instrument: ' + execution.instrument + '<br>Date: ' + formatDateFull(additionalData) + '<br>Entry Price: ' + data);
+                sendEmail(execution, 'BUY', additionalData, data);
               } else {
                 execution.trades.push(data);
                 $('#executionFeeRate').html((additionalData / 2).toFixed(3));
@@ -471,6 +479,7 @@ async function runStrategy(id) {
                 await updateExecutionDb(execution, execution.trades);
                 $('#executedTrades' + id).html(execution.trades.length);
                 openModalInfo('SELL Alert!<br><div class="text-left">Strategy: ' + execution.name + '<br>Exchange: ' + execution.exchange + '<br>Instrument: ' + execution.instrument + '<br>Date: ' + formatDateFull(additionalData) + '<br>Entry Price: ' + data);
+                sendEmail(execution, 'SELL', additionalData, data);
               } else {
                 execution.trades[execution.trades.length - 1] = data;
                 execution.takeProfitOrderId = null;
@@ -790,5 +799,21 @@ function removeExecutionFromDb(id) {
         resolve(numDeleted);
       }
     })
+  });
+}
+
+function sendEmail(execution, type, date, entry) {
+  if (execution.email === null || execution.email === undefined) {
+    return;
+  }
+  $.post("https://easycryptobot.com/mail-sender.php", {
+    f: 'ecb',
+    m: execution.email,
+    s: execution.strategy.name,
+    i: execution.instrument,
+    d: formatDateFull(date),
+    e: entry,
+    t: type
+  }, function(data, status) {
   });
 }
