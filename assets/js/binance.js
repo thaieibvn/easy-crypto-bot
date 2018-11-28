@@ -404,11 +404,19 @@ function getBinanceUSDTValue(ammount, pair, base) {
 function checkBinanceApiKey(key, secret) {
   const binanceApiTest = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, test: false});
   return new Promise((resolve, reject) => {
-    binanceApiTest.balance((error, balances) => {
+    binanceApiTest.balance(async(error, balances) => {
       if (error !== null) {
-        resolve(false);
-      }
-      resolve(true);
+			//Try again to prevent Timestamp issue on Binance
+		   await sleep(1200);
+		   binanceApiTest.balance((error, balances) => {
+			  if (error !== null) {
+				resolve(false);
+			  }
+			  resolve(true);
+			});
+      } else {
+		resolve(true);
+	  }
     })
   });
 }

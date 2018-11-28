@@ -1719,7 +1719,7 @@ async function getFineTuneStoplossAndTargetVariations(strategyVariations, strate
   let tt = 0;
   let useTarget = false;
   if (strategy.target !== null && !isNaN(strategy.target)) {
-    t = strategy.trailingSl;
+    tt = strategy.target;
     useTarget = true;
   }
   let stops = [
