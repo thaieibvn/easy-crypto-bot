@@ -1,7 +1,7 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 const Binance = require('node-binance-api');
 const binance = new Binance().options({
-  APIKEY: 'key', APISECRET: 'secret', useServerTime: true, // If you get timestamp errors, synchronize to server time at startup
+  APIKEY: 'key', APISECRET: 'secret', useServerTime: true, recvWindow: 60000, // If you get timestamp errors, synchronize to server time at startup
   test: false // If you want to use sandbox mode where orders are simulated
 });
 
@@ -14,30 +14,32 @@ let binanceInstruments = null;
 async function getBinanceInstruments() {
   if (binanceInstruments === null) {
     return new Promise((resolve, reject) => {
-      binance.prices((error, ticker) => {
-        if (error) {
-          reject(error);
-        } else {
-          if (ticker === null || JSON.stringify(ticker) === '{}') {
-            $.ajax({
-              url: 'https://easycryptobot.com/instruments.php',
-              contentType: 'json',
-              type: 'GET',
-              success: function(data) {
-                let list = JSON.parse(data);
-                binanceInstruments = {}
-                for (let item of list) {
-                  binanceInstruments['' + item + ''] = item;
-                }
-              },
-              error: function() {}
-            });
+      binance.useServerTime(function() {
+        binance.prices((error, ticker) => {
+          if (error) {
+            reject(error);
           } else {
-            binanceInstruments = ticker;
+            if (ticker === null || JSON.stringify(ticker) === '{}') {
+              $.ajax({
+                url: 'https://easycryptobot.com/instruments.php',
+                contentType: 'json',
+                type: 'GET',
+                success: function(data) {
+                  let list = JSON.parse(data);
+                  binanceInstruments = {}
+                  for (let item of list) {
+                    binanceInstruments['' + item + ''] = item;
+                  }
+                },
+                error: function() {}
+              });
+            } else {
+              binanceInstruments = ticker;
+            }
+            resolve(ticker);
           }
-          resolve(ticker);
-        }
-      })
+        })
+      });
     });
   } else {
     return Promise.resolve(binanceInstruments);
@@ -46,28 +48,32 @@ async function getBinanceInstruments() {
 
 function getLastBinancePrice(instrument) {
   return new Promise((resolve, reject) => {
-    binance.prices(instrument, (error, ticker) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(ticker[instrument]);
-      }
-    })
+    binance.useServerTime(function() {
+      binance.prices(instrument, (error, ticker) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(ticker[instrument]);
+        }
+      })
+    });
   });
 }
 
 function getBinanceTicksImpl(instrument, timeframe, startTime, endTime) {
   return new Promise((resolve, reject) => {
-    binance.candlesticks(instrument, timeframe, (error, ticks, symbol) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(ticks);
-      }
-    }, {
-      limit: 500,
-      startTime: startTime.getTime(),
-      endTime: endTime.getTime()
+    binance.useServerTime(function() {
+      binance.candlesticks(instrument, timeframe, (error, ticks, symbol) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(ticks);
+        }
+      }, {
+        limit: 500,
+        startTime: startTime.getTime(),
+        endTime: endTime.getTime()
+      });
     });
   });
 }
@@ -391,77 +397,78 @@ async function downloadBinanceTicks(instrument, timeframe, startTime, endTime, b
 
 function getBinanceUSDTValue(ammount, pair, base) {
   return new Promise((resolve, reject) => {
-    binance.prices((error, ticker) => {
-      if (pair.toLowerCase().endsWith('usdt')) {
-        resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]));
-      } else {
-        resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]) * Number.parseFloat(ticker[base.toUpperCase() + 'USDT']));
-      }
-    })
+    binance.useServerTime(function() {
+      binance.prices((error, ticker) => {
+        if (pair.toLowerCase().endsWith('usdt')) {
+          resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]));
+        } else {
+          resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]) * Number.parseFloat(ticker[base.toUpperCase() + 'USDT']));
+        }
+      })
+    });
   });
 }
 
 function checkBinanceApiKey(key, secret) {
-  const binanceApiTest = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, test: false});
+  const binanceApiTest = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, recvWindow: 60000, test: false});
   return new Promise((resolve, reject) => {
-    binanceApiTest.balance(async(error, balances) => {
-      if (error !== null) {
-			//Try again to prevent Timestamp issue on Binance
-		   await sleep(1200);
-		   binanceApiTest.balance((error, balances) => {
-			  if (error !== null) {
-				resolve(false);
-			  }
-			  resolve(true);
-			});
-      } else {
-		resolve(true);
-	  }
-    })
+    binanceApiTest.useServerTime(function() {
+      binanceApiTest.balance(async (error, balances) => {
+        if (error !== null) {} else {
+          resolve(true);
+        }
+      })
+    });
   });
 }
 
 function getBinanceBalance(key, secret, currency) {
-  const binanceApiTest = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, test: false});
+  const binanceApiTest = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, recvWindow: 60000, test: false});
   return new Promise((resolve, reject) => {
-    binanceApiTest.balance((error, balances) => {
-      resolve(balances[currency].available);
-    })
+    binanceApiTest.useServerTime(function() {
+      binanceApiTest.balance((error, balances) => {
+        resolve(balances[currency].available);
+      })
+    });
   });
 }
 
 function getBinanceLotSizeInfo(pair) {
   return new Promise((resolve, reject) => {
-    binance.exchangeInfo((error, data) => {
+    binance.useServerTime(function() {
+      binance.exchangeInfo((error, data) => {
 
-      let symbolInfo = data.symbols.filter(x => {
-        return x.symbol == pair
-      })[0];
-      let minQty = null;
-      let maxQty = null;
-      let stepSize = null;
+        let symbolInfo = data.symbols.filter(x => {
+          return x.symbol == pair
+        })[0];
+        let minQty = null;
+        let maxQty = null;
+        let stepSize = null;
 
-      symbolInfo.filters.forEach(filter => {
-        if (filter.filterType === 'LOT_SIZE') {
-          minQty = parseFloat(filter.minQty);
-          maxQty = parseFloat(filter.maxQty);
-          stepSize = parseFloat(filter.stepSize);
-        }
-      });
-      resolve([minQty, maxQty, stepSize]);
-    })
+        symbolInfo.filters.forEach(filter => {
+          if (filter.filterType === 'LOT_SIZE') {
+            minQty = parseFloat(filter.minQty);
+            maxQty = parseFloat(filter.maxQty);
+            stepSize = parseFloat(filter.stepSize);
+          }
+        });
+        resolve([minQty, maxQty, stepSize]);
+      })
+    });
   });
 }
 
 function getBinanceBidAsk(pair) {
   return new Promise((resolve, reject) => {
-    binance.depth(pair, (error, depth, symbol) => {
-      let bids = binance.sortBids(depth.bids);
-      let asks = binance.sortAsks(depth.asks);
-      resolve([
-        Number.parseFloat(binance.first(bids)),
-        Number.parseFloat(binance.first(asks))
-      ]);
+    binance.useServerTime(function() {
+      binance.depth(pair, (error, depth, symbol) => {
+        let bids = binance.sortBids(depth.bids);
+        let asks = binance.sortAsks(depth.asks);
+        resolve([
+          Number.parseFloat(binance.first(bids)),
+          Number.parseFloat(binance.first(asks))
+        ]);
+      });
     });
   });
 }
@@ -471,28 +478,30 @@ async function getBinanceInstrumentsInfo(instrument) {
   if (binanceInstrumentsInfo === null) {
     binanceInstrumentsInfo = {};
     return new Promise((resolve, reject) => {
-      binance.exchangeInfo(function(error, data) {
-        if (error) {
-          resolve(null);
-        }
-        for (let obj of data.symbols) {
-          let item = {};
-          for (let filter of obj.filters) {
-            if (filter.filterType == "MIN_NOTIONAL") {
-              item.minNotional = filter.minNotional;
-            } else if (filter.filterType == "LOT_SIZE") {
-              item.stepSize = filter.stepSize;
-              item.minQty = filter.minQty;
-              item.maxQty = filter.maxQty;
-            } else if (filter.filterType == "PRICE_FILTER") {
-              item.tickSize = filter.tickSize;
-            }
+      binance.useServerTime(function() {
+        binance.exchangeInfo(function(error, data) {
+          if (error) {
+            resolve(null);
           }
-          item.orderTypes = obj.orderTypes;
-          item.precision = getPrecisionFromTickSize(item.tickSize);
-          binanceInstrumentsInfo[obj.symbol] = item;
-        }
-        resolve(binanceInstrumentsInfo[instrument.toUpperCase()]);
+          for (let obj of data.symbols) {
+            let item = {};
+            for (let filter of obj.filters) {
+              if (filter.filterType == "MIN_NOTIONAL") {
+                item.minNotional = filter.minNotional;
+              } else if (filter.filterType == "LOT_SIZE") {
+                item.stepSize = filter.stepSize;
+                item.minQty = filter.minQty;
+                item.maxQty = filter.maxQty;
+              } else if (filter.filterType == "PRICE_FILTER") {
+                item.tickSize = filter.tickSize;
+              }
+            }
+            item.orderTypes = obj.orderTypes;
+            item.precision = getPrecisionFromTickSize(item.tickSize);
+            binanceInstrumentsInfo[obj.symbol] = item;
+          }
+          resolve(binanceInstrumentsInfo[instrument.toUpperCase()]);
+        });
       });
     });
   } else {
@@ -507,7 +516,7 @@ function binanceRoundAmmount(amount, stepSize) {
 function getPrecisionFromTickSize(tickSize) {
   let startIndex = tickSize.indexOf('.');
   let endIndex = tickSize.indexOf('1');
-  if(startIndex!==-1 && endIndex!==-1) {
+  if (startIndex !== -1 && endIndex !== -1) {
     return tickSize.substring(startIndex, endIndex).length;
   }
   return 8;

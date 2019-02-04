@@ -9,13 +9,15 @@ function sleep(ms) {
 
 function getBidAsk(pair) {
   return new Promise((resolve, reject) => {
-    binance.depth(pair, (error, depth, symbol) => {
-      let bids = binance.sortBids(depth.bids);
-      let asks = binance.sortAsks(depth.asks);
-      resolve([
-        Number.parseFloat(binance.first(bids)),
-        Number.parseFloat(binance.first(asks))
-      ]);
+    binance.useServerTime(function() {
+      binance.depth(pair, (error, depth, symbol) => {
+        let bids = binance.sortBids(depth.bids);
+        let asks = binance.sortAsks(depth.asks);
+        resolve([
+          Number.parseFloat(binance.first(bids)),
+          Number.parseFloat(binance.first(asks))
+        ]);
+      });
     });
   });
 }
@@ -36,25 +38,27 @@ async function getBinanceInstrumentsInfo(instrument) {
   if (binanceInstrumentsInfo === null) {
     binanceInstrumentsInfo = {};
     return new Promise((resolve, reject) => {
-      binance.exchangeInfo(function(error, data) {
-        for (let obj of data.symbols) {
-          let item = {};
-          for (let filter of obj.filters) {
-            if (filter.filterType == "MIN_NOTIONAL") {
-              item.minNotional = filter.minNotional;
-            } else if (filter.filterType == "LOT_SIZE") {
-              item.stepSize = filter.stepSize;
-              item.minQty = filter.minQty;
-              item.maxQty = filter.maxQty;
-            } else if (filter.filterType == "PRICE_FILTER") {
-              item.tickSize = filter.tickSize;
+      binance.useServerTime(function() {
+        binance.exchangeInfo(function(error, data) {
+          for (let obj of data.symbols) {
+            let item = {};
+            for (let filter of obj.filters) {
+              if (filter.filterType == "MIN_NOTIONAL") {
+                item.minNotional = filter.minNotional;
+              } else if (filter.filterType == "LOT_SIZE") {
+                item.stepSize = filter.stepSize;
+                item.minQty = filter.minQty;
+                item.maxQty = filter.maxQty;
+              } else if (filter.filterType == "PRICE_FILTER") {
+                item.tickSize = filter.tickSize;
+              }
             }
+            item.orderTypes = obj.orderTypes;
+            item.precision = getPrecisionFromTickSize(item.tickSize);
+            binanceInstrumentsInfo[obj.symbol] = item;
           }
-          item.orderTypes = obj.orderTypes;
-          item.precision = getPrecisionFromTickSize(item.tickSize);
-          binanceInstrumentsInfo[obj.symbol] = item;
-        }
-        resolve(binanceInstrumentsInfo[instrument.toUpperCase()]);
+          resolve(binanceInstrumentsInfo[instrument.toUpperCase()]);
+        });
       });
     });
   } else {
@@ -91,64 +95,68 @@ function getBaseCurrency(pair) {
 }
 function getOrderTradePrice(execution, orderId, type) {
   return new Promise((resolve, reject) => {
-    binance.trades(execution.instrument, async (error, tradesTmp, symbol) => {
-      let qty = 0;
-      let sum = 0;
-      let commision = 0;
-      for (let i = tradesTmp.length - 1; i >= 0; i--) {
-        if (tradesTmp[i].orderId == orderId) {
-          sum += Number.parseFloat(tradesTmp[i].price) * Number.parseFloat(tradesTmp[i].qty);
-          qty += Number.parseFloat(tradesTmp[i].qty);
-          if (tradesTmp[i].commissionAsset !== 'BNB') {
-            commision += Number.parseFloat(tradesTmp[i].commission);
-            feeRate = 0.2;
-          }
-        }
-      }
-      if (qty !== 0) {
-        if (commision !== 0 && type === 'buy') {
-          let balance = await getBalance(execution.instrument);
-          if (balance < execution.positionSize) {
-            let info = await getBinanceInstrumentsInfo(execution.instrument);
-            //Change position size as we don't have the initial ammount to sell because of the commision
-            execution.positionSize = binance.roundStep(qty - commision, info.stepSize);
-            self.postMessage([execId, 'CH_POS_SIZE', execution.positionSize]);
+    binance.useServerTime(function() {
+      binance.trades(execution.instrument, async (error, tradesTmp, symbol) => {
+        let qty = 0;
+        let sum = 0;
+        let commision = 0;
+        for (let i = tradesTmp.length - 1; i >= 0; i--) {
+          if (tradesTmp[i].orderId == orderId) {
+            sum += Number.parseFloat(tradesTmp[i].price) * Number.parseFloat(tradesTmp[i].qty);
+            qty += Number.parseFloat(tradesTmp[i].qty);
+            if (tradesTmp[i].commissionAsset !== 'BNB') {
+              commision += Number.parseFloat(tradesTmp[i].commission);
+              feeRate = 0.2;
+            }
           }
         }
         if (qty !== 0) {
-          resolve([
-            Number.parseFloat((sum / qty).toFixed(8)),
-            qty
-          ]);
+          if (commision !== 0 && type === 'buy') {
+            let balance = await getBalance(execution.instrument);
+            if (balance < execution.positionSize) {
+              let info = await getBinanceInstrumentsInfo(execution.instrument);
+              //Change position size as we don't have the initial ammount to sell because of the commision
+              execution.positionSize = binance.roundStep(qty - commision, info.stepSize);
+              self.postMessage([execId, 'CH_POS_SIZE', execution.positionSize]);
+            }
+          }
+          if (qty !== 0) {
+            resolve([
+              Number.parseFloat((sum / qty).toFixed(8)),
+              qty
+            ]);
+          } else {
+            resolve(null);
+          }
         } else {
           resolve(null);
         }
-      } else {
-        resolve(null);
-      }
-    })
+      })
+    });
   });
 }
 
 function marketBuy(execution, strategy) {
   return new Promise((resolve, reject) => {
-    binance.marketBuy(execution.instrument, execution.positionSize, async (error, response) => {
-      if (error !== null) {
-        self.postMessage([
-          execId, 'ERROR', 'Error buying ' + execution.positionSize + ' ' + execution.instrument + '.<br>Error message from Binance: ' + JSON.parse(error.body).msg
-        ]);
-        resolve(false);
-      } else {
-        let tradePrice = await getOrderTradePrice(execution, response.orderId, 'buy');
-        let trade = {
-          'openDate': new Date(),
-          'entry': tradePrice[0],
-          'result': 0
-        };
-        execution.trades.push(trade);
-        self.postMessage([execId, 'BUY', trade, feeRate]);
-        resolve(true);
-      }
+    binance.useServerTime(function() {
+      binance.marketBuy(execution.instrument, execution.positionSize, async (error, response) => {
+        if (error !== null) {
+          self.postMessage([
+            execId, 'ERROR', 'Error buying ' + execution.positionSize + ' ' + execution.instrument + '.<br>Error message from Binance: ' + JSON.parse(error.body).msg
+          ]);
+          resolve(false);
+        } else {
+          let tradePrice = await getOrderTradePrice(execution, response.orderId, 'buy');
+          let trade = {
+            'openDate': new Date(),
+            'entry': tradePrice[0],
+            'result': 0
+          };
+          execution.trades.push(trade);
+          self.postMessage([execId, 'BUY', trade, feeRate]);
+          resolve(true);
+        }
+      });
     });
   });
 }
@@ -161,29 +169,31 @@ async function marketSell(execution) {
   let positionSize = execution.positionSize - takeProfitExecutedQty;
 
   return new Promise((resolve, reject) => {
-    binance.marketSell(execution.instrument, positionSize, async (error, response) => {
-      if (error !== null) {
-        self.postMessage([
-          execId, 'ERROR', 'Error selling ' + positionSize + ' ' + execution.instrument + '.<br>Error message from Binance: ' + JSON.parse(error.body).msg
-        ]);
-        resolve(false);
-      } else {
-        let tradePrice = await getOrderTradePrice(execution, response.orderId, 'sell');
-        let finalPrice = tradePrice[0];
-        if (takeProfitExecutedQty !== 0) {
-          let takeProfitPrice = await getOrderTradePrice(execution, execution.takeProfitOrderId, 'sell');
-          finalPrice = ((takeProfitPrice[0] * takeProfitPrice[1]) + (tradePrice[0] * tradePrice[1])) / execution.positionSize;
+    binance.useServerTime(function() {
+      binance.marketSell(execution.instrument, positionSize, async (error, response) => {
+        if (error !== null) {
+          self.postMessage([
+            execId, 'ERROR', 'Error selling ' + positionSize + ' ' + execution.instrument + '.<br>Error message from Binance: ' + JSON.parse(error.body).msg
+          ]);
+          resolve(false);
+        } else {
+          let tradePrice = await getOrderTradePrice(execution, response.orderId, 'sell');
+          let finalPrice = tradePrice[0];
+          if (takeProfitExecutedQty !== 0) {
+            let takeProfitPrice = await getOrderTradePrice(execution, execution.takeProfitOrderId, 'sell');
+            finalPrice = ((takeProfitPrice[0] * takeProfitPrice[1]) + (tradePrice[0] * tradePrice[1])) / execution.positionSize;
+          }
+          let tradeIndex = execution.trades.length - 1;
+          execution.trades[tradeIndex]['closeDate'] = new Date();
+          execution.trades[tradeIndex]['exit'] = finalPrice;
+          execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - feeRate;
+          self.postMessage([
+            execId, 'SELL', execution.trades[tradeIndex]
+          ]);
+          resolve(true);
         }
-        let tradeIndex = execution.trades.length - 1;
-        execution.trades[tradeIndex]['closeDate'] = new Date();
-        execution.trades[tradeIndex]['exit'] = finalPrice;
-        execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - feeRate;
-        self.postMessage([
-          execId, 'SELL', execution.trades[tradeIndex]
-        ]);
-        resolve(true);
-      }
-    })
+      })
+    });
   });
 }
 
@@ -191,17 +201,19 @@ function placeTakeProfitLimit(execution, target) {
   return new Promise(async (resolve, reject) => {
     let info = await getBinanceInstrumentsInfo(execution.instrument);
     let price = Number.parseFloat(target.toFixed(info.precision));
-    binance.sell(execution.instrument, execution.positionSize, price, {
-      type: "LIMIT"
-    }, (error, response) => {
-      if (error) {
-        self.postMessage([
-          execId, 'ERROR', 'Error placing TAKE_PROFIT_LIMIT order for instrument ' + execution.instrument + '<br>Please take in mind that the strategy has bought and hasn\'t sell. You should manually sell on Binance the ammount or place the limit take profit order.<br>Error message from Binance: ' + JSON.parse(error.body).msg
-        ]);
-        resolve(null);
-        return;
-      }
-      resolve(response.orderId);
+    binance.useServerTime(function() {
+      binance.sell(execution.instrument, execution.positionSize, price, {
+        type: "LIMIT"
+      }, (error, response) => {
+        if (error) {
+          self.postMessage([
+            execId, 'ERROR', 'Error placing TAKE_PROFIT_LIMIT order for instrument ' + execution.instrument + '<br>Please take in mind that the strategy has bought and hasn\'t sell. You should manually sell on Binance the ammount or place the limit take profit order.<br>Error message from Binance: ' + JSON.parse(error.body).msg
+          ]);
+          resolve(null);
+          return;
+        }
+        resolve(response.orderId);
+      });
     });
   });
 }
@@ -211,8 +223,10 @@ function cancelOrder(instrument, orderId) {
     return;
   }
   return new Promise((resolve, reject) => {
-    binance.cancel(instrument, orderId, (error, response, symbol) => {
-      resolve(response);
+    binance.useServerTime(function() {
+      binance.cancel(instrument, orderId, (error, response, symbol) => {
+        resolve(response);
+      });
     });
   });
 }
@@ -529,7 +543,7 @@ self.addEventListener('message', async function(e) {
     if (execution.type === 'Trading') {
       testMode = false;
     }
-    binance = new Binance().options({APIKEY: apiKey, APISECRET: apiSecret, useServerTime: true, test: testMode});
+    binance = new Binance().options({APIKEY: apiKey, APISECRET: apiSecret, useServerTime: true, recvWindow: 60000, test: testMode});
 
     if (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit === undefined || execution.trades[execution.trades.length - 1].exit === null)) {
       tradeType = 'sell';
