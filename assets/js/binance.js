@@ -414,7 +414,9 @@ function checkBinanceApiKey(key, secret) {
   return new Promise((resolve, reject) => {
     binanceApiTest.useServerTime(function() {
       binanceApiTest.balance(async (error, balances) => {
-        if (error !== null) {} else {
+        if (error !== null) {
+          resolve(false);
+        } else {
           resolve(true);
         }
       })
