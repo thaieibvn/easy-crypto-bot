@@ -25,16 +25,16 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 		<div class="inner">
 			<nav>
 				<ul>
-					<li><a id="homeMenu" data-section="home" href="#">Home</a></li>
-					<li><a data-section="strategies" href="#">Strategies</a></li>
-					<li><a data-section="optimize" href="#">Optimize</a></li>
-					<li><a data-section="backtest" href="#">Backtest</a></li>
-					<li><a data-section="trade" href="#">Trading</a></li>
+					<li><a id="homeMenu"  onclick="sectionClick('#home')" href="#">Home</a></li>
+					<li><a id="strategiesMenu"  onclick="sectionClick('#strategies')" href="#">Strategies</a></li>
+					<li><a  id="backtestMenu" onclick="sectionClick('#backtest')" href="#">Backtest</a></li>
+					<li><a id="optimizeMenu" onclick="sectionClick('#optimize')" href="#">Optimize</a></li>
+					<li><a id="tradeMenu"onclick="sectionClick('#trade')" href="#">Trading</a></li>
 				</ul>
 			</nav>
 		</div>
-		<div id="updateAvailable"><a id="updateBtn" class="blink display-none" href="#">UPDATE AVAILABLE</a>
-			<a id="checkForUpdateBtn" onclick="checkForUpdates({type: 'manual-check'}, true, true)" href="#">CHECK FOR UPDATE</a></div>
+	<!--	<div id="updateAvailable"><a id="updateBtn" class="blink display-none" href="#">UPDATE AVAILABLE</a>
+			<a id="checkForUpdateBtn" onclick="checkForUpdates({type: 'manual-check'}, true, true)" href="#">CHECK FOR UPDATE</a></div>-->
 	</section>
 
 	<!-- Wrapper -->
@@ -44,8 +44,8 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 				<a class="close-modal" onclick="closeNewStrategy()" href="#/"><i class="text-red fas fa-times"></i></a>
 				<div>
 					<div class="text-center">
-						<h2 id="newStrategyLabel">Create New Strategy</h2> Name: <input id="strategyName" style="width:46em;" type="text" /> &nbsp;
-						<a id="duplicateStrategyBtn" href="#/" onclick="duplicateStrategy()" class="button2 display-none"><i class="fas fa-copy"></i> Duplicate</a></div>
+						<h2 id="newStrategyLabel">Create New Strategy</h2> Name: <input class="white" id="strategyName" type="text" /> &nbsp;
+						<a id="duplicateStrategyBtn" href="#/" onclick="duplicateStrategy()" class="button alt white display-none"><i class="fas fa-copy"></i> Duplicate</a></div>
 				</div>
 				<hr />
 				<h3 class="text-center">1. Open Position: BUY when all of the following rules are met:</h3>
@@ -95,20 +95,20 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 				<div class="text-center">
 					<h3 class="text-center">3. Set Stoploss and Target: Sell if the price moves against you or if your target is met:</h3>
 					<span class="min-width7 inline-block text-left">Stoploss:&nbsp;</span>
-					<input id="stoploss" onkeydown="stoplossTypeChange('sl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
+					<input class="white" id="stoploss" onkeydown="stoplossTypeChange('sl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
 					<span class="min-width7 inline-block text-left">Trailing SL:&nbsp;</span>
-					<input id="trailingSl" onkeydown="stoplossTypeChange('tsl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
+					<input class="white" id="trailingSl" onkeydown="stoplossTypeChange('tsl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
 					<span class="min-width7 inline-block text-left">Target:&nbsp;</span>
-					<input id="target" style="width:10em;" type="number" value="" />&nbsp;%<br>
-					<span style="margin-left:1.6em;" class="min-width7 inline-block text-left">Time Close <a title="Info" onclick="timeCloseInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>:&nbsp;</span>
-					<input id="timeClose" style="width:10em;" type="number" value="" />&nbsp;hours<br>
+					<input class="white" id="target" style="width:10em;" type="number" value="" />&nbsp;%<br>
+					<span style="margin-left:1.4em;" class="min-width7 inline-block text-left">Time Close <a title="Info" onclick="timeCloseInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>:&nbsp;</span>
+					<input class="white" id="timeClose" style="width:10em;" type="number" value="" />&nbsp;hours<br>
 					<span style="font-size:small">If you don't want Stoloss or Target, leave them empty.</span>
 				</div>
 				<hr />
 
 				<div class="text-center margin-s-b30">
-					<a href="#/" onclick="saveStrategy()" class="button2" style="width:12em;margin:0 1em">Save</a>
-					<a href="#/" onclick="closeNewStrategy()" class="button2" style="width:12em;margin:0 1em">Cancel</a>
+					<a href="#/" onclick="saveStrategy()" class="button alt white" style="width:12em;margin:0 1em">Save</a>
+					<a href="#/" onclick="closeNewStrategy()" class="button alt white" style="width:12em;margin:0 1em">Cancel</a>
 				</div>
 			</div>
 		</div>
@@ -120,16 +120,16 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 			<div class="text-center">
 				<h2 id="executionDetailsLabel" class="text-center ">Execution Details</h2>
 				<div id="executionDetailsLabel2" class="margin-s-b10">The commissions are included in all results. Commission rate: <span id="executionFeeRate">0.075</span>% per single trade</div>
-				<div class="features">
-					<div class="section trade-section">
+				<div class="features alt text-left">
+					<section class="trade-section">
 						<h3><i class=" fas fa-rocket"></i>&nbsp;Performance</h3> Total Return:&nbsp;
 						<span class="bold" id="executionTotalReturn"></span><br> Win/Loss Ratio:&nbsp;
 						<span class="bold" id="executionWinLoss"></span><br> Average gain/loss per trade:&nbsp;
 						<span class="bold" id="executionAvgWinLossPerTrade"></span><br>Net Gain/Loss:&nbsp;
 						<span class="bold" id="executionResultWithUsd"></span><br> Executed Trades:&nbsp;
 						<span class="bold" id="executionExecutedTrades"></span><br>
-					</div>
-					<div class="section">
+					</section>
+					<section>
 						<h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> Strategy:&nbsp;
 						<span class="bold" id="executionStrategyRes"></span><br> Exchange:&nbsp;
 						<span class="bold" id="executionExchangeRes"></span><br> Instrument:&nbsp;
@@ -139,22 +139,22 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 							<span class="bold" id="executionPosSizeRes"></span></div>
 						<div id="executionMaxLossResDiv" class="inline"><br> Maximum Execution Loss:&nbsp;
 							<span class="bold" id="executionMasLossRes"></span></div>
-					</div>
-					<div class="section trade-section">
+					</section>
+					<section class="trade-section">
 						<h3><i class=" fas fa-thumbs-up"></i>&nbsp;Winning Trades</h3> Win Rate:&nbsp;<span class="bold" id="executionWinningTradesP"></span><br> Winning trades count:&nbsp;<span class="bold" id="executionWinningCount"></span><br> Average gain per trade:&nbsp;<span class="bold" id="executionAvgGainPerWinning"></span><br>						Biggest gain:&nbsp;<span class="bold" id="executionBiggestGain"></span><br>
-					</div>
-					<div class="section trade-section">
+					</section>
+					<section class="trade-section">
 						<h3><i class=" fas fa-thumbs-down"></i>&nbsp;Loosing Trades</h3> Loose Rate:&nbsp;<span class="bold" id="executionLoosingTradesP"></span><br> Loosing trades count:&nbsp;<span class="bold" id="executionLoosingCount"></span><br> Average loss per trade:&nbsp;<span class="bold" id="executionAvgLostPerWinning"></span><br>						Biggest loss:&nbsp;<span class="bold" id="executionBiggestLost"></span><br>
-					</div>
+					</section>
 				</div>
 
 				<h3 id="executionTableLabel" class="text-center margin-s-b10">Executed Trades</h3>
-				<div class="table-wrapper">
+				<div class="table-wrapper alt">
 					<table id="executionStrategiesTable">
 					</table>
 				</div>
 				<div class="text-center margin-s-b30">
-					<a href="#/" onclick="closeExecutionWindow()" class="button2" style="width:12em;margin:0 1em">Close</a>
+					<a href="#/" onclick="closeExecutionWindow()" class="button alt white" style="width:12em;margin:0 1em">Close</a>
 				</div>
 			</div>
 		</div>
@@ -163,27 +163,27 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 	</div>
 
 	<!-- Footer -->
-	<footer id="footer" class="wrapper style1-alt">
+	<!-- Footer -->
+	<footer id="footer" class="wrapper text-center">
 		<div class="inner">
-			<div class="text-center">
-				<ul class="menu">
-					<li>&copy; Stefan Hristov</li>
-					<li><span class="one-click-select">stefan@easycryptobot.com</span>&nbsp;<a style="display:inline-block;" href="#/" title="copy" onclick="copyMail()"><i class="fas fa-copy"></i></a></li>
-				</ul>
-			</div>
+			<a href="https://www.facebook.com/EasyCryptoBot" target="_blank"> <i class="fab fa-facebook"></i></a>&nbsp;&nbsp;
+			<a href="https://twitter.com/EasyCryptoBot" target="_blank"> <i class="fab fa-twitter"></i></a>&nbsp;&nbsp;
+			<a href="https://github.com/hristovsn/easy-crypto-bot" target="_blank"> <i class="fab fa-github"></i></a>
+			<div class="nowrap"><i class="fas fa-envelope"></i>&nbsp;<span class="one-click-select">stefan@easycryptobot.com</span>&nbsp;</div>
+			<a href="https://easycryptobot.com/terms.html" target="_blank">Terms &amp; Conditions</a><br> &copy; Stefan Hristov. All rights reserved.
 		</div>
 	</footer>
 
 	<div id="modalConfirm" class="modal-small">
 		<div class="text-center">
 			<div></div>
-			<br> <a id="modalConfirmOk" style="width:10em;" class="button2" href="#/">OK</a> <a style="width:10em;" id="modalConfirmCancel" class="button2" href="#/">Cancel</a>
+			<br> <a id="modalConfirmOk" class="button alt white" href="#/">OK</a> <a id="modalConfirmCancel" class="button alt white" href="#/">Cancel</a>
 		</div>
 	</div>
 	<div id="modalInfo" class="modal-small">
 		<div class="text-center">
 			<div></div>
-			<br> <a id="modalInfoOk" class="button2" href="#/" style="width:10em;">OK</a>
+			<br> <a id="modalInfoOk" class="button alt white" href="#/">OK</a>
 		</div>
 	</div>
 
@@ -208,9 +208,10 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 	<script>
 		fillDefaultStrategies();
 		checkEulaAccepted();
-		dailyCheckForUpdates();
-		hourlyCheckForUpdates();
-		getInteractiveContent();
+		//dailyCheckForUpdates();
+		//hourlyCheckForUpdates();
+		//getInteractiveContent();
+
 		//removeTmpFiles();
 		enablePowerSaveBlocker();
 

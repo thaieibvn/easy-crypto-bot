@@ -1,23 +1,23 @@
 <template class="section-template">
-<section id="strategies" class="wrapper style1 intro fullscreen">
+<section id="strategies" style="display:none" class="wrapper fullscreen intro page display-none">
   <div id="strategiesBody" class="inner">
-    <h2>Strategies</h2>
-    <div class="margin-s-b30">You can create your own unique strategy by combining different technical indicators.</div>
-
     <div class="text-center">
-      <a id="newStrategyBtn" href="#/" onclick="newStrategy()" class="button button-big margin-s-b30">Create New Strategy</a>
+      <span class="image"><img src="assets/images/logo.png" alt="Free Crypto Bot" /></span>
+      <h1 class="major">Strategies</h1>
+      <p>You can create your own unique strategy by combining different technical indicators.</p>
     </div>
-    <hr />
     <div class="text-center">
-      <h3 class="margin-s-b10">Strategies List</h3>
+      <a id="newStrategyBtn" href="#/" onclick="newStrategy(event)" class="button white margin-s-b30">Create New Strategy</a>
+    </div>
+    <br>
+    <div class="text-center">
+      <h2 class="margin-s-b10">Strategies List</h2>
     </div>
     <div class="table-wrapper">
       <table id="strategiesTable">
       </table>
     </div>
-
+    <br>
   </div>
 </section>
 </template>
-<script>
-</script>

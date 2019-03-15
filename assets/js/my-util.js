@@ -524,3 +524,22 @@ function chunkArray(myArray, chunkSize) {
 function opKeyDownDoNothing(e) {
   e.preventDefault();
 }
+
+function sectionClick(navItem) {
+  $('#sidebar a').removeClass('active');
+  $(navItem + 'Menu').addClass('active');
+  $('#wrapper>section').hide();
+  $(navItem).fadeIn('fast');
+
+  if (navItem === "#backtest" || navItem === "#trade" || navItem === "#optimize") {
+    loadStrategiesBt();
+    fillBtTestPeriod();
+    fillOpTestPeriod();
+  } else if (navItem === '#home') {
+    $('.homeDiv').show();
+  }
+  if (navItem === "#trade") {
+    fillOldExecutions();
+  }
+
+}

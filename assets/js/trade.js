@@ -319,7 +319,9 @@ async function executeStrategy() {
     $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td>' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td>' + curExecution.timeframe + '</td><td class="text-center" id="executedTrades' + dbId + '">0</td>' + '<td><span id="executionRes' + dbId + '">' + resStr + '</span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + dbId + '\')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + dbId + '"></td><td id="terminateStrBtn' + dbId + '">Starting..</td></tr>');
 
     await runStrategy(dbId);
-
+    $('html,body').animate({
+      scrollTop: document.body.scrollHeight
+    }, "fast");
   } catch (err) {
     openModalInfo('Internal Error Occurred!<br>' + err);
   } finally {
@@ -814,6 +816,18 @@ function sendEmail(execution, type, date, entry) {
     d: formatDateFull(date),
     e: entry,
     t: type
-  }, function(data, status) {
-  });
+  }, function(data, status) {});
+}
+
+async function editTrStrategy() {
+  try {
+    let strategyName = $('#tsStrategyCombobox').text();
+    let strategy = await getStrategyByName(strategyName);
+    if (strategy === null) {
+      openModalInfo('Please Choose a Strategy to Edit!');
+      $('#tsStrategyCombobox').html('Choose Strategy');
+      return;
+    }
+    editStrategy(strategyName);
+  } catch (err) {}
 }

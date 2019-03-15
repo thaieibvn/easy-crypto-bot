@@ -244,6 +244,9 @@ async function saveStrategy() {
         if ($('#opStrategyCombobox').text() === orgStrategyName) {
           $('#opStrategyCombobox').text(strategy.name);
         }
+        if ($('#tsStrategyCombobox').text() === orgStrategyName) {
+          $('#tsStrategyCombobox').text(strategy.name);
+        }
         overwriteStrategy(strategy, orgStrategyName);
       });
       return;
@@ -262,6 +265,10 @@ async function saveStrategy() {
       if ($('#opStrategyCombobox').text() === orgStrategyName) {
         $('#opStrategyCombobox').text(strategy.name);
       }
+      if ($('#tsStrategyCombobox').text() === orgStrategyName) {
+        $('#tsStrategyCombobox').text(strategy.name);
+      }
+
     }
 
     await addStrategy(strategy);
@@ -584,6 +591,9 @@ function rmStrategy(name) {
     }
     if ($('#opStrategyCombobox').text() === name) {
       $('#opStrategyCombobox').text('Choose Strategy');
+    }
+    if ($('#tsStrategyCombobox').text() === name) {
+        $('#tsStrategyCombobox').text('Choose Strategy');
     }
   });
 }
