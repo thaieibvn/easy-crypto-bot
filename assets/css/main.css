@@ -192,6 +192,10 @@ hr.major {
   min-width: 17.8em;
 }
 
+.margin-t10 {
+  margin-top: .625em
+}
+
 .margin-s-b10 {
   margin-bottom: .625em
 }
@@ -264,6 +268,10 @@ hr.major {
 
 .nowrap {
   white-space: nowrap;
+}
+
+.overflow-hidden {
+  overflow: hidden;
 }
 
 .show-on-m {
@@ -799,6 +807,12 @@ input[type="submit"], input[type="reset"], input[type="button"], button, .button
   padding: 0 3.75em;
 }
 
+.button.disabled {
+  cursor: default;
+  opacity: .5;
+  pointer-events: none
+}
+
 .button.alt {
   line-height: 2.16em;
   vertical-align: middle;
@@ -861,6 +875,15 @@ input[type="submit"]:hover:active:after, input[type="reset"]:hover:active:after,
 .main-fields-div {
   display: inline-block;
   margin: 0 auto 1.875em auto;
+}
+
+.additional-field {
+  font-size:12pt;
+  max-width: 12.5em;
+  position: absolute;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .drop-down, .drop-down-white {
@@ -1814,6 +1837,28 @@ a.expanded>span.caret {
   margin-left: 0.4em;
 }
 
+#updateAvailable {
+  display: none;
+  position: fixed;
+  top: 4em;
+  left: 3.75em;
+  z-index: 9999;
+  font-size: 0.65em;
+  font-weight: bold;
+  letter-spacing: 0.25em;
+}
+
+.blink {
+  animation: blinker 2s linear infinite;
+  color: #fff;
+}
+
+@keyframes blinker {
+  50% {
+    opacity: 0.25;
+  }
+}
+
 @-ms-viewport {
   width: device-width;
 }
@@ -1919,6 +1964,9 @@ a.expanded>span.caret {
     height: inherit;
     line-height: inherit;
     padding: 0;
+  }
+  #updateAvailable {
+    top: 0em !important;
   }
 }
 
@@ -2030,6 +2078,9 @@ a.expanded>span.caret {
   .modal.img img {
     width: auto;
     max-width: 80vw;
+  }
+  .additional-field {
+    max-width: 9.2em;
   }
 }
 
@@ -2279,7 +2330,7 @@ a.expanded>span.caret {
     right: 0;
   }
 
-  #btInstrumentSearch, #opInstrumentSearch {
+  #btInstrumentSearch, #opInstrumentSearch, #btFeeSearch {
     min-width: 5em;
     width: 100%;
     display: block;

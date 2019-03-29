@@ -92,37 +92,43 @@ async function runBacktest() {
     openModalInfo('Cannot run backtest while executing strategy optimization!');
     return;
   }
+  $('#runBacktestBtn').addClass('disabled');
   cancelBt = false;
   btTradesRows = []
-  let feeRate = 0.15;
   let strategyName = $('#btStrategyCombobox').text();
   let exchange = $('#btExchangeCombobox').text();
   let instrument = $('#btInstrumentSearch').val().toUpperCase();
-  let timeframe = $('#btTimeframeCombobox').text();
   let startDateStr = $('#btFromDate').val();
   let endDateStr = $('#btToDate').val();
+  let feeRate = $('#btFeeSearch').val();
   if (strategyName === 'Choose Strategy') {
     openModalInfo('Please Choose a Strategy!');
+    $('#runBacktestBtn').removeClass('disabled');
     return;
   }
   if (exchange === 'Choose Exchange') {
     openModalInfo('Please Choose an Exchange!');
+    $('#runBacktestBtn').removeClass('disabled');
     return;
   }
   if (exchange === 'Binance') {
     let instruments = await getBinanceInstruments();
     if (!(instrument in instruments)) {
       openModalInfo('Invalid Instrument!<br>Please Choose an Instrument!');
+      $('#runBacktestBtn').removeClass('disabled');
       return;
     }
   }
-  if (timeframe === 'Choose Timeframe') {
-    openModalInfo('Please Choose Timeframe!');
+  if (feeRate <= 0) {
+    openModalInfo('Fee rate should be a positive number!');
+    $('#runBacktestBtn').removeClass('disabled');
     return;
   }
+
   let startDate = new Date(startDateStr);
   if (isNaN(startDate.getTime())) {
     openModalInfo('Please Choose a Start Date!');
+    $('#runBacktestBtn').removeClass('disabled');
     return;
   }
   startDate.setHours(0, 0, 0, 0);
@@ -130,10 +136,12 @@ async function runBacktest() {
 
   if (isNaN(endDate.getTime())) {
     openModalInfo('Please Choose an End Date!');
+    $('#runBacktestBtn').removeClass('disabled');
     return;
   }
   if (startDate >= endDate) {
     openModalInfo('Start Date must be before End Date!');
+    $('#runBacktestBtn').removeClass('disabled');
     return;
   }
   endDate.setHours(23, 59, 59, 59);
@@ -142,11 +150,13 @@ async function runBacktest() {
   endDateTmp.setDate(endDateTmp.getDate() - 1);
   if (startDate < endDateTmp) {
     openModalInfo('The maximum backtest period is 3 months. Please change the selected dates.');
+    $('#runBacktestBtn').removeClass('disabled');
     return;
   }
 
   if (startDate >= endDate) {
     openModalInfo('Start Date must be before End Date!');
+    $('#runBacktestBtn').removeClass('disabled');
     return;
   }
 
@@ -157,10 +167,10 @@ async function runBacktest() {
       openModalInfo('Please Choose a Strategy!');
       $('#btStrategyCombobox').html('Choose Strategy');
       backtestRunning = false;
+      $('#runBacktestBtn').removeClass('disabled');
       return;
     }
 
-    $('#runBacktestBtn').addClass('disabled');
     $('#btRunPercent').html('Starting Backtest..');
     $('#btCancelDiv').show();
     $('#btRunPercent2').hide();
@@ -171,19 +181,39 @@ async function runBacktest() {
     $('#btTrailingStopWarning').hide();
     $('#btResultDiv').show();
     $('#btStrategiesTable').html('<thead><tr><td>Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead><tbody>');
-    let ticks = await getBinanceTicks(instrument, getTimeframe(timeframe), getStartDate(timeframe, startDate), endDate, true);
-    if (cancelBt) {
-      backtestRunning = false;
-      return;
-    }
-    if (ticks === null) {
+
+    //get all timeframes
+    let timeframes = getTimeframes(strategy);
+    if(timeframes===null) {
       $('#runBacktestBtn').removeClass('disabled');
       $('#btRunning').hide();
       $('#btResult').hide();
-      openModalInfo('Could not optain data from ' + exchange + ' for the given period. The period may be too long. Please try with smaller period or try later!');
+      openModalInfo('Your strategy contains a rule without a timeframe. Please edit your strategy!');
       backtestRunning = false;
+      $('#runBacktestBtn').removeClass('disabled');
       return;
     }
+
+    let ticks = {};
+    for (let tf of timeframes) {
+      let tfTicks = await getBinanceTicks(instrument, getShortTimeframe(tf), getStartDate(tf, startDate), endDate, true);
+      if (tfTicks === null) {
+        $('#runBacktestBtn').removeClass('disabled');
+        $('#btRunning').hide();
+        $('#btResult').hide();
+        openModalInfo('Could not optain data from ' + exchange + ' for the given period. The period may be too long. Please try with smaller period or try again later!');
+        backtestRunning = false;
+        $('#runBacktestBtn').removeClass('disabled');
+        return;
+      }
+      ticks[tf] = tfTicks;
+
+      if (cancelBt) {
+        backtestRunning = false;
+        return;
+      }
+    }
+
     if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
       $('#btTrailingStopWarning').show();
     }
@@ -191,7 +221,7 @@ async function runBacktest() {
     $('#btRunPercent').html('Backtest Execution: 0%');
     $('#btRunRocket').show();
 
-    let result = await executeBacktest(strategy, ticks, timeframe, startDate, true)
+    let result = await executeBacktest(strategy, ticks, startDate, true, feeRate * 2)
     if (result === null) {
       $('#btRunning').hide();
       $('#runBacktestBtn').removeClass('disabled');
@@ -199,9 +229,10 @@ async function runBacktest() {
       return;
     }
     let marketReturn = 0;
-    for (let tick of ticks) {
+    let ticksTmp = ticks[timeframes[0]];
+    for (let tick of ticksTmp) {
       if (tick.d >= startDate) {
-        marketReturn = ((ticks[ticks.length - 1].c - tick.o) / tick.o) * 100;
+        marketReturn = ((ticksTmp[ticksTmp.length - 1].c - tick.o) / tick.o) * 100;
         break;
       }
     }
@@ -226,7 +257,6 @@ async function runBacktest() {
     $('#btStrategyRes').html(strategyName);
     $('#btExchangeRes').html(exchange);
     $('#btInstrumentRes').html(instrument);
-    $('#btTimeframeRes').html(timeframe);
     $('#btPeriodFromRes').html(startDateStr);
     $('#btPeriodToRes').html(endDateStr);
 
@@ -269,10 +299,10 @@ async function runBacktest() {
     $('#btRunPercent').html('Backtest Execution: 100%');
     await sleep(500);
     if (result[0].executedTrades > 0) {
-      drawBtResultsChart(startDate, ticks, result[1], strategy, instrument, timeframe, 'btResultsChart', result[2]);
+      drawBtResultsChart(startDate, ticks, result[1], strategy, instrument, timeframes, 'btResultsChart', result[2]);
       $('#btResult').show();
     } else {
-      drawBtResultsChart(startDate, ticks, result[1], strategy, instrument, timeframe, 'btResultsChartNoTrades', result[2]);
+      drawBtResultsChart(startDate, ticks, result[1], strategy, instrument, timeframes, 'btResultsChartNoTrades', result[2]);
       $('#btResult').hide();
       $('#btResultNoTrades').show();
     }
@@ -283,7 +313,7 @@ async function runBacktest() {
   } catch (err) {
     $('#btRunning').hide();
     $('#runBacktestBtn').removeClass('disabled');
-    openModalInfo('Internal Error Occurred!<br>' + err);
+    openModalInfo('Internal Error Occurred!<br>' + err.stack);
     backtestRunning = false;
   }
 }
@@ -291,10 +321,10 @@ async function runBacktest() {
 function containsIndicator(indicators, indicator) {
   for (let intTmp of indicators) {
     if (indicator.type === 'macd') {
-      if (intTmp.type === indicator.type && intTmp.period === indicator.period && intTmp.period2 === indicator.period2 && intTmp.period3 === indicator.period3) {
+      if (intTmp.type === indicator.type && intTmp.period === indicator.period && intTmp.period2 === indicator.period2 && intTmp.period3 === indicator.period3 && intTmp.timeframe === indicator.timeframe) {
         return true;
       }
-    } else if (intTmp.type === indicator.type && intTmp.period === indicator.period) {
+    } else if (intTmp.type === indicator.type && intTmp.period === indicator.period && intTmp.timeframe === indicator.timeframe) {
       return true;
     }
   }
@@ -309,7 +339,8 @@ function getIndicatorsFromRules(indicators, rules) {
       indTmp = {
         type: rule.indicator,
         period: rule.period,
-        data: []
+        data: [],
+        timeframe: rule.timeframe
       };
 
     } else if (rule.indicator === 'cma') {
@@ -317,26 +348,30 @@ function getIndicatorsFromRules(indicators, rules) {
         indTmp = {
           type: 'sma',
           period: rule.period,
-          data: []
+          data: [],
+          timeframe: rule.timeframe
         };
       } else {
         indTmp = {
           type: 'ema',
           period: rule.period,
-          data: []
+          data: [],
+          timeframe: rule.timeframe
         };
       }
       if (rule.type2 === "SMA") {
         indTmp2 = {
           type: 'sma',
           period: rule.period2,
-          data: []
+          data: [],
+          timeframe: rule.timeframe
         };
       } else {
         indTmp2 = {
           type: 'ema',
           period: rule.period2,
-          data: []
+          data: [],
+          timeframe: rule.timeframe
         };
       }
     } else if (rule.indicator === 'macd') {
@@ -346,7 +381,8 @@ function getIndicatorsFromRules(indicators, rules) {
         period2: rule.period2,
         period3: rule.period3,
         data: [],
-        data2: []
+        data2: [],
+        timeframe: rule.timeframe
       };
 
     }
@@ -482,14 +518,14 @@ function getBtChartButtons(timeframe) {
   }
 
 }
-function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframe, container, lastTrade) {
+function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, timeframes, container, lastTrade) {
   try {
     let indicators = [];
     getIndicatorsFromRules(indicators, strategy.buyRules);
     getIndicatorsFromRules(indicators, strategy.sellRules);
 
     let data = [];
-    let closePrices = []
+
     let dateTmp = new Date();
     let currentTimeZoneOffsetInHours = dateTmp.getTimezoneOffset() / 60;
     Highcharts.setOptions({
@@ -497,36 +533,109 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
         timezoneOffset: currentTimeZoneOffsetInHours * 60
       }
     });
-    for (let tick of ticks) {
-      if (tick.d < startDate) {
-        closePrices.push(tick.c);
-        continue;
-      }
 
-      for (let indicator of indicators) {
-        let value = null;
-        if (indicator.type === 'sma') {
-          value = calculateSMA(indicator.period, closePrices, tick.c)
-        } else if (indicator.type === 'ema') {
-          value = calculateEMA(indicator.period, closePrices, tick.c)
-        } else if (indicator.type === 'rsi') {
-          value = calculateRsi(indicator.period, closePrices, tick.c)
-        } else if (indicator.type === 'macd') {
-          value = calculateMacd(indicator.period, indicator.period2, indicator.period3, closePrices, tick.c)
-          if (value !== null && value[2] !== null && value[2].length > 0) {
-            indicator.data2.push([
-              tick.d.getTime(), value[2][value[2].length - 1]
+    let closePrices = {};
+    for (let ft of timeframes) {
+      closePrices[ft] = [];
+    }
+
+    let bigTfIndex = 0;
+    while (ticks[timeframes[0]].length > bigTfIndex) {
+      if (ticks[timeframes[0]][bigTfIndex].d > startDate) {
+        break;
+      }
+      closePrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].c);
+      bigTfIndex++;
+    }
+
+    let smallTfIndex = 0;
+    if (timeframes.length > 1) {
+
+      while (ticks[timeframes[1]].length > smallTfIndex) {
+        if (ticks[timeframes[1]][smallTfIndex].d > startDate) {
+          break;
+        }
+        closePrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].c);
+        smallTfIndex++;
+      }
+    }
+
+    while (ticks[timeframes[0]].length > bigTfIndex) {
+      closePrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].c);
+      if (timeframes.length > 1) {
+        let dateTo = getEndPeriod(ticks[timeframes[0]][bigTfIndex].d, timeframes[0]);
+        while (ticks[timeframes[1]].length > smallTfIndex && ticks[timeframes[1]][smallTfIndex].d < dateTo) {
+          closePrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].c);
+
+          for (let indicator of indicators) {
+            let value = null;
+            if (indicator.type === 'sma') {
+              value = calculateSMA(indicator.period, closePrices[indicator.timeframe])
+            } else if (indicator.type === 'ema') {
+              value = calculateEMA(indicator.period, closePrices[indicator.timeframe])
+            } else if (indicator.type === 'rsi') {
+              value = calculateRsi(indicator.period, closePrices[indicator.timeframe])
+            } else if (indicator.type === 'macd') {
+              value = calculateMacd(indicator.period, indicator.period2, indicator.period3, closePrices[indicator.timeframe])
+              if (value !== null && value[2] !== null && value[2].length > 0) {
+                indicator.data2.push([
+                  ticks[timeframes[1]][smallTfIndex].d.getTime(),
+                  value[2][value[2].length - 1]
+                ]);
+              }
+            }
+            if (value !== null && value[0] !== null) {
+              indicator.data.push([
+                ticks[timeframes[1]][smallTfIndex].d.getTime(),
+                value[0]
+              ]);
+            }
+          }
+          data.push([
+            ticks[timeframes[1]][smallTfIndex].d.getTime(),
+            ticks[timeframes[1]][smallTfIndex].o,
+            ticks[timeframes[1]][smallTfIndex].h,
+            ticks[timeframes[1]][smallTfIndex].l,
+            ticks[timeframes[1]][smallTfIndex].c
+          ]);
+          smallTfIndex++;
+
+        }
+      } else {
+        for (let indicator of indicators) {
+          let value = null;
+          if (indicator.type === 'sma') {
+            value = calculateSMA(indicator.period, closePrices[indicator.timeframe])
+          } else if (indicator.type === 'ema') {
+            value = calculateEMA(indicator.period, closePrices[indicator.timeframe])
+          } else if (indicator.type === 'rsi') {
+            value = calculateRsi(indicator.period, closePrices[indicator.timeframe])
+          } else if (indicator.type === 'macd') {
+            value = calculateMacd(indicator.period, indicator.period2, indicator.period3, closePrices[indicator.timeframe])
+            if (value !== null && value[2] !== null && value[2].length > 0) {
+              indicator.data2.push([
+                ticks[timeframes[0]][bigTfIndex].d.getTime(),
+                value[2][value[2].length - 1]
+              ]);
+            }
+          }
+          if (value !== null && value[0] !== null) {
+            indicator.data.push([
+              ticks[timeframes[0]][bigTfIndex].d.getTime(),
+              value[0]
             ]);
           }
         }
-        if (value !== null && value[0] !== null) {
-          indicator.data.push([
-            tick.d.getTime(), value[0]
-          ]);
-        }
+        data.push([
+          ticks[timeframes[0]][bigTfIndex].d.getTime(),
+          ticks[timeframes[0]][bigTfIndex].o,
+          ticks[timeframes[0]][bigTfIndex].h,
+          ticks[timeframes[0]][bigTfIndex].l,
+          ticks[timeframes[0]][bigTfIndex].c
+        ]);
       }
-      data.push([tick.d.getTime(), tick.o, tick.h, tick.l, tick.c]);
-      closePrices.push(tick.c);
+      bigTfIndex++;
+
     }
 
     let openTrades = [];
@@ -557,7 +666,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
     series.push({
       id: 'main-series',
       type: 'candlestick',
-      name: instrument + ' ' + timeframe,
+      name: instrument + ' ' + instrument.timeframe,
       data: data,
       dataGrouping: {
         enabled: false
@@ -605,7 +714,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
         }
         containsSecondAxisIndicators = true;
         series.push({
-          name: indicator.type + ' ' + indicator.period,
+          name: indicator.type + '_' + indicator.period + ' ' + indicator.timeframe.replace(' ', '_'),
           type: 'spline',
           yAxis: rsiYasxix,
           dataGrouping: {
@@ -624,7 +733,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
           freeYaxis++;
         }
         series.push({
-          name: indicator.type + ' ' + indicator.period + ',' + indicator.period2 + period3,
+          name: indicator.type + '_' + indicator.period + ',' + indicator.period2 + period3 + ' ' + indicator.timeframe.replace(' ', '_'),
           type: 'spline',
           yAxis: macdYasxix,
           dataGrouping: {
@@ -634,7 +743,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
         })
         if (hasSignalLine) {
           series.push({
-            name: indicator.type + ' ' + indicator.period + ',' + indicator.period2 + period3 + ' Signal Line',
+            name: indicator.type + '_' + indicator.period + ',' + indicator.period2 + period3 + ' Signal Line ' + indicator.timeframe.replace(' ', '_'),
             type: 'spline',
             yAxis: macdYasxix,
             dataGrouping: {
@@ -645,7 +754,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
         }
       } else {
         series.push({
-          name: indicator.type + ' ' + indicator.period,
+          name: indicator.type + '_' + indicator.period + ' ' + indicator.timeframe.replace(' ', '_'),
           type: 'spline',
           yAxis: 0,
           dataGrouping: {
@@ -693,7 +802,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
           enabled: true
         }
       };
-    let buttons = getBtChartButtons(timeframe);
+    let buttons = getBtChartButtons(timeframes[timeframes.length - 1]);
     let chart = Highcharts.stockChart(container, {
       rangeSelector: {
         buttons: buttons,
@@ -701,7 +810,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
         inputEnabled: false
       },
       title: {
-        text: instrument + ' ' + timeframe
+        text: instrument + ' ' + timeframes[timeframes.length - 1]
       },
       xAxis: {
         crosshair: false
@@ -734,7 +843,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
     });
   } catch (err) {
     //TODO
-    console.log(err)
+    console.log(err.stack)
   }
 }
 function btResultShowRows(from, to) {

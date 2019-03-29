@@ -1,6 +1,8 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 const checkTradeRules = require('./indicators.js').checkTradeRules
 const Mutex = require('./mutex.js').Mutex
+const getTimeframes = require('./utils.js').getTimeframes
+const getEndPeriod = require('./utils.js').getEndPeriod
 const executeBacktest = require('./backtest-strategy.js').executeBacktest
 const cancelBacktest = require('./backtest-strategy.js').cancelBacktest
 
@@ -15,6 +17,7 @@ let id = null;
 let opExecutionCanceled = false;
 const mutex = new Mutex();
 let isRunning = false;
+let feeRate = 0.075;
 self.addEventListener('message', async function(e) {
   try {
     //await mutex.lock();
@@ -23,6 +26,7 @@ self.addEventListener('message', async function(e) {
       timeframe = e.data[2];
       startDate = e.data[3];
       ticks = e.data[4];
+      feeRate = e.data[5];
       opExecutionCanceled = false;
       self.postMessage(['STARTED', id]);
     } else if (typeof e.data[0] === 'string' && e.data[0].startsWith('STOP')) {
@@ -44,7 +48,7 @@ self.addEventListener('message', async function(e) {
       }
       isRunning = true;
       let strategy = e.data[1];
-      let result = await executeBacktest(strategy, ticks, timeframe, startDate, false)
+      let result = await executeBacktest(strategy, ticks, startDate, false, feeRate * 2)
       if (result !== null && !opExecutionCanceled) {
         self.postMessage([
           'RESULT', id, result[0]
@@ -56,7 +60,7 @@ self.addEventListener('message', async function(e) {
       }*/
     }
   } catch (err) {
-    self.postMessage('ERR:' + err);
+    self.postMessage('ERR: ' + err.stack);
   } finally {
     //mutex.release();
   }

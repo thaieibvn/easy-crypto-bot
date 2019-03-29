@@ -376,10 +376,10 @@ async function downloadBinanceTicks(instrument, timeframe, startTime, endTime, b
   //var userTimezoneOffset = dateTmp.getTimezoneOffset() * 60000;
   for (let tick of ticks) {
     let date = new Date(tick[0]);
-    if (timeframe === '1d') {
+    /*if (timeframe === '1d') {
       //date = new Date(date.getTime() + userTimezoneOffset);
       date.setHours(0, 0, 0, 0);
-    }
+    }*/
     ticksTmp.push({
       'd': date,
       'o': Number.parseFloat(tick[1]),
@@ -395,14 +395,14 @@ async function downloadBinanceTicks(instrument, timeframe, startTime, endTime, b
   return ticksTmp;
 }
 
-function getBinanceUSDTValue(ammount, pair, base) {
+function getBinanceUSDTValue(ammount, pair, quoted) {
   return new Promise((resolve, reject) => {
     binance.useServerTime(function() {
       binance.prices((error, ticker) => {
         if (pair.toLowerCase().endsWith('usdt')) {
           resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]));
         } else {
-          resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]) * Number.parseFloat(ticker[base.toUpperCase() + 'USDT']));
+          resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]) * Number.parseFloat(ticker[quoted.toUpperCase() + 'USDT']));
         }
       })
     });

@@ -33,30 +33,16 @@
           <div class="inline" id="btInstrument">
             <span class="inline-block min-width5">Instrument:&nbsp;</span>
             <div id="btInstrumentList" class="drop-down">
-              <input autocomplete="off" class="search blue" onkeyup="btInstrumentKeyup()" id="btInstrumentSearch" type="text" placeholder="Ticker" />
+              <input autocomplete="off" class="search blue" onkeyup="btInstrumentKeyup()" id="btInstrumentSearch" type="text" placeholder="Ticker"/>
               <ul class="backtest-dropdown">
               </ul>
             </div>
           </div>
           <br>
-
-          <div class="inline" id="btTimeframe">
-            <span class="inline-block min-width5 ">Timeframe:&nbsp;</span>
+          <div class="inline">
+            <span class="inline-block min-width5">Fee Rate %:&nbsp;</span>
             <div class="drop-down">
-              <a href="#/" onclick="dropDown('#btTimeframe')"><span id="btTimeframeCombobox" class="name main-field">Choose Timeframe</span> <span class="caret"></span></a>
-              <ul class="backtest-dropdown">
-                <li><a href="#/" onclick="dropDownItem('1 minute', '#btTimeframe')">1 minute</a></li>
-                <li><a href="#/" onclick="dropDownItem('3 minutes', '#btTimeframe')">3 minutes</a></li>
-                <li><a href="#/" onclick="dropDownItem('5 minutes', '#btTimeframe')">5 minutes</a></li>
-                <li><a href="#/" onclick="dropDownItem('15 minutes', '#btTimeframe')">15 minutes</a></li>
-                <li><a href="#/" onclick="dropDownItem('30 minutes', '#btTimeframe')">30 minutes</a></li>
-                <li><a href="#/" onclick="dropDownItem('1 hour', '#btTimeframe')">1 hour</a></li>
-                <li><a href="#/" onclick="dropDownItem('2 hours', '#btTimeframe')">2 hours</a></li>
-                <li><a href="#/" onclick="dropDownItem('4 hours', '#btTimeframe')">4 hours</a></li>
-                <li><a href="#/" onclick="dropDownItem('6 hours', '#btTimeframe')">6 hours</a></li>
-                <li><a href="#/" onclick="dropDownItem('12 hours', '#btTimeframe')">12 hours</a></li>
-                <li><a href="#/" onclick="dropDownItem('1 day', '#btTimeframe')">1 day</a></li>
-              </ul>
+              <input autocomplete="off" class="search blue" id="btFeeSearch" type="number" placeholder="Fee" value="0.075"/>
             </div>
           </div>
           <br>
@@ -87,7 +73,7 @@
         </div>
         <div id="btResult" class="display-none font-large">
           <h2 class="text-center">Result</h2>
-          <div class="text-center margin-s-b10">The commissions are included in all results. Commission rate: <span id="btFeeRate">0.05</span>%</div>
+          <div class="text-center margin-s-b10">The trading fees are included in the results.</div>
           <div class="features alt">
             <section>
               <h3><i class=" fas fa-rocket"></i>&nbsp;Performance</h3>
@@ -103,8 +89,7 @@
               <h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> Strategy:&nbsp;
               <span id="btStrategyRes"></span><br> Exchange:&nbsp;
               <span id="btExchangeRes"></span><br> Instrument:&nbsp;
-              <span id="btInstrumentRes"></span><br> Timeframe:&nbsp;
-              <span id="btTimeframeRes"></span><br> Period Start:&nbsp;
+              <span id="btInstrumentRes"></span><br> Period Start:&nbsp;
               <span id="btPeriodFromRes"></span><br> Period End:&nbsp;
               <span id="btPeriodToRes"></span><br>
             </section>

@@ -5,13 +5,16 @@ function tsExecTypeChange() {
   if ($('#trExecTypeSignals').is(':checked')) {
     $('#tsPosSizeDiv').hide();
     $('#tsMaxLossDiv').hide();
+    $('#feeRateDiv').hide();
     $('#emailDiv').show();
   } else if ($('#trExecTypeSim').is(':checked')) {
     $('#emailDiv').hide();
     $('#tsPosSizeDiv').show();
     $('#tsMaxLossDiv').show();
+    $('#feeRateDiv').show();
   } else if ($('#trExecTypeTrade').is(':checked')) {
     $('#emailDiv').hide();
+    $('#feeRateDiv').hide();
     $('#tsPosSizeDiv').show();
     $('#tsMaxLossDiv').show();
     let exchange = $('#tsExchangeCombobox').text();
@@ -93,34 +96,6 @@ async function tsInstrumentKeyup() {
   } catch (err) {}
 }
 
-function getQuotedCurrency(pair) {
-  if (pair.toLowerCase().endsWith("btc")) {
-    return "BTC";
-  } else if (pair.toLowerCase().endsWith("eth")) {
-    return "ETH";
-  } else if (pair.toLowerCase().endsWith("bnb")) {
-    return "BNB";
-  } else if (pair.toLowerCase().endsWith("usdt")) {
-    return "USDT";
-  } else {
-    return '';
-  }
-}
-
-function getBaseCurrency(pair) {
-  if (pair.toLowerCase().endsWith("btc")) {
-    return pair.substring(0, pair.toLowerCase().lastIndexOf("btc")).toUpperCase();
-  } else if (pair.toLowerCase().endsWith("eth")) {
-    return pair.substring(0, pair.toLowerCase().lastIndexOf("eth")).toUpperCase();
-  } else if (pair.toLowerCase().endsWith("bnb")) {
-    return pair.substring(0, pair.toLowerCase().lastIndexOf("bnb")).toUpperCase();
-  } else if (pair.toLowerCase().endsWith("usdt")) {
-    return pair.substring(0, pair.toLowerCase().lastIndexOf("usdt")).toUpperCase();
-  } else {
-    return '';
-  }
-}
-
 async function tsFillInstrument(name) {
   $('#tsInstrument>div>ul').hide();
   $('#tsInstrumentSearch').val(name);
@@ -189,7 +164,6 @@ async function executeStrategy() {
     let email = $('#emailBox').val();
     let exchange = $('#tsExchangeCombobox').text();
     let instrument = $('#tsInstrumentSearch').val().toUpperCase();
-    let timeframe = $('#tsTimeframeCombobox').text();
     if (email.indexOf('@') === -1) {
       email = null;
     }
@@ -209,11 +183,6 @@ async function executeStrategy() {
       }
     }
 
-    if (timeframe === 'Choose Timeframe') {
-      openModalInfo('Please Choose Timeframe!');
-      return;
-    }
-
     let strategy = await getStrategyByName(strategyName);
     if (strategy === null) {
       openModalInfo('Please Choose a Strategy!');
@@ -221,13 +190,25 @@ async function executeStrategy() {
       return;
     }
 
+    let timeframes = getTimeframes(strategy);
+    if (timeframes === null) {
+      openModalInfo('<h3 class="text-red text-center">ERROR</h3><div class="text-red">Your strategy contains a rule without a timeframe. Please edit your strategy!</div>');
+      return;
+    }
+
     let positionSize = '';
     let maxLoss = null;
     let executionType = 'Alerts';
+    let feeRate = null;
     if ($('#trExecTypeTrade').is(':checked')) {
       executionType = 'Trading';
     } else if ($('#trExecTypeSim').is(':checked')) {
       executionType = 'Simulation';
+      feeRate = Number.parseFloat($('#trFeeBox').val());
+      if (feeRate <= 0) {
+        openModalInfo('Fee rate should be a positive number!');
+        return;
+      }
     }
 
     if ($('#trExecTypeTrade').is(':checked') || $('#trExecTypeSim').is(':checked')) {
@@ -303,27 +284,29 @@ async function executeStrategy() {
       strategy: strategy,
       exchange: exchange,
       instrument: instrument,
-      timeframe: getTimeframe(timeframe),
       positionSize: positionSize,
       status: 'starting',
       maxLoss: maxLoss,
       trades: [],
       trailingSlPriceUsed: null,
-      email: email
+      email: email,
+      feeRate: feeRate,
+      timeframes: timeframes
     }
     addExecutionToDb(curExecution);
     let resStr = '0.00%';
     if (executionType === "Alerts") {
       resStr = '';
     }
-    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td>' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td>' + curExecution.timeframe + '</td><td class="text-center" id="executedTrades' + dbId + '">0</td>' + '<td><span id="executionRes' + dbId + '">' + resStr + '</span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + dbId + '\')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + dbId + '"></td><td id="terminateStrBtn' + dbId + '">Starting..</td></tr>');
+
+    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td>' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="executedTrades' + dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td><span id="executionRes' + dbId + '">' + resStr + '</span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + dbId + '\')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + dbId + '"></td><td id="terminateStrBtn' + dbId + '">Starting..</td></tr>');
 
     await runStrategy(dbId);
     $('html,body').animate({
       scrollTop: document.body.scrollHeight
     }, "fast");
   } catch (err) {
-    openModalInfo('Internal Error Occurred!<br>' + err);
+    openModalInfo('Internal Error Occurred!<br>' + err.stack);
   } finally {
     $('#executeStrategyBtn').removeClass('disabled');
     executionMutex.release();
@@ -358,7 +341,7 @@ async function checkMaxLossReached(id) {
   }
   let totalGainLoss = execution.positionSize * (result / 100);
   if (totalGainLoss <= execution.maxLoss) {
-    let errorMsg = 'Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' on ' + execution.timeframe + ' has reached the maximum loss.<br>The execution was stopped.';
+    let errorMsg = 'Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' has reached the maximum loss.<br>The execution was stopped.';
     stopStrategyExecution(id, errorMsg);
     openModalInfo(errorMsg);
     execution.error = errorMsg;
@@ -376,6 +359,17 @@ async function runStrategy(id) {
   try {
     $('#terminateStrBtn' + id).html('Starting..');
     let execution = await getExecutionById(id);
+
+    let timeframes = getTimeframes(execution.strategy);
+    if (timeframes === null) {
+      let errorMsg = 'Your strategy contains a rule without a timeframe. Please remove this execution and edit your strategy!';
+      execution.error = errorMsg;
+      await updateExecutionDb(execution);
+      $('#terminateStrBtn' + id).html('Error&nbsp;<a title="Show Error" href="#/" onclick="showErrorMsg(\'' + errorMsg + '\', ' + id + ')"><i class="fas fa-question-circle"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
+      openModalInfoBig('<h3 class="text-red text-center">ERROR</h3><div class="text-red">' + errorMsg + '</div>');
+      return;
+    }
+
     if (execution.type === 'Trading') {
       if (exchangesApiKeys[execution.exchange] === undefined) {
         openModalConfirm('<div class="text-justify">Please provide your API key for ' + execution.exchange + '. </div><br><div class="text-left"><span class="inline-block min-width5">API Key:&nbsp;</span><input class="min-width20" id="exchangeApiKey" type="text" placeholder="API KEY" /><br>' + '<span class="inline-block min-width5">Secret:&nbsp;</span><input class="min-width20" id="exchangeApiSecret" type="text" placeholder="Secret" /></div><br><div class="text-justify">Your key and secret are not stored anywhere by this application.</div>', async function() {
@@ -439,11 +433,11 @@ async function runStrategy(id) {
               $('#terminateStrBtn' + id).html('Failed&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
               break;
             case 'ERROR':
-              let errorMsg = data.replace("'", "") + '<br><br>The execution of the strategy was stopped!'
-              openModalInfoBig(errorMsg);
+              let errorMsg = data.replace("'", "") + '<br><br>The execution of the strategy was stopped!';
               stopStrategyExecution(id, errorMsg);
               execution.error = errorMsg;
               await updateExecutionDb(execution);
+              showErrorMsg(errorMsg, id);
               break;
             case 'LAST_UPDATED':
               $('#lastUpdatedExecution' + id).html(formatDateNoYear(new Date()));
@@ -470,10 +464,13 @@ async function runStrategy(id) {
                 sendEmail(execution, 'BUY', additionalData, data);
               } else {
                 execution.trades.push(data);
-                $('#executionFeeRate').html((additionalData / 2).toFixed(3));
+              }
+              if (execution.type === 'Trading' && execution.feeRate === null || execution.feeRate === undefined) {
+                execution.feeRate = additionalData;
               }
               await updateExecutionDb(execution);
               $('#executedTrades' + id).html(execution.trades.length);
+              $('#openTrade' + id).html('<i class="fa fa-check"></i>');
               break;
             case 'SELL':
               if (execution.type === 'Alerts') {
@@ -487,24 +484,37 @@ async function runStrategy(id) {
                 execution.takeProfitOrderId = null;
                 await updateExecutionDb(execution);
                 fillExecResInTable(execution.trades, id);
+                $('#openTrade' + id).html('');
                 await checkMaxLossReached(id);
               }
               break;
             default:
           };
         } catch (err) {
-          openModalInfo('Internal Error Occurred!!!<br>' + err);
+          openModalInfo('Internal Error Occurred!!!<br>' + err.stack);
         } finally {
           runMutex.release();
         }
       }, false);
 
-      wk.postMessage([execution, apiKey, apiSecret]);
       executionWorkers.push({status: 'running', execId: id, wk: wk});
+      wk.postMessage([execution, apiKey, apiSecret]);
     }
   } catch (err) {
-    openModalInfo('Internal Error Occurred!!!!<br>' + err);
+    openModalInfo('Internal Error Occurred!!!!<br>' + err.stack);
   }
+}
+
+function showErrorMsg(msg, id) {
+  openModalInfoBig('<h3 class="text-red text-center">ERROR</h3><div class="text-red">' + msg + '</div><br><div class="text-center"><a class="button alt white" title="Clear Error" href="#/" onclick="clearError(' + id + ')">Clear Error</a></div>')
+}
+
+async function clearError(id) {
+  let execution = await getExecutionById(id);
+  execution.error = null;
+  await updateExecutionDb(execution);
+  $('#terminateStrBtn' + id).html('Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="resumeExecution(' + id + ')"><i class="fas fa-play"></i></a>');
+  openModalInfo('<h3>Error cleared!</h3>You can resume the execution of your strategy by clicking the play button.');
 }
 
 async function rmExecutionFromTable(id) {
@@ -524,28 +534,32 @@ async function rmExecutionFromTable(id) {
 }
 
 async function resumeExecution(id) {
+  let hasWorker = false;
   for (let worker of executionWorkers) {
     if (worker.execId == id) {
-      worker.wk.postMessage('RESUME');
       worker.status = 'running';
+      $('#terminateStrBtn' + id).html('Starting..');
+      worker.wk.postMessage('RESUME');
+      hasWorker = true;
       break;
     }
   }
-  $('#terminateStrBtn' + id).html('Starting..');
+  if (!hasWorker) {
+    runStrategy(id);
+  }
 }
 
 function stopStrategyExecution(id, errorMsg) {
+
   for (let worker of executionWorkers) {
     if (worker.execId == id) {
-      worker.wk.postMessage('PAUSE');
       worker.status = 'paused';
+      worker.wk.postMessage('PAUSE');
       break;
     }
   }
-  let status = 'Stopped';
   if (errorMsg !== null && errorMsg !== undefined) {
-    status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + errorMsg + '\')"><i class="fas fa-question-circle"></i></a>';
-    $('#terminateStrBtn' + id).html('Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + errorMsg.replace("'", "") + '\')"><i class="fas fa-question-circle"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
+    $('#terminateStrBtn' + id).html('Error&nbsp;<a title="Show Error" href="#/" onclick="showErrorMsg(\'' + errorMsg + '\',' + id + ')"><i class="fas fa-question-circle"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
   } else {
     $('#terminateStrBtn' + id).html('Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="resumeExecution(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
   }
@@ -587,6 +601,11 @@ async function showExecutionResult(id) {
     let biggestLost = 0;
 
     let count = 1;
+    if (execution.feeRate !== null && execution.feeRate !== undefined) {
+      $('#executionFeeRate').html('Fee Rate per trade: ' + execution.feeRate.toFixed(4) + '%');
+    } else {
+      $('#executionFeeRate').html('');
+    }
     for (let trade of execution.trades) {
       if (trade.closeDate !== undefined) {
         let classes = '';
@@ -672,7 +691,6 @@ async function showExecutionResult(id) {
   $('#executionStrategyRes').html(execution.name);
   $('#executionExchangeRes').html(execution.exchange);
   $('#executionInstrumentRes').html(execution.instrument);
-  $('#executionTimeframeRes').html(execution.timeframe);
   $('#tradeBody').css('opacity', '0.5');
   $('#tradeBody').css('pointer-events', 'none');
   $('#sidebar').css('opacity', '0.5');
@@ -722,11 +740,34 @@ async function fillOldExecutions() {
     if (executions !== null && executions.length > 0) {
       for (let execution of executions) {
 
+        //Check for old version strategies without individual rule timeframes
+        let hasRuleWithNoTf = false;
+        for (let rule of execution.strategy.buyRules) {
+          if (rule.timeframe === null || rule.timeframe === undefined) {
+            hasRuleWithNoTf = true;
+            break;
+          }
+        }
+        for (let rule of execution.strategy.sellRules) {
+          if (rule.timeframe === null || rule.timeframe === undefined) {
+            hasRuleWithNoTf = true;
+            break;
+          }
+        }
+        if (hasRuleWithNoTf) {
+          execution.error = 'This strategy contains rules without individual timeframes. You will not be able to resume the execution. You can remove this execution, edit the strategy by adding timeframes to each rule and then execute it again.';
+          updateExecutionDb(executions);
+        }
+
         let status = 'Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="runStrategy(' + execution.id + ')"><i class="fas fa-play"></i></a>';
         if (execution.error !== null && execution.error !== undefined) {
-          status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="openModalInfoBig(\'' + execution.error + '\')"><i class="fas fa-question-circle"></i></a>'
+          status = 'Error&nbsp;<a title="Show Error" href="#/" onclick="showErrorMsg(\'' + execution.error + '\',' + execution.id + ')"><i class="fas fa-question-circle"></i></a>'
         }
-        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td>' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td>' + execution.timeframe + '</td><td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td>' + '<td><span id="executionRes' + execution.id + '"></span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + execution.id + ')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + execution.id + '"></td><td id="terminateStrBtn' + execution.id + '">' + status + '&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + execution.id + ')"><i class="fas fa-times"></i></a></td></tr>');
+        let openTrade = '';
+        if (execution.trades.length > 0 && execution.trades[execution.trades.length - 1].exit === undefined) {
+          openTrade = '<i class="fa fa-check"></i>';
+        }
+        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td>' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td><td class="text-center" id="openTrade' + execution.id + '">' + openTrade + '</td><td><span id="executionRes' + execution.id + '"></span>&nbsp;' + '<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + execution.id + ')"><i class="far fa-file-alt"></i></a>&nbsp;</td>' + '<td id="lastUpdatedExecution' + execution.id + '"></td><td id="terminateStrBtn' + execution.id + '">' + status + '&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + execution.id + ')"><i class="fas fa-times"></i></a></td></tr>');
         if (execution.type !== 'Alerts') {
           fillExecResInTable(execution.trades, execution.id);
         }

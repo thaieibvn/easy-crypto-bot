@@ -93,9 +93,10 @@ async function runOptimize() {
     openModalInfo('Cannot run optimization while executing backtest!');
     return;
   }
+  $('#runOptBtn').addClass('disabled');
   if (hasTradingStrategies()) {
     let continueExecution = 0;
-    openModalConfirmBig('You have realtime strategies running under Trade & Alerts tab. It is highly recommended to pause them before using the optimization feature, as it consumes a lot of your PC resources and the realtime execution may not be executed in time!<br><div class="text-center">Continue anyway?</div>', function() {
+    openModalConfirm('<h3>Warning</h3><div style="text-align:justify">You have realtime strategies running under Trade & Alerts tab. It is highly recommended to pause them before using the optimization feature, as it consumes a lot of your PC resources and the realtime execution may not be executed in time!</div><br><div class="text-center">Continue anyway?</div>', function() {
       continueExecution = 1
     }, function() {
       continueExecution = -1
@@ -106,6 +107,7 @@ async function runOptimize() {
       let continueExecution = 0;
     }
     if (continueExecution === -1) {
+      $('#runOptBtn').removeClass('disabled');
       return;
     }
   }
@@ -114,24 +116,28 @@ async function runOptimize() {
   let strategyName = $('#opStrategyCombobox').text();
   let exchange = $('#opExchangeCombobox').text();
   let instrument = $('#opInstrumentSearch').val().toUpperCase();
-  let timeframe = $('#opTimeframeCombobox').text();
+  let feeRate = $('#opFeeSearch').val();
   if (strategyName === 'Choose Strategy') {
     openModalInfo('Please Choose a Strategy!');
+    $('#runOptBtn').removeClass('disabled');
     return;
   }
   if (exchange === 'Choose Exchange') {
     openModalInfo('Please Choose an Exchange!');
+    $('#runOptBtn').removeClass('disabled');
     return;
   }
   if (exchange === 'Binance') {
     let instruments = await getBinanceInstruments();
     if (!(instrument in instruments)) {
       openModalInfo('Invalid Instrument!<br>Please Choose an Instrument!');
+      $('#runOptBtn').removeClass('disabled');
       return;
     }
   }
-  if (timeframe === 'Choose Timeframe') {
-    openModalInfo('Please Choose Timeframe!');
+  if (feeRate <= 0) {
+    openModalInfo('Fee rate should be a positive number!');
+    $('#runOptBtn').removeClass('disabled');
     return;
   }
   let startDateStr = $('#opFromDate').val();
@@ -140,6 +146,7 @@ async function runOptimize() {
   let startDate = new Date(startDateStr);
   if (isNaN(startDate.getTime())) {
     openModalInfo('Please Choose a Start Date!');
+    $('#runOptBtn').removeClass('disabled');
     return;
   }
   startDate.setHours(0, 0, 0, 0);
@@ -147,10 +154,12 @@ async function runOptimize() {
 
   if (isNaN(endDate.getTime())) {
     openModalInfo('Please Choose an End Date!');
+    $('#runOptBtn').removeClass('disabled');
     return;
   }
   if (startDate >= endDate) {
     openModalInfo('Start Date must be before End Date!');
+    $('#runOptBtn').removeClass('disabled');
     return;
   }
   endDate.setHours(23, 59, 59, 59);
@@ -159,11 +168,13 @@ async function runOptimize() {
   endDateTmp.setDate(endDateTmp.getDate() - 1);
   if (startDate < endDateTmp) {
     openModalInfo('The maximum period is 3 months. Please change the selected dates.');
+    $('#runOptBtn').removeClass('disabled');
     return;
   }
 
   if (startDate >= endDate) {
     openModalInfo('Start Date must be before End Date!');
+    $('#runOptBtn').removeClass('disabled');
     return;
   }
 
@@ -175,10 +186,10 @@ async function runOptimize() {
       openModalInfo('Please Choose a Strategy!');
       $('#opStrategyCombobox').html('Choose Strategy');
       optimizationRunning = false;
+      $('#runOptBtn').removeClass('disabled');
       return;
     }
 
-    $('#runOptBtn').addClass('disabled');
     $('#opRunPercent').html('Starting Optimization..');
     $('#opRunPercent2').hide();
     $('#opRunRocket').hide();
@@ -191,22 +202,44 @@ async function runOptimize() {
     $('#opResultDiv').show();
     $('#opStrategiesTable').html('<thead><tr><td>Strategy</td><td>Total Return</td><td>Max Drawdown</td><td>Winning %</td><td>Avg. Trade</td><td>Best Trade</td><td>Worst Trade</td><td>Trades N.</td><td>Save</td></tr></thead><tbody>');
     $('#opCancelDiv').show();
-    let ticks = await getBinanceTicks(instrument, getTimeframe(timeframe), getStartDate(timeframe, startDate), endDate, false);
-    if (opExecutionCanceled) {
-      return;
-    }
-    if (ticks === null) {
+
+    let timeframes = getTimeframes(strategy);
+    if (timeframes === null) {
       $('#runOptBtn').removeClass('disabled');
       $('#opRunning').hide();
       $('#opResult').hide();
-      openModalInfo('Could not optain data from ' + exchange + ' for the given period. The period may be too long. Please try with smaller period or try later!');
+      openModalInfo('Your strategy contains a rule without a timeframe. Please edit your strategy!');
       optimizationRunning = false;
+      $('#runBacktestBtn').removeClass('disabled');
       return;
     }
+
+    let ticks = {};
+    for (let tf of timeframes) {
+      let tfTicks = await getBinanceTicks(instrument, getShortTimeframe(tf), getStartDate(tf, startDate), endDate, false);
+      if (tfTicks === null) {
+        $('#runOptBtn').removeClass('disabled');
+        $('#opRunning').hide();
+        $('#opResult').hide();
+        if (!opExecutionCanceled) {
+          openModalInfo('Could not optain data from ' + exchange + ' for the given period. The period may be too long. Please try with smaller period or try again later!');
+        }
+        optimizationRunning = false;
+        $('#runBacktestBtn').removeClass('disabled');
+        return;
+      }
+      ticks[tf] = tfTicks;
+
+      if (opExecutionCanceled) {
+        return;
+      }
+    }
+
     marketReturn = 0;
-    for (let tick of ticks) {
+    let ticksTmp = ticks[timeframes[0]];
+    for (let tick of ticksTmp) {
       if (tick.d >= startDate) {
-        marketReturn = ((ticks[ticks.length - 1].c - tick.o) / tick.o) * 100;
+        marketReturn = ((ticksTmp[ticksTmp.length - 1].c - tick.o) / tick.o) * 100;
         break;
       }
     }
@@ -224,7 +257,7 @@ async function runOptimize() {
       let rulesTmp = fullOptimization
         ? getFullRulesVariations(rule, rulesCount, changeStoploss)
         : getFineTuneRulesVariations(rule, rulesCount, changeStoploss);
-      strategyVariations = await getNewStrategyVariations(rulesTmp, strategyVariations, 'buy', strategy, instrument, getTimeframe(timeframe));
+      strategyVariations = await getNewStrategyVariations(rulesTmp, strategyVariations, 'buy', strategy, instrument);
       if (checkTooManyVariations()) {
         optimizationRunning = false;
         return;
@@ -234,7 +267,7 @@ async function runOptimize() {
       let rulesTmp = fullOptimization
         ? getFullRulesVariations(rule, rulesCount, changeStoploss)
         : getFineTuneRulesVariations(rule, rulesCount, changeStoploss);
-      strategyVariations = await getNewStrategyVariations(rulesTmp, strategyVariations, 'sell', strategy, instrument, getTimeframe(timeframe));
+      strategyVariations = await getNewStrategyVariations(rulesTmp, strategyVariations, 'sell', strategy, instrument);
       if (checkTooManyVariations()) {
         optimizationRunning = false;
         return;
@@ -327,7 +360,7 @@ async function runOptimize() {
               openModalInfo('Unexpected Internal Error Occurred!<br>' + e.data);
             }
           } catch (err) {
-            openModalInfo('Internal Error Occurred!<br>' + err);
+            openModalInfo('Internal Error Occurred!<br>' + err.stack);
           } finally {
             executionOpMutex.release();
           }
@@ -343,7 +376,14 @@ async function runOptimize() {
           optimizationRunning = false;
           return;
         }
-        opExecutionWorkers[i].postMessage(['INITIALIZE', i, timeframe, startDate, ticks]);
+        opExecutionWorkers[i].postMessage([
+          'INITIALIZE',
+          i,
+          timeframes,
+          startDate,
+          ticks,
+          feeRate
+        ]);
         runningWorkiers++;
       } finally {
         opWorkerTerminateMutex.release();
@@ -354,7 +394,7 @@ async function runOptimize() {
     $('#opRunning').hide();
     optimizationRunning = false;
     await terminateOpWorkers();
-    openModalInfo('Internal Error Occurred!<br>' + err);
+    openModalInfo('Internal Error Occurred!<br>' + err.stack);
   }
 }
 
@@ -394,7 +434,9 @@ async function terminateOpWorkers() {
     await opWorkerTerminateMutex.lock();
     opExecutionCanceled = true;
     for (let i = 0; i < maxOpWorkers; i++) {
-      opExecutionWorkers[i].postMessage(['STOP']);
+      if (opExecutionWorkers[i] !== undefined) {
+        opExecutionWorkers[i].postMessage(['STOP']);
+      }
     }
     while (runningWorkiers > 0) {
       await sleep(500);
@@ -456,7 +498,7 @@ async function fillOptimizationResult(marketReturn) {
 
     await terminateOpWorkers();
   } catch (err) {
-    openModalInfo('Internal Error Occurred!<br>' + err);
+    openModalInfo('Internal Error Occurred!<br>' + err.stack);
   }
 }
 
@@ -1079,6 +1121,7 @@ function getFineTuneRulesVariations(rule, rulesCount, changeStoploss) {
           }
           let ruleTmp = {};
           ruleTmp.indicator = rule.indicator;
+          ruleTmp.timeframe = rule.timeframe;
           ruleTmp.direction = rule.direction;
           ruleTmp.crossDirection = rule.crossDirection;
           ruleTmp.period = p;
@@ -1088,6 +1131,7 @@ function getFineTuneRulesVariations(rule, rulesCount, changeStoploss) {
       } else {
         let ruleTmp = {};
         ruleTmp.indicator = rule.indicator;
+        ruleTmp.timeframe = rule.timeframe;
         ruleTmp.direction = rule.direction;
         ruleTmp.crossDirection = rule.crossDirection;
         ruleTmp.period = p;
@@ -1105,6 +1149,7 @@ function getFineTuneRulesVariations(rule, rulesCount, changeStoploss) {
         }
         let ruleTmp = {};
         ruleTmp.indicator = rule.indicator;
+        ruleTmp.timeframe = rule.timeframe;
         ruleTmp.type = rule.type;
         ruleTmp.type2 = rule.type2;
         ruleTmp.crossDirection = rule.crossDirection;
@@ -1126,6 +1171,7 @@ function getFineTuneRulesVariations(rule, rulesCount, changeStoploss) {
         }
         let ruleTmp = {};
         ruleTmp.indicator = rule.indicator;
+        ruleTmp.timeframe = rule.timeframe;
         ruleTmp.direction = rule.direction;
         ruleTmp.crossDirection = rule.crossDirection;
         ruleTmp.period = p;
@@ -1154,6 +1200,7 @@ function getFineTuneRulesVariations(rule, rulesCount, changeStoploss) {
                 }
                 let ruleTmp = {};
                 ruleTmp.indicator = rule.indicator;
+                ruleTmp.timeframe = rule.timeframe;
                 ruleTmp.type = rule.type;
                 ruleTmp.direction = rule.direction;
                 ruleTmp.crossDirection = rule.crossDirection;
@@ -1166,6 +1213,7 @@ function getFineTuneRulesVariations(rule, rulesCount, changeStoploss) {
             } else {
               let ruleTmp = {};
               ruleTmp.indicator = rule.indicator;
+              ruleTmp.timeframe = rule.timeframe;
               ruleTmp.type = rule.type;
               ruleTmp.direction = rule.direction;
               ruleTmp.crossDirection = rule.crossDirection;
@@ -1178,6 +1226,7 @@ function getFineTuneRulesVariations(rule, rulesCount, changeStoploss) {
         } else {
           let ruleTmp = {};
           ruleTmp.indicator = rule.indicator;
+          ruleTmp.timeframe = rule.timeframe;
           ruleTmp.type = rule.type;
           ruleTmp.direction = rule.direction;
           ruleTmp.crossDirection = rule.crossDirection;
@@ -1608,6 +1657,7 @@ function getFullRulesVariations(rule, rulesCount, changeStoploss) {
         for (let v of maStepV) {
           let ruleTmp = {};
           ruleTmp.indicator = rule.indicator;
+          ruleTmp.timeframe = rule.timeframe;
           ruleTmp.direction = rule.direction;
           ruleTmp.crossDirection = rule.crossDirection;
           ruleTmp.period = p;
@@ -1617,6 +1667,7 @@ function getFullRulesVariations(rule, rulesCount, changeStoploss) {
       } else {
         let ruleTmp = {};
         ruleTmp.indicator = rule.indicator;
+        ruleTmp.timeframe = rule.timeframe;
         ruleTmp.direction = rule.direction;
         ruleTmp.crossDirection = rule.crossDirection;
         ruleTmp.period = p;
@@ -1631,6 +1682,7 @@ function getFullRulesVariations(rule, rulesCount, changeStoploss) {
         }
         let ruleTmp = {};
         ruleTmp.indicator = rule.indicator;
+        ruleTmp.timeframe = rule.timeframe;
         ruleTmp.type = rule.type;
         ruleTmp.type2 = rule.type2;
         ruleTmp.crossDirection = rule.crossDirection;
@@ -1646,6 +1698,7 @@ function getFullRulesVariations(rule, rulesCount, changeStoploss) {
       for (let v of rsiStepV) {
         let ruleTmp = {};
         ruleTmp.indicator = rule.indicator;
+        ruleTmp.timeframe = rule.timeframe;
         ruleTmp.direction = rule.direction;
         ruleTmp.crossDirection = rule.crossDirection;
         ruleTmp.period = p;
@@ -1665,6 +1718,7 @@ function getFullRulesVariations(rule, rulesCount, changeStoploss) {
               for (let v of macdStepV) {
                 let ruleTmp = {};
                 ruleTmp.indicator = rule.indicator;
+                ruleTmp.timeframe = rule.timeframe;
                 ruleTmp.type = rule.type;
                 ruleTmp.direction = rule.direction;
                 ruleTmp.crossDirection = rule.crossDirection;
@@ -1677,6 +1731,7 @@ function getFullRulesVariations(rule, rulesCount, changeStoploss) {
             } else {
               let ruleTmp = {};
               ruleTmp.indicator = rule.indicator;
+              ruleTmp.timeframe = rule.timeframe;
               ruleTmp.type = rule.type;
               ruleTmp.direction = rule.direction;
               ruleTmp.crossDirection = rule.crossDirection;
@@ -1689,6 +1744,7 @@ function getFullRulesVariations(rule, rulesCount, changeStoploss) {
         } else {
           let ruleTmp = {};
           ruleTmp.indicator = rule.indicator;
+          ruleTmp.timeframe = rule.timeframe;
           ruleTmp.type = rule.type;
           ruleTmp.direction = rule.direction;
           ruleTmp.crossDirection = rule.crossDirection;
@@ -1945,7 +2001,7 @@ async function getFullStoplossAndTargetVariations(strategyVariations, rulesCount
   return newStrategyVariations;
 }
 
-async function getNewStrategyVariations(newRules, strategyVariations, type, strategy, instrument, timeframe) {
+async function getNewStrategyVariations(newRules, strategyVariations, type, strategy, instrument) {
   let newStrategyVariations = [];
   let count = 0;
   for (let newRule of newRules) {
@@ -1956,7 +2012,7 @@ async function getNewStrategyVariations(newRules, strategyVariations, type, stra
         }
         count++;
         let newSstrategy = {};
-        newSstrategy.name = strategy.name + ' (' + instrument + ' ' + timeframe + ')';
+        newSstrategy.name = strategy.name + ' (' + instrument + ' Opt.)';
         newSstrategy.timeClose = strategy.timeClose;
         newSstrategy.buyRules = [];
         newSstrategy.sellRules = [];
@@ -1979,7 +2035,7 @@ async function getNewStrategyVariations(newRules, strategyVariations, type, stra
       }
     } else {
       let newSstrategy = {};
-      newSstrategy.name = strategy.name + ' (' + instrument + ' ' + timeframe + ')';
+      newSstrategy.name = strategy.name + ' (' + instrument + ' Opt.)';
       newSstrategy.timeClose = strategy.timeClose;
       newSstrategy.buyRules = [];
       newSstrategy.sellRules = [];

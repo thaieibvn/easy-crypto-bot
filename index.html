@@ -7,6 +7,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<script src="assets/js/utils.js"></script>
 	<script src="assets/js/my-util.js"></script>
 	<script src="assets/js/strategies.js"></script>
 	<link rel="stylesheet" href="assets/css/fontawesome-all.min.css">
@@ -33,8 +34,8 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 				</ul>
 			</nav>
 		</div>
-	<!--	<div id="updateAvailable"><a id="updateBtn" class="blink display-none" href="#">UPDATE AVAILABLE</a>
-			<a id="checkForUpdateBtn" onclick="checkForUpdates({type: 'manual-check'}, true, true)" href="#">CHECK FOR UPDATE</a></div>-->
+		<div id="updateAvailable"><a id="updateBtn" class="blink display-none" href="#">UPDATE AVAILABLE</a>
+			<a id="checkForUpdateBtn" onclick="checkForUpdates({type: 'manual-check'}, true, true)" href="#">CHECK FOR UPDATE</a></div>
 	</section>
 
 	<!-- Wrapper -->
@@ -45,8 +46,11 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 				<div>
 					<div class="text-center">
 						<h2 id="newStrategyLabel">Create New Strategy</h2> Name: <input class="white" id="strategyName" type="text" /> &nbsp;
-						<a id="duplicateStrategyBtn" href="#/" onclick="duplicateStrategy()" class="button alt white display-none"><i class="fas fa-copy"></i> Duplicate</a></div>
+						<a id="duplicateStrategyBtn" href="#/" onclick="duplicateStrategy()" class="button alt white display-none"><i class="fas fa-copy"></i> Duplicate</a>
+						<p>You can use up to 2 different timeframes in your rules.</p>
+					</div>
 				</div>
+
 				<hr />
 				<h3 class="text-center">1. Open Position: BUY when all of the following rules are met:</h3>
 				<div class="text-center margin-b10">
@@ -119,7 +123,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 			<a class="close-modal" onclick="closeExecutionWindow()" href="#/"><i class="text-red fas fa-times"></i></a>
 			<div class="text-center">
 				<h2 id="executionDetailsLabel" class="text-center ">Execution Details</h2>
-				<div id="executionDetailsLabel2" class="margin-s-b10">The commissions are included in all results. Commission rate: <span id="executionFeeRate">0.075</span>% per single trade</div>
+				<div id="executionDetailsLabel2" class="margin-s-b10">The trading fees are included in the results. <span id="executionFeeRate"></span></div>
 				<div class="features alt text-left">
 					<section class="trade-section">
 						<h3><i class=" fas fa-rocket"></i>&nbsp;Performance</h3> Total Return:&nbsp;
@@ -133,8 +137,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 						<h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> Strategy:&nbsp;
 						<span class="bold" id="executionStrategyRes"></span><br> Exchange:&nbsp;
 						<span class="bold" id="executionExchangeRes"></span><br> Instrument:&nbsp;
-						<span class="bold" id="executionInstrumentRes"></span><br> Timeframe:&nbsp;
-						<span class="bold" id="executionTimeframeRes"></span>
+						<span class="bold" id="executionInstrumentRes"></span>
 						<div id="executionPosSizeResDiv" class="inline"><br> Position Size:&nbsp;
 							<span class="bold" id="executionPosSizeRes"></span></div>
 						<div id="executionMaxLossResDiv" class="inline"><br> Maximum Execution Loss:&nbsp;
@@ -208,10 +211,8 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 	<script>
 		fillDefaultStrategies();
 		checkEulaAccepted();
-		//dailyCheckForUpdates();
-		//hourlyCheckForUpdates();
+		hourlyCheckForUpdates();
 		//getInteractiveContent();
-
 		//removeTmpFiles();
 		enablePowerSaveBlocker();
 

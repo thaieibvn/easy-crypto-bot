@@ -22,7 +22,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 975,
-    minWidth: 800,
+    minWidth: 830,
     minHeight: 300,
     title: "EasyCryptoBot v" + app.getVersion(),
     icon: "./assets/icons/icon.png",
@@ -45,7 +45,7 @@ function createWindow() {
     // when you should delete the corresponding element.
     mainWindow = null
     app.quit();
-  })
+  });
 
   ipcMain.on("download", (event, info) => {
     download(BrowserWindow.getFocusedWindow(), info.url, info.properties).then(dl => mainWindow.webContents.send("download complete", dl.getSavePath()));

@@ -1,11 +1,15 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
-function checkTradeRules(rules, historicalData) {
+function checkTradeRules(rules, historicalDatas) {
   //try {
-  if (rules === null || rules === undefined || rules.length === 0 || historicalData.length < 2) {
+  if (rules === null || rules === undefined || rules.length === 0) {
     return false;
   }
   let rulesMet = 0;
   for (let rule of rules) {
+    let historicalData = historicalDatas[rule.timeframe];
+    if (historicalData.length < 2) {
+      return false;
+    }
     if (rule.indicator === 'sma' || rule.indicator === 'ema') {
       let ma = rule.indicator === 'sma'
         ? calculateSMA(rule.period, historicalData)

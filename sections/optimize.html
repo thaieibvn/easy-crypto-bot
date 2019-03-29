@@ -38,30 +38,17 @@
             </div>
           </div>
           <br>
-
-          <div class="inline" id="opTimeframe">
-            <span class="inline-block min-width5 ">Timeframe:&nbsp;</span>
+          <div class="inline">
+            <span class="inline-block min-width5">Fee Rate %:&nbsp;</span>
             <div class="drop-down-white">
-              <a href="#/" onclick="dropDown('#opTimeframe')"><span id="opTimeframeCombobox" class="name main-field">Choose Timeframe</span> <span class="caret"></span></a>
-              <ul class="backtest-dropdown">
-                <li><a href="#/" onclick="dropDownItem('1 minute', '#opTimeframe')">1 minute</a></li>
-                <li><a href="#/" onclick="dropDownItem('3 minutes', '#opTimeframe')">3 minutes</a></li>
-                <li><a href="#/" onclick="dropDownItem('5 minutes', '#opTimeframe')">5 minutes</a></li>
-                <li><a href="#/" onclick="dropDownItem('15 minutes', '#opTimeframe')">15 minutes</a></li>
-                <li><a href="#/" onclick="dropDownItem('30 minutes', '#opTimeframe')">30 minutes</a></li>
-                <li><a href="#/" onclick="dropDownItem('1 hour', '#opTimeframe')">1 hour</a></li>
-                <li><a href="#/" onclick="dropDownItem('2 hours', '#opTimeframe')">2 hours</a></li>
-                <li><a href="#/" onclick="dropDownItem('4 hours', '#opTimeframe')">4 hours</a></li>
-                <li><a href="#/" onclick="dropDownItem('6 hours', '#opTimeframe')">6 hours</a></li>
-                <li><a href="#/" onclick="dropDownItem('12 hours', '#opTimeframe')">12 hours</a></li>
-                <li><a href="#/" onclick="dropDownItem('1 day', '#opTimeframe')">1 day</a></li>
-              </ul>
+              <input autocomplete="off" class="search main-field white" id="opFeeSearch" type="number" placeholder="Fee" value="0.075"/>
             </div>
           </div>
           <br>
+
           <span class="inline-block min-width5" id="opPeriodFrom">Period from:&nbsp;</span><input class="white" id="opFromDate" type="date" />&nbsp;&nbsp;to:&nbsp;&nbsp;<input class="white" id="opToDate" type="date" />
-          <br>
-          <div id="opStopLossTargetDiv">
+
+          <div id="opStopLossTargetDiv" class="margin-t10 ">
             <span class="inline-block min-width10" id="opStopLossTarget">Stoploss &amp; Target:&nbsp;</span>
             <input type="radio" id="opChangeStoplossNo" name="opChangeStoploss" value="no" checked><label class="min-width10" for="opChangeStoplossNo">Don't change</label>
             &nbsp;<input type="radio" id="opChangeStoplossYes" name="opChangeStoploss" value="yes"> <label for="opChangeStoplossYes">Change</label>

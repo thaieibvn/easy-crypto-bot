@@ -17,162 +17,344 @@ function cancelBacktest() {
   cancelBtExecution = true;
 }
 
-async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) {
+async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
   cancelBtExecution = false;
-  let feeRate = 0.15;
+
+  let timeframes = getTimeframes(strategy);
+
+  let closePrices = {};
+  for (let ft of timeframes) {
+    closePrices[ft] = [];
+  }
+
+  //Fill the additional data prior start date
+  let bigTfIndex = 0;
+  while (ticks[timeframes[0]].length > bigTfIndex) {
+    if (ticks[timeframes[0]][bigTfIndex].d >= startDate) {
+      break;
+    }
+    closePrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].c);
+    bigTfIndex++;
+  }
+
+  let smallTfIndex = 0;
+  if (timeframes.length > 1) {
+    while (ticks[timeframes[1]].length > smallTfIndex) {
+      if (ticks[timeframes[1]][smallTfIndex].d >= startDate) {
+        break;
+      }
+      closePrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].c);
+      smallTfIndex++;
+    }
+  }
+
+  //Search for trades
   let trades = [];
   let tradeType = 'buy';
   let stoploss = Number.MIN_VALUE;
   let target = Number.MAX_VALUE;
   let timeClose = null;
   let trailingSlPriceUsed = -1;
-  let closePrices = [];
-
-  for (let i = 0; i < ticks.length; i++) {
+  while (ticks[timeframes[0]].length > bigTfIndex) {
     if (cancelBtExecution) {
       return null;
     }
-    if (useSleep && i > 100 && i % 100 === 0) {
+    if (useSleep && bigTfIndex > 100 && bigTfIndex % 100 === 0) {
       await sleep(0);
     }
-    let closePrice = ticks[i].c;
-    let openPrice = ticks[i].o;
-    let highPrice = ticks[i].h;
-    let lowPrice = ticks[i].l;
-    let date = ticks[i].d;
-    if (date < startDate) {
-      closePrices.push(closePrice);
-      continue;
-    }
-    if (tradeType === 'buy') {
-      if (checkTradeRules(strategy.buyRules, closePrices)) {
-        //let openWithSpread = addBuySpread(openPrice);
-        let trade = {
-          'openDate': date,
-          'entry': openPrice,
-          /*'entry': openWithSpread > highPrice
-            ? highPrice
-            : openWithSpread,*/
-          'result': 0
-        };
-        if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
-          stoploss = trade.entry * (1 - (strategy.stoploss / 100))
-        }
-        if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
-          trailingSlPriceUsed = trade.entry;
-          stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100))
-        }
-        if (strategy.target !== null && !isNaN(strategy.target)) {
-          target = trade.entry * (1 + (strategy.target / 100))
-        }
-        if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
-          timeClose = new Date(date.getTime());
-          timeClose.setHours(timeClose.getHours() + strategy.timeClose);
-        }
-        trades.push(trade);
-        tradeType = 'sell'
-      }
-    }
 
-    if (tradeType === 'sell') {
-      if (stoploss >= lowPrice) {
-        trades[trades.length - 1]['closeDate'] = date;
-        if (openPrice < smallNumber) {
-          if (stoploss >= openPrice) {
-            let openWithSpread = addSellSpread(openPrice);
-            trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
-              ? openPrice
-              : openWithSpread;
-          } else if (stoploss >= closePrice) {
-            let closeWithSpread = addSellSpread(closePrice);
-            trades[trades.length - 1]['exit'] = closeWithSpread < lowPrice
-              ? closePrice
-              : closeWithSpread;
-          } else {
-            trades[trades.length - 1]['exit'] = lowPrice
+    if (timeframes.length > 1) {
+      let dateTo = getEndPeriod(ticks[timeframes[0]][bigTfIndex].d, timeframes[0]);
+      //calculate end date
+      while (ticks[timeframes[1]].length > smallTfIndex && ticks[timeframes[1]][smallTfIndex].d < dateTo) {
+        if (cancelBtExecution) {
+          return null;
+        }
+        if (useSleep && smallTfIndex > 100 && smallTfIndex % 100 === 0) {
+          await sleep(0);
+        }
+        //TODO extract in separate function
+        let closePrice = ticks[timeframes[1]][smallTfIndex].c;
+        let openPrice = ticks[timeframes[1]][smallTfIndex].o;
+        let highPrice = ticks[timeframes[1]][smallTfIndex].h;
+        let lowPrice = ticks[timeframes[1]][smallTfIndex].l;
+        let date = ticks[timeframes[1]][smallTfIndex].d;
+        if (tradeType === 'buy') {
+          if (checkTradeRules(strategy.buyRules, closePrices)) {
+            //let openWithSpread = addBuySpread(openPrice);
+            let trade = {
+              'openDate': date,
+              'entry': openPrice,
+              /*'entry': openWithSpread > highPrice
+                ? highPrice
+                : openWithSpread,*/
+              'result': 0
+            };
+            if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
+              stoploss = trade.entry * (1 - (strategy.stoploss / 100))
+            }
+            if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
+              trailingSlPriceUsed = trade.entry;
+              stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100))
+            }
+            if (strategy.target !== null && !isNaN(strategy.target)) {
+              target = trade.entry * (1 + (strategy.target / 100))
+            }
+            if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
+              timeClose = new Date(date.getTime());
+              timeClose.setHours(timeClose.getHours() + strategy.timeClose);
+            }
+            trades.push(trade);
+            tradeType = 'sell'
           }
-        } else {
-          trades[trades.length - 1]['exit'] = stoploss > openPrice
-            ? openPrice
-            : stoploss;
         }
-        trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
-        tradeType = 'buy';
-        if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
-          trailingSlPriceUsed = highPrice;
-          stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
-        }
-        closePrices.push(closePrice);
-        continue;
-      }
-      if (target <= highPrice) {
-        trades[trades.length - 1]['closeDate'] = date;
-        if (openPrice < smallNumber) {
-          if (target <= openPrice) {
-            let openWithSpread = addSellSpread(openPrice);
-            trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
-              ? openPrice
-              : openWithSpread;
-          } else if (target <= closePrice) {
-            let closeWithSpread = addSellSpread(closePrice);
-            trades[trades.length - 1]['exit'] = closeWithSpread < lowPrice
-              ? closePrice
-              : closeWithSpread;
-          } else {
-            let highWithSpread = addSellSpread(highPrice);
-            trades[trades.length - 1]['exit'] = highWithSpread < lowPrice
-              ? highPrice
-              : highWithSpread;
+
+        if (tradeType === 'sell') {
+          if (stoploss >= lowPrice) {
+            trades[trades.length - 1]['closeDate'] = date;
+            if (openPrice < smallNumber) {
+              if (stoploss >= openPrice) {
+                let openWithSpread = addSellSpread(openPrice);
+                trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
+                  ? openPrice
+                  : openWithSpread;
+              } else if (stoploss >= closePrice) {
+                let closeWithSpread = addSellSpread(closePrice);
+                trades[trades.length - 1]['exit'] = closeWithSpread < lowPrice
+                  ? closePrice
+                  : closeWithSpread;
+              } else {
+                trades[trades.length - 1]['exit'] = lowPrice
+              }
+            } else {
+              trades[trades.length - 1]['exit'] = stoploss > openPrice
+                ? openPrice
+                : stoploss;
+            }
+            trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+            tradeType = 'buy';
+            if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+              trailingSlPriceUsed = highPrice;
+              stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+            }
+            closePrices[timeframes[1]].push(closePrice);
+            smallTfIndex++;
+            continue;
           }
-        } else {
-          trades[trades.length - 1]['exit'] = target < openPrice
-            ? openPrice
-            : target;
-        }
+          if (target <= highPrice) {
+            trades[trades.length - 1]['closeDate'] = date;
+            if (openPrice < smallNumber) {
+              if (target <= openPrice) {
+                let openWithSpread = addSellSpread(openPrice);
+                trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
+                  ? openPrice
+                  : openWithSpread;
+              } else if (target <= closePrice) {
+                let closeWithSpread = addSellSpread(closePrice);
+                trades[trades.length - 1]['exit'] = closeWithSpread < lowPrice
+                  ? closePrice
+                  : closeWithSpread;
+              } else {
+                let highWithSpread = addSellSpread(highPrice);
+                trades[trades.length - 1]['exit'] = highWithSpread < lowPrice
+                  ? highPrice
+                  : highWithSpread;
+              }
+            } else {
+              trades[trades.length - 1]['exit'] = target < openPrice
+                ? openPrice
+                : target;
+            }
 
-        trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
-        tradeType = 'buy';
+            trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+            tradeType = 'buy';
+            if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+              trailingSlPriceUsed = highPrice;
+              stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+            }
+            closePrices[timeframes[1]].push(closePrice);
+            smallTfIndex++;
+            continue;
+          }
+          if (timeClose !== null && timeClose <= date) {
+            trades[trades.length - 1]['closeDate'] = date;
+            trades[trades.length - 1]['exit'] = openPrice;
+            trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+            tradeType = 'buy';
+            closePrices[timeframes[1]].push(closePrice);
+            smallTfIndex++;
+            continue;
+          }
+
+          if (strategy.sellRules.length === 0) {
+            if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+              trailingSlPriceUsed = highPrice;
+              stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+            }
+            closePrices[timeframes[1]].push(closePrice);
+            smallTfIndex++;
+            continue;
+          }
+          if (checkTradeRules(strategy.sellRules, closePrices)) {
+            //let openWithSpread = addSellSpread(openPrice);
+            trades[trades.length - 1]['closeDate'] = date;
+            trades[trades.length - 1]['exit'] = openPrice;
+            /*trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
+              ? lowPrice
+              : openWithSpread;*/
+            trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+            tradeType = 'buy';
+          }
+
+        }
         if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
           trailingSlPriceUsed = highPrice;
           stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
         }
-        closePrices.push(closePrice);
-        continue;
+        closePrices[timeframes[1]].push(closePrice);
+        smallTfIndex++;
       }
-      if (timeClose !== null && timeClose <= date) {
-        trades[trades.length - 1]['closeDate'] = date;
-        trades[trades.length - 1]['exit'] = openPrice;
-        trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
-        tradeType = 'buy';
-        closePrices.push(closePrice);
-        continue;
-      }
-
-      if (strategy.sellRules.length === 0) {
-        if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
-          trailingSlPriceUsed = highPrice;
-          stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+    } else {
+      //TODO extract in separate function
+      let closePrice = ticks[timeframes[0]][bigTfIndex].c;
+      let openPrice = ticks[timeframes[0]][bigTfIndex].o;
+      let highPrice = ticks[timeframes[0]][bigTfIndex].h;
+      let lowPrice = ticks[timeframes[0]][bigTfIndex].l;
+      let date = ticks[timeframes[0]][bigTfIndex].d;
+      if (tradeType === 'buy') {
+        if (checkTradeRules(strategy.buyRules, closePrices)) {
+          //let openWithSpread = addBuySpread(openPrice);
+          let trade = {
+            'openDate': date,
+            'entry': openPrice,
+            'result': 0
+          };
+          if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
+            stoploss = trade.entry * (1 - (strategy.stoploss / 100))
+          }
+          if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
+            trailingSlPriceUsed = trade.entry;
+            stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100))
+          }
+          if (strategy.target !== null && !isNaN(strategy.target)) {
+            target = trade.entry * (1 + (strategy.target / 100))
+          }
+          if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
+            timeClose = new Date(date.getTime());
+            timeClose.setHours(timeClose.getHours() + strategy.timeClose);
+          }
+          trades.push(trade);
+          tradeType = 'sell'
         }
-        closePrices.push(closePrice);
-        continue;
       }
-      if (checkTradeRules(strategy.sellRules, closePrices)) {
-        //let openWithSpread = addSellSpread(openPrice);
-        trades[trades.length - 1]['closeDate'] = date;
-        trades[trades.length - 1]['exit'] = openPrice;
-        /*trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
-          ? lowPrice
-          : openWithSpread;*/
-        trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
-        tradeType = 'buy';
+
+      if (tradeType === 'sell') {
+        if (stoploss >= lowPrice) {
+          trades[trades.length - 1]['closeDate'] = date;
+          if (openPrice < smallNumber) {
+            if (stoploss >= openPrice) {
+              let openWithSpread = addSellSpread(openPrice);
+              trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
+                ? openPrice
+                : openWithSpread;
+            } else if (stoploss >= closePrice) {
+              let closeWithSpread = addSellSpread(closePrice);
+              trades[trades.length - 1]['exit'] = closeWithSpread < lowPrice
+                ? closePrice
+                : closeWithSpread;
+            } else {
+              trades[trades.length - 1]['exit'] = lowPrice
+            }
+          } else {
+            trades[trades.length - 1]['exit'] = stoploss > openPrice
+              ? openPrice
+              : stoploss;
+          }
+          trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+          tradeType = 'buy';
+          if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+            trailingSlPriceUsed = highPrice;
+            stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+          }
+          closePrices[timeframes[0]].push(closePrice);
+          bigTfIndex++;
+          continue;
+        }
+        if (target <= highPrice) {
+          trades[trades.length - 1]['closeDate'] = date;
+          if (openPrice < smallNumber) {
+            if (target <= openPrice) {
+              let openWithSpread = addSellSpread(openPrice);
+              trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
+                ? openPrice
+                : openWithSpread;
+            } else if (target <= closePrice) {
+              let closeWithSpread = addSellSpread(closePrice);
+              trades[trades.length - 1]['exit'] = closeWithSpread < lowPrice
+                ? closePrice
+                : closeWithSpread;
+            } else {
+              let highWithSpread = addSellSpread(highPrice);
+              trades[trades.length - 1]['exit'] = highWithSpread < lowPrice
+                ? highPrice
+                : highWithSpread;
+            }
+          } else {
+            trades[trades.length - 1]['exit'] = target < openPrice
+              ? openPrice
+              : target;
+          }
+
+          trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+          tradeType = 'buy';
+          if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+            trailingSlPriceUsed = highPrice;
+            stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+          }
+          closePrices[timeframes[0]].push(closePrice);
+          bigTfIndex++;
+          continue;
+        }
+        if (timeClose !== null && timeClose <= date) {
+          trades[trades.length - 1]['closeDate'] = date;
+          trades[trades.length - 1]['exit'] = openPrice;
+          trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+          tradeType = 'buy';
+          closePrices[timeframes[0]].push(closePrice);
+          bigTfIndex++;
+          continue;
+        }
+
+        if (strategy.sellRules.length === 0) {
+          if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+            trailingSlPriceUsed = highPrice;
+            stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+          }
+          closePrices[timeframes[0]].push(closePrice);
+          bigTfIndex++;
+          continue;
+        }
+        if (checkTradeRules(strategy.sellRules, closePrices)) {
+          //let openWithSpread = addSellSpread(openPrice);
+          trades[trades.length - 1]['closeDate'] = date;
+          trades[trades.length - 1]['exit'] = openPrice;
+          /*trades[trades.length - 1]['exit'] = openWithSpread < lowPrice
+            ? lowPrice
+            : openWithSpread;*/
+          trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
+          tradeType = 'buy';
+        }
+
+      }
+      if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
+        trailingSlPriceUsed = highPrice;
+        stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
       }
 
     }
-    if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
-      trailingSlPriceUsed = highPrice;
-      stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
-    }
-    closePrices.push(closePrice);
+    closePrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].c);
+    bigTfIndex++;
+
   }
 
   //END
@@ -262,6 +444,7 @@ async function executeBacktest(strategy, ticks, timeframe, startDate, useSleep) 
       result.maxDrawdown = drawdowns[i];
     }
   }
+
   return [result, trades, lastTrade];
 }
 

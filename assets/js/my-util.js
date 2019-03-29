@@ -174,15 +174,6 @@ async function downloadUpdates() {
   });
 }
 
-async function dailyCheckForUpdates() {
-  while (true) {
-    await sleep(1000 * 60 * 60 * 24); // 1 Day
-    checkForUpdates({
-      type: 'daily-check'
-    }, true, false);
-  }
-}
-
 async function hourlyCheckForUpdates() {
   while (true) {
     await sleep(1000 * 60 * 60 * 4); // 4 Hours
@@ -192,13 +183,15 @@ async function hourlyCheckForUpdates() {
   }
 }
 
-function showUpdateMsg(isAutomatic) {
-  if (isAutomatic) {
-    openModalConfirm('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>Update now?', function() {
+function showUpdateMsg(curVersion, latestVersion) {
+  let curSplited = curVersion.split('.');
+  let latestSplited = latestVersion.split('.');
+  if (curSplited[0] === latestSplited[0]) {
+    openModalConfirm('<h3>An update is available!</h3><br>Check on the button bellow to see what is new since your current version ' + curVersion + '<br> <a href="https://easycryptobot.com/update" target="_blank" class="button alt white">Update Info</a><br><br><h3>Update now?</h3>', function() {
       downloadUpdates()
     });
   } else {
-    openModalInfo('An update is available!<br>Check what is new at at<br><span class="one-click-select">https://easycryptobot.com/update</span><br><br>No automatic update is available for this version, so in order to update, you need to download again the app from <span class="one-click-select">https://easycryptobot.com/</span>. After the download you can extract the app at a new location and start it from there.')
+    openModalInfo('<h3>An update is available!</h3><br>Check on the button bellow to see what is new since your current version ' + curVersion + '<br> <a href="https://easycryptobot.com/update" target="_blank" class="button alt white">Update Info</a><br><br>No automatic update is available for your version. In order to update, you need to download again the app from <span class="one-click-select">https://easycryptobot.com/</span>. After the download you can extract the app at a new location and start it from there.')
   }
 }
 
@@ -215,13 +208,11 @@ async function checkForUpdates(data, showUpdate, showNoUpdate) {
           let version = data.split(':');
           let latestVersion = version[1].trim();
           if (latestVersion != curVersion) {
-            let latestSplited = latestVersion.split('.');
-            let curSplited = curVersion.split('.');
             if (showUpdate) {
-              showUpdateMsg(latestSplited[0] === curSplited[0]);
+              showUpdateMsg(curVersion, latestVersion);
             }
             $('#updateBtn').click(function() {
-              showUpdateMsg(latestSplited[0] === curSplited[0])
+              showUpdateMsg(curVersion, latestVersion)
             });
             $('#checkForUpdateBtn').hide();
             $('#updateBtn').show();
@@ -441,76 +432,6 @@ function getDbFileName2(exchange, instrument, timeframe, startTime, endTime) {
 
 function getDbFileName(exchange, instrument, timeframe) {
   return exchange + '-' + instrument + '-' + timeframe + '.db';
-}
-
-function getTimeframe(value) {
-  switch (value) {
-    case '1 minute':
-      return '1m';
-    case '3 minutes':
-      return '3m';
-    case '5 minutes':
-      return '5m';
-    case '5 minutes':
-      return '5m';
-    case '15 minutes':
-      return '15m';
-    case '30 minutes':
-      return '30m';
-    case '1 hour':
-      return '1h';
-    case '2 hours':
-      return '2h';
-    case '4 hours':
-      return '4h';
-    case '6 hours':
-      return '6h';
-    case '12 hours':
-      return '12h';
-    case '1 day':
-      return '1d';
-  }
-}
-
-//Add additional 300 ticks to the start date in order to calculate RSIs and EMAs
-function getStartDate(value, date) {
-  let startDate = new Date(date.getTime());
-  switch (value) {
-    case '1 minute':
-      startDate.setDate(startDate.getDate() - 1);
-      break;
-    case '3 minutes':
-      startDate.setDate(startDate.getDate() - 1);
-      break;
-    case '5 minutes':
-      startDate.setDate(startDate.getDate() - 1);
-      break;
-    case '15 minutes':
-      startDate.setDate(startDate.getDate() - 3);
-      break;
-    case '30 minutes':
-      startDate.setDate(startDate.getDate() - 6);
-      break;
-    case '1 hour':
-      startDate.setDate(startDate.getDate() - 12);
-      break;
-    case '2 hours':
-      startDate.setDate(startDate.getDate() - 25);
-      break;
-    case '4 hours':
-      startDate.setDate(startDate.getDate() - 50);
-      break;
-    case '6 hours':
-      startDate.setDate(startDate.getDate() - 75);
-      break;
-    case '12 hours':
-      startDate.setDate(startDate.getDate() - 150);
-      break;
-    case '1 day':
-      startDate.setDate(startDate.getDate() - 300);
-      break;
-  }
-  return startDate;
 }
 
 function chunkArray(myArray, chunkSize) {
