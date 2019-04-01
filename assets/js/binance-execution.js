@@ -537,7 +537,7 @@ function startBinanceWebsocket() {
                   let tradeIndex = execution.trades.length - 1;
                   execution.trades[tradeIndex]['closeDate'] = new Date();
                   execution.trades[tradeIndex]['exit'] = curPrice;
-                  execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - feeRate;
+                  execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (feeRate * 2);
                   self.postMessage([
                     execId, 'SELL', execution.trades[tradeIndex]
                   ]);
@@ -578,7 +578,7 @@ function startBinanceWebsocket() {
               let tradeIndex = execution.trades.length - 1;
               execution.trades[tradeIndex]['closeDate'] = new Date();
               execution.trades[tradeIndex]['exit'] = curPrice;
-              execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - feeRate;
+              execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (feeRate * 2);
               self.postMessage([
                 execId, 'SELL', execution.trades[tradeIndex]
               ]);
