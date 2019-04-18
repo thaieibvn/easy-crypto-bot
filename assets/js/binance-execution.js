@@ -302,10 +302,10 @@ function balanceUpdate(data) {}
 
 async function checkTakeProfitExecuted() {
   if (execution.type !== 'Trading' || execution.takeProfitOrderId === null) {
-    return;
+    return 0;
   }
   let priceAndQty = await getOrderTradePrice(execution, execution.takeProfitOrderId, 'sell');
-  if (priceAndQty === null) {
+  if (priceAndQty === null || priceAndQty[1] == null) {
     return 0;
   }
   if (priceAndQty[1] == execution.positionSize) {
@@ -323,18 +323,22 @@ async function checkTakeProfitExecuted() {
 }
 
 async function executionUpdate(data) {
-  let {
-    x: executionType,
-    s: symbol,
-    p: price,
-    q: quantity,
-    S: side,
-    o: orderType,
-    i: orderId,
-    X: orderStatus
-  } = data;
-  if (orderId == execution.takeProfitOrderId) {
-    await checkTakeProfitExecuted();
+  try {
+    let {
+      x: executionType,
+      s: symbol,
+      p: price,
+      q: quantity,
+      S: side,
+      o: orderType,
+      i: orderId,
+      X: orderStatus
+    } = data;
+    if (orderId == execution.takeProfitOrderId) {
+      await checkTakeProfitExecuted();
+    }
+  } catch (err) {
+    self.postMessage([execId, 'ERROR', err.stack]);
   }
 }
 
@@ -383,7 +387,9 @@ function startBinanceWebsocket() {
       let lastDate = binance.last(chart);
       if (chart[lastDate] === undefined) {
         paused = true;
-        self.postMessage([execId, 'ERROR', 'Connection to Binance lost. Check Binance website for maintenance and try executing your strategy later.']);
+        startTries++;
+        let restart = startTries < 6 ? 'restart': null;
+        self.postMessage([execId, 'ERROR', 'Connection to Binance lost. Check Binance website for maintenance and try executing your strategy later.', restart]);
         return;
       }
 
@@ -643,6 +649,7 @@ let lastCheckedDataBigTf = -1;
 let firstCande = true; // skip the first candle
 let binanceInstrumentsInfo = null;
 let paused = false;
+let startTries = 0;
 
 self.addEventListener('message', async function(e) {
   try {
@@ -685,6 +692,7 @@ self.addEventListener('message', async function(e) {
       firstCande = true;
       binanceInstrumentsInfo = null;
       paused = false;
+      startTries = 0;
       return;
     } else if (typeof e.data === 'string' && e.data === ('RESUME')) {
       statusSent = false;

@@ -449,6 +449,17 @@ async function runStrategy(id) {
               $('#terminateStrBtn' + id).html('Failed&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
               break;
             case 'ERROR':
+              if (additionalData === 'restart') {
+                for (let worker of executionWorkers) {
+                  if (worker.execId == id) {
+                    worker.wk.postMessage('PAUSE');
+                    await sleep(2000);
+                    worker.wk.postMessage('RESUME');
+                    break;
+                  }
+                }
+                return;
+              }
               let errorMsg = data.replace(/[^a-z0-9]/gi, ' ') + '<br><br>The execution of the strategy was stopped!';
               stopStrategyExecution(id, errorMsg);
               execution.error = errorMsg;
