@@ -33,7 +33,9 @@ async function btInstrumentKeyup() {
       }
 
     }
-  } catch (err) {}
+  } catch (err) {
+    log('error', 'btInstrumentKeyup', err.stack);
+  }
 }
 
 function btFillInstrument(name) {
@@ -65,7 +67,9 @@ function fillBtTestPeriod() {
     day);
     $('#btToDate').val(toDateStr);
 
-  } catch (err) {}
+  } catch (err) {
+    log('error', 'fillBtTestPeriod', err.stack);
+  }
 }
 
 async function editBtStrategy() {
@@ -78,7 +82,9 @@ async function editBtStrategy() {
       return;
     }
     editStrategy(strategyName);
-  } catch (err) {}
+  } catch (err) {
+      log('error', 'editBtStrategy', err.stack);
+  }
 }
 
 let btTradesRows = []
@@ -315,6 +321,7 @@ async function runBacktest() {
     $('#runBacktestBtn').removeClass('disabled');
     openModalInfo('Internal Error Occurred!<br>' + err.stack);
     backtestRunning = false;
+    log('error', 'runBacktest', err.stack);
   }
 }
 
@@ -842,8 +849,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
       series: series
     });
   } catch (err) {
-    //TODO
-    console.log(err.stack)
+    log('error', 'drawBtResultsChart', err.stack);
   }
 }
 function btResultShowRows(from, to) {

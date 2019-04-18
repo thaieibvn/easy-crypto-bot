@@ -7,12 +7,12 @@ global.optimizatin = {
   startDate: null,
   ticks: null,
   ticks1m: null,
-  strategyVariations:null,
-  results:null
+  strategyVariations: null,
+  results: null
 };
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
-let mainWindow
+let mainWindow;
 app.disableHardwareAcceleration();
 //app.commandLine.appendSwitch('enable-transparent-visuals');
 //app.commandLine.appendSwitch('disable-gpu');
@@ -47,12 +47,38 @@ function createWindow() {
     app.quit();
   });
 
+  mainWindow.on('close', function(event) {
+    event.preventDefault();
+    mainWindow.webContents.send("shutdown");
+  });
+
+  ipcMain.on("shutdown", (event, info) => {
+    mainWindow.destroy();
+    mainWindow = null;
+    app.quit();
+  });
+
+  ipcMain.on("relaunch", (event, info) => {
+    mainWindow.destroy();
+    mainWindow = null;
+    app.relaunch();
+    app.quit();
+  });
+
+  ipcMain.on("connection-error", (event, info) => {
+    mainWindow.destroy();
+    mainWindow = null;
+    app.relaunch();
+    app.quit();
+    dialog.showErrorBox('EasyCryptoBot has lost connection to the Internet and will be restarted :( ', 'Please check your intenet connection and the connectivity to the Binance servers.');
+  });
+
   ipcMain.on("download", (event, info) => {
     download(BrowserWindow.getFocusedWindow(), info.url, info.properties).then(dl => mainWindow.webContents.send("download complete", dl.getSavePath()));
   });
 
   mainWindow.webContents.on('crashed', (e) => {
-    dialog.showErrorBox('The App has crashed and will be restarted :(','Please contact me at stefan@easycryptobot.com with details what happened so I can fix it! Thanks!');
+    dialog.showErrorBox('The App has crashed and will be restarted :(', 'Please contact me at stefan@easycryptobot.com with details what happened so I can fix it! Thanks!');
     console.log(e);
     app.relaunch();
     app.quit()

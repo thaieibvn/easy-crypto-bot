@@ -93,7 +93,9 @@ async function tsInstrumentKeyup() {
       }
 
     }
-  } catch (err) {}
+  } catch (err) {
+    log('error', 'tsInstrumentKeyup', err.stack);
+  }
 }
 
 async function tsFillInstrument(name) {
@@ -114,7 +116,7 @@ async function fillPosSizeDetails() {
   let value = $('#tsPosSize').val();
   if (value.length > 0 && Number.parseFloat(value) > 0) {
     let ustdValue = await getBinanceUSDTValue(Number.parseFloat(value), instrument, getQuotedCurrency(instrument));
-    if (!isNaN(ustdValue) && $('#tsPosSize').val() == value) {
+    if (ustdValue != null && !isNaN(ustdValue) && $('#tsPosSize').val() == value) {
       $('#tsQuotedCurrency').html(getBaseCurrency(instrument) + ' ($' + ustdValue.toFixed(2) + ')');
     }
   }
@@ -131,7 +133,7 @@ async function fillMaxLossDetails() {
   let value = $('#tsMaxLoss').val();
   if (value.length > 0 && Number.parseFloat(value) > 0) {
     let ustdValue = await getBinanceUSDTValue(Number.parseFloat(value), instrument, getQuotedCurrency(instrument));
-    if (!isNaN(ustdValue) && $('#tsMaxLoss').val() == value) {
+    if (ustdValue != null && !isNaN(ustdValue) && $('#tsMaxLoss').val() == value) {
       $('#tsMaxLossCurrency').html(getBaseCurrency(instrument) + ' ($' + ustdValue.toFixed(2) + ')');
     }
   }
@@ -306,6 +308,7 @@ async function executeStrategy() {
       scrollTop: document.body.scrollHeight
     }, "fast");
   } catch (err) {
+    log('error', 'executeStrategy', err.stack);
     openModalInfo('Internal Error Occurred!<br>' + err.stack);
   } finally {
     $('#executeStrategyBtn').removeClass('disabled');
@@ -357,6 +360,18 @@ function maxLossInfo() {
 
 async function runStrategy(id) {
   try {
+    //Check if execution already exists
+    for (let worker of executionWorkers) {
+      if (worker.execId === id) {
+        if (worker.status === 'running') {
+          return;
+        } else if (worker.status === 'paused') {
+          await resumeExecution(id);
+          return;
+        }
+      }
+    }
+
     $('#terminateStrBtn' + id).html('Starting..');
     let execution = await getExecutionById(id);
 
@@ -411,6 +426,7 @@ async function runStrategy(id) {
         wk = new Worker("./assets/js/binance-execution.js");
       }
       wk.addEventListener('error', function(e) {
+        log('error', 'runStrategy', 'Internal Error Occurred!!<br>' + execution.type + ' ' + e.message + '<br>' + e.filename + ' ' + e.lineno);
         openModalInfo('Internal Error Occurred!!<br>' + execution.type + ' ' + e.message + '<br>' + e.filename + ' ' + e.lineno);
       }, false);
 
@@ -425,7 +441,7 @@ async function runStrategy(id) {
           let additionalData = e.data[3];
           switch (type) {
             case 'STARTED':
-              $('#terminateStrBtn' + id).html('Running&nbsp;<a class="stop-stgy-exec text-red" title="Stop Execution" href="#/" onclick="stopStrategyExecution(' + id + ')"><i class="fas fa-pause"></i></a>');
+              $('#terminateStrBtn' + id).html('Running&nbsp;<a class="stop-stgy-exec text-red" title="Stop Execution" href="#/" onclick="stopStrategyExecution(' + id + ')"><i class="fas fa-stop"></i></a>');
               break;
             case 'STOPPED':
               $('#executeStrategyBtn').removeClass('disabled');
@@ -433,11 +449,17 @@ async function runStrategy(id) {
               $('#terminateStrBtn' + id).html('Failed&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
               break;
             case 'ERROR':
-              let errorMsg = data.replace("'", "") + '<br><br>The execution of the strategy was stopped!';
+              let errorMsg = data.replace(/[^a-z0-9]/gi, ' ') + '<br><br>The execution of the strategy was stopped!';
               stopStrategyExecution(id, errorMsg);
               execution.error = errorMsg;
               await updateExecutionDb(execution);
               showErrorMsg(errorMsg, id);
+              log('error', 'runStrategy webworker listener', errorMsg);
+              if (additionalData === 'crashed') {
+                log('error', 'runStrategy webworker listener', ' Binance webworker CRASHED!');
+                await stopAllExecutions(true);
+                sendConnectionLost();
+              }
               break;
             case 'LAST_UPDATED':
               $('#lastUpdatedExecution' + id).html(formatDateNoYear(new Date()));
@@ -491,6 +513,7 @@ async function runStrategy(id) {
             default:
           };
         } catch (err) {
+          log('error', 'runStrategy', err.stack);
           openModalInfo('Internal Error Occurred!!!<br>' + err.stack);
         } finally {
           runMutex.release();
@@ -501,6 +524,7 @@ async function runStrategy(id) {
       wk.postMessage([execution, apiKey, apiSecret]);
     }
   } catch (err) {
+    log('error', 'runStrategy', err.stack);
     openModalInfo('Internal Error Occurred!!!!<br>' + err.stack);
   }
 }
@@ -513,7 +537,7 @@ async function clearError(id) {
   let execution = await getExecutionById(id);
   execution.error = null;
   await updateExecutionDb(execution);
-  $('#terminateStrBtn' + id).html('Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="resumeExecution(' + id + ')"><i class="fas fa-play"></i></a>');
+  $('#terminateStrBtn' + id).html('Stopped&nbsp;<a title="Resume Execution" href="#/" onclick="resumeExecution(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-times"></i></a>');
   openModalInfo('<h3>Error cleared!</h3>You can resume the execution of your strategy by clicking the play button.');
 }
 
@@ -549,12 +573,15 @@ async function resumeExecution(id) {
   }
 }
 
-function stopStrategyExecution(id, errorMsg) {
-
+function stopStrategyExecution(id, errorMsg, terminate) {
   for (let worker of executionWorkers) {
     if (worker.execId == id) {
       worker.status = 'paused';
-      worker.wk.postMessage('PAUSE');
+      if (terminate) {
+        worker.wk.postMessage('DELAYED_TERMINATE');
+      } else {
+        worker.wk.postMessage('PAUSE');
+      }
       break;
     }
   }
@@ -566,6 +593,7 @@ function stopStrategyExecution(id, errorMsg) {
 }
 
 async function showExecutionResult(id) {
+
   let execution = await getExecutionById(id);
   $('#executionStrategiesTable').html('<thead><tr><td class="text-left">Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead>');
 
@@ -700,14 +728,24 @@ async function showExecutionResult(id) {
 }
 
 async function fillUSDFields(resultWithUSD, posSize, maxLoss, instrument) {
-  let ustdValue = await getBinanceUSDTValue(resultWithUSD, instrument, getQuotedCurrency(instrument));
-  $('#executionResultWithUsd').html(resultWithUSD.toFixed(8) + '&nbsp;' + getBaseCurrency(instrument) + ' ( ~' + ustdValue.toFixed(2) + '$ )');
+  try {
+    let ustdValue = await getBinanceUSDTValue(resultWithUSD, instrument, getQuotedCurrency(instrument));
+    if (ustdValue == null) {
+      $('#executionResultWithUsd').html(resultWithUSD.toFixed(8) + '&nbsp;' + getBaseCurrency(instrument));
+      $('#executionPosSizeRes').html(posSize + '&nbsp;' + getBaseCurrency(instrument));
+      $('#executionMasLossRes').html(Math.abs(maxLoss) + '&nbsp;' + getBaseCurrency(instrument));
+      return;
+    }
 
-  let posSizeUsd = await getBinanceUSDTValue(posSize, instrument, getQuotedCurrency(instrument));
-  $('#executionPosSizeRes').html(execution.positionSize + '&nbsp;' + getBaseCurrency(execution.instrument) + ' ( ~' + posSizeUsd.toFixed(2) + '$ )');
-  if (maxLoss !== null) {
-    let maxLossUsd = await getBinanceUSDTValue(resultWithUSD, instrument, getQuotedCurrency(instrument));
-    $('#executionMasLossRes').html(Math.abs(execution.maxLoss) + '&nbsp;' + getBaseCurrency(execution.instrument) + ' ( ~' + maxLossUsd.toFixed(2) + '$ )');
+    $('#executionResultWithUsd').html(resultWithUSD.toFixed(8) + '&nbsp;' + getBaseCurrency(instrument) + ' ( ~' + ustdValue.toFixed(2) + '$ )');
+    let posSizeUsd = await getBinanceUSDTValue(posSize, instrument, getQuotedCurrency(instrument));
+    $('#executionPosSizeRes').html(posSize + '&nbsp;' + getBaseCurrency(instrument) + ' ( ~' + posSizeUsd.toFixed(2) + '$ )');
+    if (maxLoss !== null) {
+      let maxLossUsd = await getBinanceUSDTValue(maxLoss, instrument, getQuotedCurrency(instrument));
+      $('#executionMasLossRes').html(Math.abs(maxLoss) + '&nbsp;' + getBaseCurrency(instrument) + ' ( ~' + maxLossUsd.toFixed(2) + '$ )');
+    }
+  } catch (err) {
+    log('error', 'fillUSDFields', err.stack);
   }
 }
 
@@ -870,5 +908,82 @@ async function editTrStrategy() {
       return;
     }
     editStrategy(strategyName);
-  } catch (err) {}
+  } catch (err) {
+    log('error', 'editTrStrategy', err.stack);
+  }
+}
+
+async function startAllExecutions() {
+  let executions = await getExecutionsFromDb();
+  if (executions !== null && executions.length > 0) {
+    let hasRealTrading = false;
+    //TODO: This will not work when more exchanges are added
+    let exchange = null;
+    for (let execution of executions) {
+      if (execution.error === null || execution.error === undefined) {
+        if (execution.type == 'Trading') {
+          hasRealTrading = true;
+          exchange = execution.exchange;
+          break;
+        }
+      }
+    }
+
+    if (hasRealTrading) {
+      if (exchangesApiKeys[exchange] === undefined) {
+        openModalConfirm('<div class="text-justify">Please provide your API key for ' + exchange + '. </div><br><div class="text-left"><span class="inline-block min-width5">API Key:&nbsp;</span><input class="min-width20" id="exchangeApiKey" type="text" placeholder="API KEY" /><br>' + '<span class="inline-block min-width5">Secret:&nbsp;</span><input class="min-width20" id="exchangeApiSecret" type="text" placeholder="Secret" /></div><br><div class="text-justify">Your key and secret are not stored anywhere by this application.</div>', async function() {
+          let result = await verifyKeyAndSecret(exchange);
+          if (result) {
+            startAllExecutions();
+          } else {
+            for (let execution of executions) {
+              if (execution.error === null || execution.error === undefined) {
+                if (execution.type != 'Trading') {
+                  await runStrategy(execution.id);
+                }
+              }
+            }
+          }
+        }, async function() {
+          openModalInfoBig("In order to start Real Trading strategies you need to provide your API Key and Secret!");
+          for (let execution of executions) {
+            if (execution.error === null || execution.error === undefined) {
+              if (execution.type != 'Trading') {
+                await runStrategy(execution.id);
+              }
+            }
+          }
+        });
+        return;
+      } else {
+        for (let execution of executions) {
+          if (execution.error === null || execution.error === undefined) {
+            await runStrategy(execution.id)
+          }
+        }
+      }
+    } else {
+      for (let execution of executions) {
+        if (execution.error === null || execution.error === undefined) {
+          await runStrategy(execution.id)
+        }
+      }
+    }
+  }
+}
+
+async function stopAllExecutions(terminate) {
+  let useSleep = hasTradingStrategies();
+  let executions = await getExecutionsFromDb();
+  if (executions !== null && executions.length > 0) {
+    for (let execution of executions) {
+      if (execution.error === null || execution.error === undefined) {
+        await stopStrategyExecution(execution.id, null, terminate);
+      }
+    }
+  }
+  if (useSleep) {
+    await sleep(3000);
+  }
+
 }

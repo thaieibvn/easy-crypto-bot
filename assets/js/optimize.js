@@ -34,7 +34,9 @@ async function opInstrumentKeyup() {
       }
 
     }
-  } catch (err) {}
+  } catch (err) {
+    log('error', 'opInstrumentKeyup', err.stack);
+  }
 }
 
 function opFillInstrument(name) {
@@ -360,6 +362,7 @@ async function runOptimize() {
               openModalInfo('Unexpected Internal Error Occurred!<br>' + e.data);
             }
           } catch (err) {
+            log('error', 'runOptimize', err.stack);
             openModalInfo('Internal Error Occurred!<br>' + err.stack);
           } finally {
             executionOpMutex.release();
@@ -391,6 +394,7 @@ async function runOptimize() {
     }
 
   } catch (err) {
+    log('error', 'runOptimize', err.stack);
     $('#opRunning').hide();
     optimizationRunning = false;
     await terminateOpWorkers();
@@ -445,7 +449,7 @@ async function terminateOpWorkers() {
     $('#runOptBtn').removeClass('disabled');
     $('#opCancelBtn').removeClass('disabled');
   } catch (err) {
-    alert(err);
+    log('error', 'terminateOpWorkers', err.stack);
   } finally {
     opWorkerTerminateMutex.release();
   }
@@ -498,6 +502,7 @@ async function fillOptimizationResult(marketReturn) {
 
     await terminateOpWorkers();
   } catch (err) {
+    log('error', 'fillOptimizationResult', err.stack);
     openModalInfo('Internal Error Occurred!<br>' + err.stack);
   }
 }
@@ -2063,7 +2068,9 @@ async function editOpStrategy() {
       return;
     }
     editStrategy(strategyName);
-  } catch (err) {}
+  } catch (err) {
+    log('error', 'editOpStrategy', err.stack);
+  }
 }
 
 async function opCancel() {
@@ -2111,7 +2118,9 @@ function fillOpTestPeriod() {
     day);
     $('#opToDate').val(toDateStr);
 
-  } catch (err) {}
+  } catch (err) {
+    log('error', 'fillOpTestPeriod', err.stack);
+  }
 }
 
 function checkTooManyVariations() {

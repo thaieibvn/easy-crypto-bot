@@ -82,7 +82,11 @@
       <div id="tsResultDiv" class="display-none">
         <hr>
         <div>
-          <h2 class="text-center margin-s-b10">Executions&nbsp;<i class="fas fa-rocket"></i> </h2>
+          <h2 class="text-center">Executions&nbsp;<i class="fas fa-rocket"></i> </h2>
+          <div class="text-center margin-s-b10">
+            <a id="" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="startAllExecutions()" class="button white alt"><i class="text-green fas fa-play"></i> Start All</a>
+            <a id="" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="stopAllExecutions()" class="button white alt"><i class="text-red fas fa-stop"></i> Stop All</a>
+          </div>
           <div class="table-wrapper alt">
             <table id="tsStrategiesTable">
               <thead>

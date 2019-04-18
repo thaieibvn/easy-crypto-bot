@@ -17,7 +17,8 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 	<link rel="import" href="sections/optimize.html">
 	<link rel="import" href="sections/backtest.html">
 	<link rel="import" href="sections/trade.html">
-
+	<link rel="import" href="sections/bugs.html">
+		
 </head>
 
 <body>
@@ -30,7 +31,8 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 					<li><a id="strategiesMenu"  onclick="sectionClick('#strategies')" href="#">Strategies</a></li>
 					<li><a  id="backtestMenu" onclick="sectionClick('#backtest')" href="#">Backtest</a></li>
 					<li><a id="optimizeMenu" onclick="sectionClick('#optimize')" href="#">Optimize</a></li>
-					<li><a id="tradeMenu"onclick="sectionClick('#trade')" href="#">Trading</a></li>
+					<li><a id="tradeMenu" onclick="sectionClick('#trade')" href="#">Trading</a></li>
+					<li><a id="bugMenu" onclick="sectionClick('#bugs')" href="#">Report Bug</a></li>
 				</ul>
 			</nav>
 		</div>
@@ -189,7 +191,9 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 			<br> <a id="modalInfoOk" class="button alt white" href="#/">OK</a>
 		</div>
 	</div>
-
+	<div class="text-center modal no-select" id="modalLoading">
+		<img class="no-select" style="width:150px;height:150px;margin:auto;" src="assets/images/loading.gif" alt="Loading.." />
+	</div>
 	<!-- Scripts -->
 	<script>
 		window.$ = window.jQuery = require('./assets/js/jquery.min.js');

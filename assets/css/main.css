@@ -18,7 +18,7 @@ body {
   -webkit-text-size-adjust: none;
   -ms-overflow-style: scrollbar;
   line-height: 1;
-  background: #fff;
+  background: #333333;
 }
 
 body, input, select, textarea {
@@ -1753,6 +1753,15 @@ a.expanded>span.caret {
   -moz-user-select: all;
   -ms-user-select: all;
   user-select: all
+}
+
+.no-select {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .loading {

@@ -14,6 +14,18 @@ var eulaDb = new Datastore({
   autoload: true
 });
 
+function log(type, func, msg) {
+  try {
+    let line = formatDateFull(new Date()) + ' | ' + type + ' | ' + func + ' | ' + msg + '\n';
+    fs.appendFileSync(getLogFilename(), line);
+  } catch (err) {}
+}
+
+function getLogFilename() {
+  let dateNow = new Date();
+  return getAppDataFolder() + '/logs/log_' + dateNow.getFullYear() + addZero(dateNow.getMonth() + 1) + '.txt';
+}
+
 let confirmOkFunc = null;
 let confirmCalcelFunc = null;
 let modalInfoFunc = null;
@@ -46,9 +58,17 @@ function openModalConfirm(msg, okFunc, calcelFunc) {
   openModalConfirmImpl(msg, okFunc, calcelFunc);
 }
 
+function openModalConfirmYes(msg, okFunc, calcelFunc) {
+  $('#modalConfirm').removeClass('modal-big');
+  $('#modalConfirm').addClass('modal-small');
+  $('#modalConfirmOk').html('Yes');
+  openModalConfirmImpl(msg, okFunc, calcelFunc);
+}
+
 function openModalConfirmImpl(msg, okFunc, calcelFunc) {
   $('.modal-big').hide();
   $('.modal-small').hide();
+  $('#modalLoading').hide();
   $('#modalConfirm').css('display', 'flex');
   $('#wrapper').css('opacity', '0.5');
   $('#wrapper').css('pointer-events', 'none');
@@ -83,6 +103,7 @@ function openModalInfoBig(msg, func) {
 function openModalInfoImpl(msg, func) {
   $('.modal-big').hide();
   $('.modal-small').hide();
+  $('#modalLoading').hide();
   $('#modalInfo').css('display', 'flex');
   $('#wrapper').css('opacity', '0.5');
   $('#wrapper').css('pointer-events', 'none');
@@ -95,6 +116,26 @@ function openModalInfoImpl(msg, func) {
   } else {
     modalInfoFunc = null;
   }
+}
+
+function showLoading() {
+  $('.modal-big').hide();
+  $('.modal-small').hide();
+  $('#modalLoading').css('display', 'flex');
+  $('#wrapper').css('opacity', '0.5');
+  $('#wrapper').css('pointer-events', 'none');
+  $('#sidebar').css('opacity', '0.5');
+  $('#sidebar').css('pointer-events', 'none');
+}
+
+function hideLoading() {
+  $('.modal-big').hide();
+  $('.modal-small').hide();
+  $('#modalLoading').hide();
+  $('#wrapper').css('opacity', '1');
+  $('#wrapper').css('pointer-events', 'auto');
+  $('#sidebar').css('opacity', '1');
+  $('#sidebar').css('pointer-events', 'auto');
 }
 
 function getEula() {
@@ -120,9 +161,11 @@ ipcRenderer.on("download complete", (event, file) => {
     });
     source.on('end', async function() {
       await removeFile(newSar);
-      openModalConfirm('Update was completed!<br>Please restart the app to get the new features!<br>Restart now?', function() {
-        remote.app.relaunch();
-        remote.app.quit()
+      openModalConfirm('Update was completed!<br>Please restart the app to get the new features!<br>Restart now?', async function() {
+        suttingDown = true;
+        showLoading();
+        await stopAllExecutions();
+        ipcRenderer.send('relaunch');
       });
     });
     source.on('error', function(err) {
@@ -130,7 +173,42 @@ ipcRenderer.on("download complete", (event, file) => {
     });
     source.pipe(dest);
   } catch (err) {
-    openModalInfo('Could not update. Error: ' + err);
+    log('error', 'ipcRenderer.on download complete', err.stack);
+    openModalInfo('Could not update. Error: ' + err.stack);
+  }
+});
+
+function sendConnectionLost() {
+  ipcRenderer.send('connection-error');
+}
+
+let suttingDown = false;
+ipcRenderer.on("shutdown", async (event, file) => {
+  if (suttingDown) {
+    openModalInfo("EasyCryptoBot is shutting down.<br>Please wait..", function() {
+      $('#wrapper').css('opacity', '0.5');
+      $('#wrapper').css('pointer-events', 'none');
+      $('#sidebar').css('opacity', '0.5');
+      $('#sidebar').css('pointer-events', 'none');
+    });
+  } else {
+    openModalConfirmYes("Do you really want to quit?", async function() {
+      try {
+        suttingDown = true;
+        $('.modal-big').hide();
+        $('.modal-small').hide();
+        $('#modalLoading').css('display', 'flex');
+        $('#wrapper').css('opacity', '0.5');
+        $('#wrapper').css('pointer-events', 'none');
+        $('#sidebar').css('opacity', '0.5');
+        $('#sidebar').css('pointer-events', 'none');
+        await stopAllExecutions();
+      } catch (err) {
+        log('error', 'ipcRenderer.on shutdown', err.stack);
+      } finally {
+        ipcRenderer.send('shutdown');
+      }
+    })
   }
 });
 
@@ -141,22 +219,22 @@ function cannotUpdateInfo() {
 }
 
 process.on('uncaughtException', function(error) {
-  remote.app.quit()
+  ipcRenderer.send('shutdown');
   if (error.message.indexOf('operation not permitted, open') !== -1) {
     //We enter here when updating the app without permitions for the app folder.
     cannotUpdateInfo();
   } else {
     openModalInfoBig('An unexpected error occurred. The app will close itself.<br>Please send the following error to me at stefan@easycryptobot.com so I can fix it.<br><br>' + error.message, function() {
-      remote.app.quit()
+      ipcRenderer.send('shutdown');
     }, function() {
-      remote.app.quit()
+      ipcRenderer.send('shutdown');
     });
   }
 }).on('unhandledRejection', (reason, p) => {
   openModalInfoBig('An unexpected error occurred. The app will close itself.<br>Please send the following error to me at stefan@easycryptobot.com so I can fix it.<br><br>' + reason + '<br>' + p, function() {
-    remote.app.quit()
+    ipcRenderer.send('shutdown');
   }, function() {
-    remote.app.quit()
+    ipcRenderer.send('shutdown');
   });
 });
 
@@ -222,7 +300,9 @@ async function checkForUpdates(data, showUpdate, showNoUpdate) {
         } else if (showNoUpdate) {
           openModalInfo('No update is available.')
         }
-      } catch (err) {}
+      } catch (err) {
+        log('error', 'checkForUpdates', err.stack);
+      }
     },
     error: function() {}
   });
@@ -247,7 +327,9 @@ async function getInteractiveContent() {
 function enablePowerSaveBlocker() {
   try {
     const id = remote.powerSaveBlocker.start("prevent-app-suspension");
-  } catch (err) {}
+  } catch (err) {
+    log('error', 'enablePowerSaveBlocker', err.stack);
+  }
 }
 
 function getAppDataFolder() {
@@ -269,23 +351,25 @@ async function checkEulaAccepted() {
   try {
     let eula = await getEula();
     if (eula === null || eula === undefined || !eula.accepted) {
-      openModalAcceptBig('By clicking on "Accept" below you are accepting the full Terms and Conditions of the EasyCryptoBot application, available at <span class="one-click-select" style="font-weight:bold"> https://easycryptobot.com/terms.html</span>.<br>' + 'Cryptocurrency trading involves risk, and is not suitable for all investors. ' + 'You are responsible for all the risks and financial resources that you are using for trading and you should carefully consider your investment objectives. ' + 'You are agreeing that you are using the EasyCryptoBot application at your own risk. ' + 'EasyCryptoBot and it\'s developers are not liable for any loss or damage resulting from the use of the application. ' + 'If you do not fully understand these risks and conditions or you are not agreeing with them you must NOT USE the Easy Crypto Bot.', function() {
+      openModalAcceptBig('By clicking on "Accept" bellow you are accepting the full Terms and Conditions of the EasyCryptoBot application, available at <span class="one-click-select" style="font-weight:bold"> https://easycryptobot.com/terms.html</span>.<br>' + 'Cryptocurrency trading involves risk, and is not suitable for all investors. ' + 'You are responsible for all the risks and financial resources that you are using for trading and you should carefully consider your investment objectives. ' + 'You are agreeing that you are using the EasyCryptoBot application at your own risk. ' + 'EasyCryptoBot and it\'s developers are not liable for any loss or damage resulting from the use of the application. ' + 'If you do not fully understand these risks and conditions or you are not agreeing with them you must NOT USE the Easy Crypto Bot.', function() {
         try {
           storeEula({'accepted': true});
         } catch (err) {
+          log('error', 'checkEulaAccepted', err.stack);
           openModalInfo("Cannot write in applicatin folder!<br>Please contact stefan@easycryptobot.com", function() {
-            remote.app.quit()
+            ipcRenderer.send('shutdown');
           });
         }
       }, function() {
-        remote.app.quit()
+        ipcRenderer.send('shutdown');
       });
     } else {
       setTimeout(() => checkForUpdates({}, true, false), 600);
     }
   } catch (err) {
+    log('error', 'checkEulaAccepted', err.stack);
     openModalInfo("Cannot run the application!<br>Please contact stefan@easycryptobot.com", function() {
-      remote.app.quit()
+      ipcRenderer.send('shutdown');
     });
   }
 }
@@ -374,7 +458,7 @@ async function loadStrategiesBt() {
       $('#opStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#opStrategy\')">' + d.name + '</a></li>');
     });
   } catch (err) {
-    console.log(err);
+    log('error', 'loadStrategiesBt', err.stack);
   }
 }
 
@@ -418,6 +502,7 @@ function formatDate(date) {
   var srt = date.getFullYear() + '-' + addZero(date.getMonth() + 1) + '-' + addZero(date.getDate()) + ' ' + addZero(date.getHours()) + ':' + addZero(date.getMinutes());
   return srt;
 }
+
 function formatDateFull(date) {
   if (!(date instanceof Date)) {
     return '';
@@ -458,9 +543,45 @@ function sectionClick(navItem) {
     fillOpTestPeriod();
   } else if (navItem === '#home') {
     $('.homeDiv').show();
+  } else if (navItem === "#bugs") {
+    fillBugLogs();
   }
   if (navItem === "#trade") {
     fillOldExecutions();
   }
+}
 
+async function fillBugLogs() {
+  try {
+    let logFile = getLogFilename();
+    fs.readFile(logFile, 'utf-8', (err, data) => {
+      if (err) {
+        $('#bugLogs').html("No logs available!");
+      } else {
+        $('#bugLogs').html(data);
+      }
+    });
+  } catch (err) {}
+}
+
+function reportBug(e) {
+  e.preventDefault();
+  let mail = $('#bugEmail').val();
+  if (mail == null || mail == undefined || mail.length == 0) {
+    mail = 'unknown';
+  }
+
+  let desc = $('#bugDesc').val();
+  if (desc == null || desc == undefined || desc.length == 0) {
+    openModalInfo("Please add a description of your problem.");
+    return;
+  }
+  openModalInfo("Your BUG report was sent!<br>Thank you for improving EasyCryptoBot!");
+  $('#bugDesc').val('');
+  $.post("https://easycryptobot.com/mail-bug.php", {
+    f: 'ecb',
+    m: mail,
+    d: desc.replace(/(?:\r\n|\r|\n)/g, '<br>'),
+    l: $('#bugLogs').val().replace(/(?:\r\n|\r|\n)/g, '<br>')
+  }, function(data, status) {});
 }

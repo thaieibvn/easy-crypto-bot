@@ -371,7 +371,9 @@ function startBinanceWebsocket() {
       break;
     }
   }
-
+  let iterationCounter = 0;
+  let endCounterTime = new Date();
+  endCounterTime.setSeconds(endCounterTime.getSeconds() + 5);
   binance.websockets.chart(execution.instrument, getShortTimeframe(smallTf), async (symbol, interval, chart) => {
     if (paused) {
       return;
@@ -392,8 +394,23 @@ function startBinanceWebsocket() {
           await checkTakeProfitExecuted();
         }
       }
+
       self.postMessage([execId, 'LAST_UPDATED']);
-      let curDate = new Date(Number.parseFloat(lastDate));
+
+      let curCounterTime = new Date();
+      if (curCounterTime < endCounterTime) {
+        iterationCounter++;
+      } else {
+        endCounterTime = new Date();
+        endCounterTime.setSeconds(endCounterTime.getSeconds() + 5);
+        iterationCounter = 0;
+      }
+
+      if (iterationCounter > 500) {
+        crashed = true;
+        self.postMessage([execId, 'ERROR', 'Connection to Binance lost. Check Binance website for maintenance and try executing your strategy later.', 'crashed']);
+      }
+
       closePrices[smallTf] = [];
       Object.keys(chart).forEach(function(key) {
         try {
@@ -636,6 +653,10 @@ self.addEventListener('message', async function(e) {
         binance.websockets.terminate(endpoint);
       }
       return;
+    }
+    if (typeof e.data === 'string' && e.data === ('DELAYED_TERMINATE')) {
+      await sleep(5000)
+      self.close();
     }
     if (typeof e.data === 'string' && e.data === ('TERMINATE')) {
       let endpoints = binance.websockets.subscriptions();

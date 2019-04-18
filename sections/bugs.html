@@ -1,0 +1,39 @@
+<template class="section-template">
+  <section id="bugs" style="display:none" class="wrapper white alt intro fullscreen page display-none">
+    <div id="" class="inner">
+      <div class="text-center">
+        <span class="image alt"><img src="assets/images/logo.png" alt="Free Crypto Bot" /></span>
+        <h1 class="major alt">Send Bug Report</h1>
+        <p>Thank you for sending a bug report. I'll try to fix as soon as possible any issues with the app.</p>
+      </div>
+
+      <div class="text-center font-large">
+        <div class="text-left main-fields-div">
+          <div >
+            <span class="inline-block min-width5">Your email:&nbsp;</span>
+            <input autocomplete="off" class="blue main-field" style="width:550px;" id="bugEmail" type="text" placeholder="(not required)" />
+          </div>
+          <div class="margin-t10">
+            <span class="inline-block min-width5" style="vertical-align: top;">Desctiption:&nbsp;</span>
+            <div class="inline-block" style="width: 550px">
+              <textarea id="bugDesc" class="blue" style="height: 150px" cols="10" rows="10"></textarea>
+            </div>
+          </div>
+          <div style="margin-top:5px">
+            <span class="inline-block min-width5" style="vertical-align: top;">Logs:&nbsp;</span>
+            <div class="inline-block" style="width: 550px">
+              <textarea disabled id="bugLogs" class="blue" style="height: 150px" cols="10" rows="10"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center">
+        <a href="#/" onkeydown="opKeyDownDoNothing(event)" onclick="reportBug(event)" class="button blue margin-s-b30"><i class="fas fa-bug"></i> Send Report</a>
+      </div>
+    </div>
+  </section>
+</template>
+<script>
+
+</script>

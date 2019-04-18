@@ -1,6 +1,5 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 function checkTradeRules(rules, historicalDatas) {
-  //try {
   if (rules === null || rules === undefined || rules.length === 0) {
     return false;
   }
@@ -116,10 +115,6 @@ function checkTradeRules(rules, historicalDatas) {
     }
   }
   return rulesMet === rules.length;
-  //  } catch (err) {
-  //alert(err);
-  //    return false;
-  //  }
 }
 
 function calculateSMA(smaPeriod, historicalData) {

@@ -356,11 +356,11 @@ function emaInfo() {
 }
 
 function cmaInfo() {
-  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">A Crossover occurs when a short-term average crosses through a long-term average." + "<br><br>This signal is used by traders to identify that momentum is shifting in one direction and that a strong move is likely approaching." + "<br><br>A buy signal is generated when the short-term average crosses above the long-term average, while a sell signal is triggered by a short-term average crossing below a long-term average." + "</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/cma-info.png\" alt=\"\">");
+  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">A Crossover occurs when a short-term average crosses through a long-term average." + "<br><br>This signal is used by traders to identify that momentum is shifting in one direction and that a strong move is likely approaching." + "<br><br>A buy signal is generated when the short-term average crosses above the long-term average, while a sell signal is triggered by a short-term average crossing bellow a long-term average." + "</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/cma-info.png\" alt=\"\">");
 }
 
 function rsiInfo() {
-  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">Relative Strength Index - RSI is a momentum indicator which provides a relative evaluation of the strength of the recent price performance." + " RSI values range from 0 to 100. " + "<br><br>A RSI reading of 70 or above is commonly interpreted as indicating an overbought or overvalued condition that may signal a trend change or corrective price reversal to the downside." + "<br><br>A RSI reading of 30 or below is commonly interpreted as indicating an oversold or undervalued condition that may signal a trend change or corrective price reversal to the upside." + "</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/rsi-info.png\" alt=\"\">");
+  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">Relative Strength Index - RSI is a momentum indicator which provides a relative evaluation of the strength of the recent price performance." + " RSI values range from 0 to 100. " + "<br><br>A RSI reading of 70 or above is commonly interpreted as indicating an overbought or overvalued condition that may signal a trend change or corrective price reversal to the downside." + "<br><br>A RSI reading of 30 or bellow is commonly interpreted as indicating an oversold or undervalued condition that may signal a trend change or corrective price reversal to the upside." + "</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/rsi-info.png\" alt=\"\">");
 }
 
 function timeCloseInfo() {
@@ -588,7 +588,9 @@ function openStrategy(strategy) {
     });
     sellRuleType = sellRuleTypeTmp;
 
-  } catch (err) {}
+  } catch (err) {
+    log('error', 'openStrategy', err.stack);
+  }
 }
 
 async function editStrategy(name) {
@@ -638,7 +640,9 @@ async function rmStrategy2(name) {
   try {
     const numDeleted = await removeStrategy(name);
     loadStrategies()
-  } catch (err) {}
+  } catch (err) {
+    log('error', 'rmStrategy2', err.stack);
+  }
 }
 
 async function loadStrategies() {
@@ -649,7 +653,7 @@ async function loadStrategies() {
       $('#strategiesTable').append('<tr><td>' + d.name + '<td><td><a title="Edit Strategy" href="#newStrategyLabel" onclick="editStrategy(\'' + d.name + '\')" ><i class="far fa-edit"></i></a><td><td><a title="Remove Strategy" href="#/" onclick="rmStrategy(\'' + d.name + '\')"><i class="fas fa-times"></i></a></td></tr>');
     });
   } catch (err) {
-    console.log(err);
+      log('error', 'loadStrategies', err.stack);
   }
 }
 
@@ -665,6 +669,7 @@ async function fillDefaultStrategies() {
           'buyRules': [
             {
               'indicator': 'cma',
+              "timeframe":"5 minutes",
               'period': 7,
               'period2': 20,
               'type': 'EMA',
@@ -675,6 +680,7 @@ async function fillDefaultStrategies() {
           'sellRules': [
             {
               'indicator': 'cma',
+              "timeframe":"5 minutes",
               'period': 7,
               'period2': 20,
               'type': 'EMA',
@@ -690,6 +696,7 @@ async function fillDefaultStrategies() {
           'buyRules': [
             {
               'indicator': 'ema',
+              "timeframe":"5 minutes",
               'period': 5,
               'direction': 'bellow',
               'value': 0.5
@@ -698,6 +705,7 @@ async function fillDefaultStrategies() {
           'sellRules': [
             {
               'indicator': 'ema',
+              "timeframe":"5 minutes",
               'period': 5,
               'direction': 'above',
               'value': 0.5
@@ -712,11 +720,13 @@ async function fillDefaultStrategies() {
           'buyRules': [
             {
               'indicator': 'rsi',
+              "timeframe":"5 minutes",
               'period': 20,
               'direction': 'bellow',
               'value': 40
             }, {
               'indicator': 'cma',
+              "timeframe":"5 minutes",
               'period': 3,
               'period2': 10,
               'type': 'EMA',
@@ -727,11 +737,13 @@ async function fillDefaultStrategies() {
           'sellRules': [
             {
               'indicator': 'rsi',
+              "timeframe":"5 minutes",
               'period': 20,
               'direction': 'above',
               'value': 60
             }, {
               'indicator': 'cma',
+              "timeframe":"5 minutes",
               'period': 3,
               'period2': 10,
               'type': 'EMA',
@@ -748,11 +760,13 @@ async function fillDefaultStrategies() {
           "buyRules": [
             {
               "indicator": "sma",
+              "timeframe":"15 minutes",
               "period": 30,
               "direction": "bellow",
               "value": 3
             }, {
               "indicator": "rsi",
+              "timeframe":"15 minutes",
               "period": 10,
               "direction": "above",
               "value": 10
@@ -761,6 +775,7 @@ async function fillDefaultStrategies() {
           "sellRules": [
             {
               "indicator": "sma",
+              "timeframe":"15 minutes",
               "period": 30,
               "direction": "above",
               "value": 2
@@ -776,6 +791,6 @@ async function fillDefaultStrategies() {
       loadStrategies();
     });
   } catch (err) {
-    //alert(err)
+    log('error', 'fillDefaultStrategies', err.stack);
   }
 }

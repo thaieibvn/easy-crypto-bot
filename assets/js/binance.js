@@ -258,7 +258,9 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime, bt) {
   let result = null;
   try {
     result = await getBinanceTicksDb(instrument, timeframe, startTime, endTime);
-  } catch (err) {}
+  } catch (err) {
+      log('error', 'getBinanceTicks', err.stack);
+  }
   let leftSite = false;
   let rightSite = false;
 
@@ -311,7 +313,7 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime, bt) {
     }
 
   } catch (err) {
-    //alert(err)
+    log('error', 'getBinanceTicks', err.stack);
     return null;
   }
   if (noData || leftSite || rightSite) {
@@ -344,6 +346,7 @@ async function downloadBinanceTicks(instrument, timeframe, startTime, endTime, b
   try {
     ticks = await getBinanceTicksImpl(instrument, timeframe, startTime, endTime);
   } catch (err) {
+    log('error', 'downloadBinanceTicks', err.stack);
     return null;
   }
   if (ticks === null || ticks === undefined || ticks.length === 0) {
@@ -362,6 +365,7 @@ async function downloadBinanceTicks(instrument, timeframe, startTime, endTime, b
     try {
       nextData = await getBinanceTicksImpl(instrument, timeframe, lastCloseTime, endTime);
     } catch (err) {
+      log('error', 'downloadBinanceTicks', err.stack);
       return null;
     }
     if (nextData === null || nextData === undefined || nextData.length === 0) {
@@ -399,6 +403,10 @@ function getBinanceUSDTValue(ammount, pair, quoted) {
   return new Promise((resolve, reject) => {
     binance.useServerTime(function() {
       binance.prices((error, ticker) => {
+        if (error) {
+          resolve(null);
+          return;
+        }
         if (pair.toLowerCase().endsWith('usdt')) {
           resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]));
         } else {
