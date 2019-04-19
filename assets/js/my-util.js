@@ -558,7 +558,11 @@ async function fillBugLogs() {
       if (err) {
         $('#bugLogs').html("No logs available!");
       } else {
-        $('#bugLogs').html(data);
+        if (data == null || data == undefined || data.length == 0) {
+          $('#bugLogs').html("No logs available!");
+        } else {
+          $('#bugLogs').html(data);
+        }
       }
     });
   } catch (err) {}
@@ -576,12 +580,21 @@ function reportBug(e) {
     openModalInfo("Please add a description of your problem.");
     return;
   }
+
+  try {
+    fs.writeFileSync(getLogFilename(), '', 'utf-8');
+  } catch (err) {}
+
   openModalInfo("Your BUG report was sent!<br>Thank you for improving EasyCryptoBot!");
+
+  let logs = $('#bugLogs').val().replace(/(?:\r\n|\r|\n)/g, '<br>');
+  $('#bugLogs').html("No logs available!");
   $('#bugDesc').val('');
   $.post("https://easycryptobot.com/mail-bug.php", {
     f: 'ecb',
     m: mail,
     d: desc.replace(/(?:\r\n|\r|\n)/g, '<br>'),
-    l: $('#bugLogs').val().replace(/(?:\r\n|\r|\n)/g, '<br>')
+    l: logs
   }, function(data, status) {});
+
 }
