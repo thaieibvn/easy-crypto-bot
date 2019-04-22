@@ -200,6 +200,10 @@ hr.major {
   margin-bottom: .625em
 }
 
+.margin-b20 {
+  margin-bottom: 1em
+}
+
 .margin-s-b30 {
   margin-bottom: 1.875em
 }
@@ -544,6 +548,11 @@ table {
   margin: 0 0 2em 0;
   width: 100%;
 }
+table.white:hover {
+  background-color: rgba(255, 255, 255, 0.85);
+  border-color: rgba(17, 112, 196, 0.45);
+  color: #1170c4;
+}
 
 table th {
   text-align: left;
@@ -555,6 +564,16 @@ table tr {
   border-color: rgba(255, 255, 255, 0.15);
   border-left: 0;
   border-right: 0
+}
+
+td {
+  padding-right: 0.5em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+td:first-child {
+  padding-left: 0.5em;
 }
 
 table thead tr {
@@ -577,27 +596,27 @@ table a:hover {
   color: #0a4375;
 }
 
-.alt table tr {
+table.alt tr {
   border: solid 1px;
   border-color: rgba(17, 112, 196, 0.15);
   border-left: 0;
   border-right: 0
 }
 
-.alt table tr:nth-child(2n) {
+table.alt tr:nth-child(2n) {
   background-color: rgba(17, 112, 196, 0.25)
 }
 
-.alt table thead tr {
+table.alt thead tr {
   background-color: rgba(17, 112, 196, 0.65);
   color: #fff;
 }
 
-.alt table thead {
+table.alt thead {
   border-bottom: solid 2px rgba(17, 112, 196, 0.15)
 }
 
-.alt table tfoot {
+table.alt tfoot {
   border-top: solid 2px rgba(17, 112, 196, 0.15)
 }
 
@@ -1822,19 +1841,12 @@ a.expanded>span.caret {
   width: 46em;
 }
 
-#btStrategiesTable td, #opStrategiesTable td, #tsStrategiesTable td {
-  padding-right: 0.5em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 #btStrategiesTableNav, #opStrategiesTableNav {
   overflow-x: auto;
   white-space: nowrap;
 }
 
-#btStrategiesList, #opStrategiesList {
+#btStrategiesList, #opStrategiesList, #tsStrategiesList {
   right: 1.7em;
 }
 
@@ -2166,6 +2178,10 @@ a.expanded>span.caret {
     height: auto;
   }
 
+  td {
+    padding-right: 0.3em;
+  }
+
   /*Drop-down Mob*/
   .drop-down, .drop-down-white {
     display: block;
@@ -2328,11 +2344,6 @@ a.expanded>span.caret {
   #strategyName {
     width: 100%;
     display: inline-block;
-  }
-
-  #strategiesTable td {
-    padding-right: 0.3em;
-    text-overflow: ellipsis;
   }
 
   #btStrategiesList, #opStrategiesList {

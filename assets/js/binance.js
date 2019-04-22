@@ -4,6 +4,7 @@ const binance = new Binance().options({
   APIKEY: 'key', APISECRET: 'secret', useServerTime: true, recvWindow: 60000, // If you get timestamp errors, synchronize to server time at startup
   test: false // If you want to use sandbox mode where orders are simulated
 });
+var binanceRealTrading = null;
 
 let cancelBinanceData = false;
 function cancelGetBinanceData() {
@@ -259,7 +260,7 @@ async function getBinanceTicks(instrument, timeframe, startTime, endTime, bt) {
   try {
     result = await getBinanceTicksDb(instrument, timeframe, startTime, endTime);
   } catch (err) {
-      log('error', 'getBinanceTicks', err.stack);
+    log('error', 'getBinanceTicks', err.stack);
   }
   let leftSite = false;
   let rightSite = false;
@@ -418,25 +419,31 @@ function getBinanceUSDTValue(ammount, pair, quoted) {
 }
 
 function checkBinanceApiKey(key, secret) {
-  const binanceApiTest = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, recvWindow: 60000, test: false});
-  return new Promise((resolve, reject) => {
-    binanceApiTest.useServerTime(function() {
-      binanceApiTest.balance(async (error, balances) => {
-        if (error !== null) {
-          resolve(false);
-        } else {
-          resolve(true);
-        }
-      })
+  if (binanceRealTrading == null) {
+    binanceRealTrading = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, recvWindow: 60000, test: false});
+    return new Promise((resolve, reject) => {
+      binanceRealTrading.useServerTime(function() {
+        binanceRealTrading.balance(async (error, balances) => {
+          if (error !== null) {
+            binanceRealTrading = null;
+            resolve(false);
+          } else {
+            resolve(true);
+          }
+        })
+      });
     });
-  });
+  } else {
+    //Should never go here
+    log('warning', 'checkBinanceApiKey', 'Method is called even binanceRealTrading != null.');
+    return false;
+  }
 }
 
 function getBinanceBalance(key, secret, currency) {
-  const binanceApiTest = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, recvWindow: 60000, test: false});
   return new Promise((resolve, reject) => {
-    binanceApiTest.useServerTime(function() {
-      binanceApiTest.balance((error, balances) => {
+    binanceRealTrading.useServerTime(function() {
+      binanceRealTrading.balance((error, balances) => {
         resolve(balances[currency].available);
       })
     });
@@ -530,4 +537,47 @@ function getPrecisionFromTickSize(tickSize) {
     return tickSize.substring(startIndex, endIndex).length;
   }
   return 8;
+}
+
+function getBidAsk(pair) {
+  return new Promise((resolve, reject) => {
+    binance.useServerTime(function() {
+      binance.depth(pair, (error, depth, symbol) => {
+        let bids = binance.sortBids(depth.bids);
+        let asks = binance.sortAsks(depth.asks);
+        resolve([
+          Number.parseFloat(binance.first(bids)),
+          Number.parseFloat(binance.first(asks))
+        ]);
+      });
+    });
+  });
+}
+
+function getBalance(instrument) {
+  return new Promise((resolve, reject) => {
+    binanceRealTrading.useServerTime(function() {
+      binanceRealTrading.balance((error, balances) => {
+        if (error) {
+          resolve(0);
+          return;
+        }
+        resolve(balances[getBaseCurrency(instrument)].available);
+      })
+    })
+  });
+}
+
+function getBinanceTicks300(instrument, timeframe) {
+  return new Promise((resolve, reject) => {
+    binance.useServerTime(function() {
+      binance.candlesticks(instrument, timeframe, (error, ticks, symbol) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(ticks);
+        }
+      }, {limit: 300});
+    });
+  });
 }

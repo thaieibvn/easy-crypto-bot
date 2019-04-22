@@ -18,7 +18,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 	<link rel="import" href="sections/backtest.html">
 	<link rel="import" href="sections/trade.html">
 	<link rel="import" href="sections/bugs.html">
-		
+
 </head>
 
 <body>
@@ -27,9 +27,9 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 		<div class="inner">
 			<nav>
 				<ul>
-					<li><a id="homeMenu"  onclick="sectionClick('#home')" href="#">Home</a></li>
-					<li><a id="strategiesMenu"  onclick="sectionClick('#strategies')" href="#">Strategies</a></li>
-					<li><a  id="backtestMenu" onclick="sectionClick('#backtest')" href="#">Backtest</a></li>
+					<li><a id="homeMenu" onclick="sectionClick('#home')" href="#">Home</a></li>
+					<li><a id="strategiesMenu" onclick="sectionClick('#strategies')" href="#">Strategies</a></li>
+					<li><a id="backtestMenu" onclick="sectionClick('#backtest')" href="#">Backtest</a></li>
 					<li><a id="optimizeMenu" onclick="sectionClick('#optimize')" href="#">Optimize</a></li>
 					<li><a id="tradeMenu" onclick="sectionClick('#trade')" href="#">Trading</a></li>
 					<li><a id="bugMenu" onclick="sectionClick('#bugs')" href="#">Report Bug</a></li>
@@ -42,6 +42,8 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 
 	<!-- Wrapper -->
 	<div id="wrapper">
+	</div>
+	<div id="wrapperModals">
 		<div id="newStrategyWindow" class="modal">
 			<div>
 				<a class="close-modal" onclick="closeNewStrategy()" href="#/"><i class="text-red fas fa-times"></i></a>
@@ -59,7 +61,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 					<div class="inline" id="buyRulesDiv">
 						Add new Rule with
 						<div class="drop-down">
-							<a href="#/" onclick="dropDown('#buyRulesDiv')"><span id="buyRulesCombobox" class="name">Simple Moving Average SMA</span> <span	class="caret"></span></a>
+							<a href="#/" onclick="dropDown('#buyRulesDiv')"><span id="buyRulesCombobox" class="name">Simple Moving Average SMA</span> <span class="caret"></span></a>
 							<ul>
 								<li><a href="#/" onclick="dropDownItem('Simple Moving Average SMA', '#buyRulesDiv', function(){buyRuleType='sma'})">Simple Moving Average SMA</a></li>
 								<li><a href="#/" onclick="dropDownItem('Exponential Moving Average EMA', '#buyRulesDiv', function(){buyRuleType='ema'})">Exponential Moving Average EMA</a></li>
@@ -70,7 +72,8 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 							</ul>
 						</div>
 					</div>
-					&nbsp;<a id="newBuyRuleBtn" href="#/" onclick="newBuyRule()" class="button2"><i class="text-green fa fa-plus"></i> Add</a></div>
+					&nbsp;<a id="newBuyRuleBtn" href="#/" onclick="newBuyRule()" class="button2"><i class="text-green fa fa-plus"></i> Add</a>
+				</div>
 				<div id="buyRules">
 					<ul>
 					</ul>
@@ -81,7 +84,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 					<div class="inline" id="sellRulesDiv">
 						Add new Rule with
 						<div class="drop-down">
-							<a href="#/" onclick="dropDown('#sellRulesDiv')"><span id="sellRulesCombobox" class="name">Simple Moving Average SMA</span> <span	class="caret"></span></a>
+							<a href="#/" onclick="dropDown('#sellRulesDiv')"><span id="sellRulesCombobox" class="name">Simple Moving Average SMA</span> <span class="caret"></span></a>
 							<ul>
 								<li><a href="#/" onclick="dropDownItem('Simple Moving Average SMA', '#sellRulesDiv', function(){sellRuleType='sma'})">Simple Moving Average SMA</a></li>
 								<li><a href="#/" onclick="dropDownItem('Exponential Moving Average EMA', '#sellRulesDiv', function(){sellRuleType='ema'})">Exponential Moving Average EMA</a></li>
@@ -92,7 +95,8 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 							</ul>
 						</div>
 					</div>
-					&nbsp;<a id="newSellRuleBtn" href="#/" onclick="newSellRule()" class="button2"><i class="text-green fa fa-plus"></i> Add</a></div>
+					&nbsp;<a id="newSellRuleBtn" href="#/" onclick="newSellRule()" class="button2"><i class="text-green fa fa-plus"></i> Add</a>
+				</div>
 				<div id="sellRules">
 					<ul>
 					</ul>
@@ -113,61 +117,101 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 				<hr />
 
 				<div class="text-center margin-s-b30">
-					<a href="#/" onclick="saveStrategy()" class="button alt white" style="width:12em;margin:0 1em">Save</a>
-					<a href="#/" onclick="closeNewStrategy()" class="button alt white" style="width:12em;margin:0 1em">Cancel</a>
+					<a href="#/" onclick="saveStrategy()" class="button alt white">Save</a>
+					<a href="#/" onclick="closeNewStrategy()" class="button alt white">Cancel</a>
 				</div>
 			</div>
 		</div>
-	</div>
 
-	<div id="executionResultsWindow" class="modal">
-		<div>
-			<a class="close-modal" onclick="closeExecutionWindow()" href="#/"><i class="text-red fas fa-times"></i></a>
-			<div class="text-center">
-				<h2 id="executionDetailsLabel" class="text-center ">Execution Details</h2>
-				<div id="executionDetailsLabel2" class="margin-s-b10">The trading fees are included in the results. <span id="executionFeeRate"></span></div>
-				<div class="features alt text-left">
-					<section class="trade-section">
-						<h3><i class=" fas fa-rocket"></i>&nbsp;Performance</h3> Total Return:&nbsp;
-						<span class="bold" id="executionTotalReturn"></span><br> Win/Loss Ratio:&nbsp;
-						<span class="bold" id="executionWinLoss"></span><br> Average gain/loss per trade:&nbsp;
-						<span class="bold" id="executionAvgWinLossPerTrade"></span><br>Net Gain/Loss:&nbsp;
-						<span class="bold" id="executionResultWithUsd"></span><br> Executed Trades:&nbsp;
-						<span class="bold" id="executionExecutedTrades"></span><br>
-					</section>
-					<section>
-						<h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> Strategy:&nbsp;
-						<span class="bold" id="executionStrategyRes"></span><br> Exchange:&nbsp;
-						<span class="bold" id="executionExchangeRes"></span><br> Instrument:&nbsp;
-						<span class="bold" id="executionInstrumentRes"></span>
-						<div id="executionPosSizeResDiv" class="inline"><br> Position Size:&nbsp;
-							<span class="bold" id="executionPosSizeRes"></span></div>
-						<div id="executionMaxLossResDiv" class="inline"><br> Maximum Execution Loss:&nbsp;
-							<span class="bold" id="executionMasLossRes"></span></div>
-					</section>
-					<section class="trade-section">
-						<h3><i class=" fas fa-thumbs-up"></i>&nbsp;Winning Trades</h3> Win Rate:&nbsp;<span class="bold" id="executionWinningTradesP"></span><br> Winning trades count:&nbsp;<span class="bold" id="executionWinningCount"></span><br> Average gain per trade:&nbsp;<span class="bold" id="executionAvgGainPerWinning"></span><br>						Biggest gain:&nbsp;<span class="bold" id="executionBiggestGain"></span><br>
-					</section>
-					<section class="trade-section">
-						<h3><i class=" fas fa-thumbs-down"></i>&nbsp;Loosing Trades</h3> Loose Rate:&nbsp;<span class="bold" id="executionLoosingTradesP"></span><br> Loosing trades count:&nbsp;<span class="bold" id="executionLoosingCount"></span><br> Average loss per trade:&nbsp;<span class="bold" id="executionAvgLostPerWinning"></span><br>						Biggest loss:&nbsp;<span class="bold" id="executionBiggestLost"></span><br>
-					</section>
-				</div>
+		<div id="executionResultsWindow" class="modal">
+			<div>
+				<a class="close-modal" onclick="closeExecutionWindow()" href="#/"><i class="text-red fas fa-times"></i></a>
+				<div class="text-center">
+					<h2 id="executionDetailsLabel" class="text-center ">Execution Details</h2>
+					<div id="executionDetailsLabel2" class="margin-s-b10">The trading fees are included in the results. <span id="executionFeeRate"></span></div>
+					<div class="features alt text-left">
+						<section class="trade-section">
+							<h3><i class=" fas fa-rocket"></i>&nbsp;Performance</h3> Total Return:&nbsp;
+							<span class="bold" id="executionTotalReturn"></span><br> Win/Loss Ratio:&nbsp;
+							<span class="bold" id="executionWinLoss"></span><br> Average gain/loss per trade:&nbsp;
+							<span class="bold" id="executionAvgWinLossPerTrade"></span><br>Net Gain/Loss:&nbsp;
+							<span class="bold" id="executionResultWithUsd"></span><br> Executed Trades:&nbsp;
+							<span class="bold" id="executionExecutedTrades"></span><br>
+						</section>
+						<section>
+							<h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> Strategy:&nbsp;
+							<span class="bold" id="executionStrategyRes"></span><br> Exchange:&nbsp;
+							<span class="bold" id="executionExchangeRes"></span><br> Instrument:&nbsp;
+							<span class="bold" id="executionInstrumentRes"></span>
+							<div id="executionPosSizeResDiv" class="inline"><br> Position Size:&nbsp;
+								<span class="bold" id="executionPosSizeRes"></span></div>
+							<div id="executionMaxLossResDiv" class="inline"><br> Maximum Execution Loss:&nbsp;
+								<span class="bold" id="executionMasLossRes"></span></div>
+							<div id="executionEmailResDiv" class="inline"><br> Email:&nbsp;
+								<span class="bold" id="executionResEmail"></span></div>
+						</section>
+						<section class="trade-section">
+							<h3><i class=" fas fa-thumbs-up"></i>&nbsp;Winning Trades</h3> Win Rate:&nbsp;<span class="bold" id="executionWinningTradesP"></span><br> Winning trades count:&nbsp;<span class="bold" id="executionWinningCount"></span><br> Average gain per
+							trade:&nbsp;<span class="bold" id="executionAvgGainPerWinning"></span><br> Biggest gain:&nbsp;<span class="bold" id="executionBiggestGain"></span><br>
+						</section>
+						<section class="trade-section">
+							<h3><i class=" fas fa-thumbs-down"></i>&nbsp;Loosing Trades</h3> Loose Rate:&nbsp;<span class="bold" id="executionLoosingTradesP"></span><br> Loosing trades count:&nbsp;<span class="bold" id="executionLoosingCount"></span><br> Average loss
+							per
+							trade:&nbsp;<span class="bold" id="executionAvgLostPerWinning"></span><br> Biggest loss:&nbsp;<span class="bold" id="executionBiggestLost"></span><br>
+						</section>
+					</div>
 
-				<h3 id="executionTableLabel" class="text-center margin-s-b10">Executed Trades</h3>
-				<div class="table-wrapper alt">
-					<table id="executionStrategiesTable">
-					</table>
-				</div>
-				<div class="text-center margin-s-b30">
-					<a href="#/" onclick="closeExecutionWindow()" class="button alt white" style="width:12em;margin:0 1em">Close</a>
+					<h3 id="executionTableLabel" class="text-center margin-s-b10">Executed Trades</h3>
+					<div class="table-wrapper">
+						<table id="executionStrategiesTable" class="alt">
+						</table>
+					</div>
+					<div class="text-center margin-s-b30">
+						<a href="#/" onclick="closeExecutionWindow()" class="button alt white">Close</a>
+					</div>
 				</div>
 			</div>
 		</div>
-	</div>
+
+		<div id="eidtExecutionWindow" class="modal">
+			<div>
+				<a class="close-modal" onclick="closeEditExecutionWindow()" href="#/"><i class="text-red fas fa-times"></i></a>
+				<div class="text-center">
+					<h2 class="text-center ">Edit Execution</h2>
+
+					<div class="features text-left">
+						<section>
+							<h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> <span class="inline-block min-width5">Mode:&nbsp;</span>
+							<span class="bold" id="executionModeEdit"></span><br> <span class="inline-block min-width5">Strategy:&nbsp;</span>
+							<span class="bold" id="executionStrategyEdit"></span>&nbsp;&nbsp;<atitle="Edit Strategy" onclick="editExecutionStrategy()" href="#/"><i class="far fa-edit"></i></a>
+							<br> <span class="inline-block min-width5">Exchange:&nbsp;</span>
+							<span class="bold" id="executionExchangeEdit"></span><br> <span class="inline-block min-width5">Instrument:&nbsp;</span>
+							<span class="bold" id="executionInstrumentEdit"></span>
+							<div id="executionPosSizeEditDiv" class="inline"><br> <span class="inline-block min-width5">Trade Size:&nbsp;</span>
+								<input style="width:200px;" onkeyup="fillPosSizeDetailsEdit()" autocomplete="off" class="search" id="executionPosSizeEdit" type="number" placeholder="Position Size" />&nbsp;<span class="additional-field inline-block min-width5" id="tsQuotedCurrencyEdit"></span>
+							</div>
+							<div id="executionMaxLosEditDiv" class="inline"><br> <span class="inline-block min-width5">Max Loss:&nbsp;</span>
+								<input style="width:200px;" onkeyup="fillMaxLossDetailsEdit()" autocomplete="off" class="search" id="executionMasLossEdit" type="number" placeholder="Max Loss" />&nbsp;<span class="additional-field inline-block min-width5" id="tsMaxLossCurrencyEdit"></span>
+							</div>
+							<div id="executionMailEditDiv" class="inline"><br> <span class="inline-block min-width5">Email:&nbsp;</span>
+								<input style="width:200px;" autocomplete="off" class="search" id="executionEmailEdit" type="text" placeholder="email" />
+							</div>
+							<div id="executionFeeRateEditDiv" class="inline"><br><span class="inline-block min-width5">Fee Rate %:&nbsp;</span>
+								<input style="width:200px;" autocomplete="off" class="search" id="executionFeeRateEdit" type="number" placeholder="Fee Rate %" />
+							</div>
+						</section>
+					</div>
+
+					<div class="text-center margin-s-b30">
+						<a href="#/" id="editExecutionSaveBtn" class="button alt white">Save</a>
+						<a href="#/" onclick="closeEditExecutionWindow()" class="button alt white">Close</a>
+					</div>
+				</div>
+			</div>
+		</div>
 
 	</div>
 
-	<!-- Footer -->
 	<!-- Footer -->
 	<footer id="footer" class="wrapper text-center">
 		<div class="inner">
@@ -220,13 +264,27 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 		//removeTmpFiles();
 		enablePowerSaveBlocker();
 
+		function modalsClosed() {
+			if (!$('#newStrategyWindow').is(':visible') && !$('#executionResultsWindow').is(':visible') && !$('#eidtExecutionWindow').is(':visible')) {
+				$('#wrapper').css('opacity', '1');
+				$('#wrapper').css('pointer-events', 'auto');
+				$('#sidebar').css('opacity', '1');
+				$('#sidebar').css('pointer-events', 'auto');
+				$('#footer').css('opacity', '1');
+				$('#footer').css('pointer-events', 'auto');
+			} else {
+				$('#wrapper').css('opacity', '0.5');
+				$('#footer').css('opacity', '0.5');
+			}
+			$('#wrapperModals').css('opacity', '1');
+			$('#wrapperModals').css('pointer-events', 'auto');
+		}
+
 		$('#modalConfirmOk').click(function(e) {
 			e.preventDefault();
+			modalsClosed();
 			$('#modalConfirm').css('display', 'none');
-			$('#wrapper').css('opacity', '1');
-			$('#wrapper').css('pointer-events', 'auto');
-			$('#sidebar').css('opacity', '1');
-			$('#sidebar').css('pointer-events', 'auto');
+
 			if (confirmOkFunc !== null) {
 				confirmOkFunc();
 				confirmOkFunc = null;
@@ -235,11 +293,9 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 
 		$('#modalConfirmCancel').click(function(e) {
 			e.preventDefault();
+			modalsClosed();
 			$('#modalConfirm').css('display', 'none');
-			$('#wrapper').css('opacity', '1');
-			$('#wrapper').css('pointer-events', 'auto');
-			$('#sidebar').css('opacity', '1');
-			$('#sidebar').css('pointer-events', 'auto');
+
 			if (confirmCalcelFunc !== null) {
 				confirmCalcelFunc();
 				confirmCalcelFunc = null;
@@ -248,11 +304,8 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 
 		$('#modalInfoOk').click(function(e) {
 			e.preventDefault();
+			modalsClosed();
 			$('#modalInfo').css('display', 'none');
-			$('#wrapper').css('opacity', '1');
-			$('#wrapper').css('pointer-events', 'auto');
-			$('#sidebar').css('opacity', '1');
-			$('#sidebar').css('pointer-events', 'auto');
 			if (modalInfoFunc !== null) {
 				modalInfoFunc();
 				modalInfoFunc = null;

@@ -74,21 +74,22 @@
       <div class="text-center">
         <a id="executeStrategyBtn" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="executeStrategy()" class="button white margin-s-b30"><i class="text-green fas fa-play"></i> Execute</a>
         <br>
-        <span style="font-size:small">NOTE: If you close the application, all executions will be terminated and not executed any more.
+        <span style="font-size:small">NOTE: If you close the application, all executions will be terminated and NOT executed any more.
           You can resume their execution on app re-launch.<br>
-          NOTE: If you are executing a strategy and edit it the changes will not take place in the execution. You need to remove the execution and start a new one!</span>
+          NOTE: If you are executing a strategy and edit it the changes will NOT take place in the execution. You need to edit the execution itself!</span>
       </div>
 
       <div id="tsResultDiv" class="display-none">
         <hr>
         <div>
           <h2 class="text-center">Executions&nbsp;<i class="fas fa-rocket"></i> </h2>
-          <div class="text-center margin-s-b10">
-            <a id="" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="startAllExecutions()" class="button white alt"><i class="text-green fas fa-play"></i> Start All</a>
-            <a id="" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="stopAllExecutions()" class="button white alt"><i class="text-red fas fa-stop"></i> Stop All</a>
+          <div class="text-center margin-b20">
+            <a style="width:15em" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="startAllExecutions()" class="button white alt"><i class="text-green fas fa-play"></i> Start All</a>
+            <a style="width:15em"  onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="stopAllExecutions()" class="button white alt"><i class="text-red fas fa-stop"></i> Stop All</a>
+            <a style="width:15em"  onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="clearErrors()" class="button white alt"><i class="text-blue fas fa-recycle"></i>  Clear Errors</a>
           </div>
-          <div class="table-wrapper alt">
-            <table id="tsStrategiesTable">
+          <div class="table-wrapper ">
+            <table id="tsStrategiesTable" class="white alt">
               <thead>
                 <tr>
                   <td>Mode</td>
@@ -100,6 +101,7 @@
                   <td>Result</td>
                   <td>Last Tick</td>
                   <td>Status</td>
+                  <td>Actions</td>
                 </tr>
               </thead>
             </table>

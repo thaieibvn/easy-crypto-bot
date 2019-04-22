@@ -423,6 +423,10 @@ function closeNewStrategy() {
   $('#strategiesBody').css('pointer-events', 'auto');
   $('#sidebar').css('opacity', '1');
   $('#sidebar').css('pointer-events', 'auto');
+  $('#wrapper').css('opacity', '1');
+  $('#wrapper').css('pointer-events', 'auto');
+  $('#footer').css('opacity', '1');
+  $('#footer').css('pointer-events', 'auto');
   $('#btBody').css('opacity', '1');
   $('#btBody').css('pointer-events', 'auto');
   $('body').css('overflow-y', 'auto');
@@ -440,6 +444,10 @@ function newStrategy() {
   $('#strategiesBody').css('pointer-events', 'none');
   $('#sidebar').css('opacity', '0.5');
   $('#sidebar').css('pointer-events', 'none');
+  $('#wrapper').css('opacity', '0.5');
+  $('#wrapper').css('pointer-events', 'none');
+  $('#footer').css('opacity', '0.5');
+  $('#footer').css('pointer-events', 'none');
   $('body').css('overflow', 'hidden');
 };
 
@@ -468,6 +476,10 @@ function openStrategy(strategy) {
     $('#strategiesBody').css('pointer-events', 'none');
     $('#sidebar').css('opacity', '0.5');
     $('#sidebar').css('pointer-events', 'none');
+    $('#wrapper').css('opacity', '0.5');
+    $('#wrapper').css('pointer-events', 'none');
+    $('#footer').css('opacity', '0.5');
+    $('#footer').css('pointer-events', 'none');
     $('body').css('overflow', 'hidden');
 
     $('#strategyName').val(strategy.name);
@@ -650,7 +662,7 @@ async function loadStrategies() {
     const strategies = await getStrategies();
     $('#strategiesTable').html('');
     strategies.forEach(function(d) {
-      $('#strategiesTable').append('<tr><td>' + d.name + '<td><td><a title="Edit Strategy" href="#newStrategyLabel" onclick="editStrategy(\'' + d.name + '\')" ><i class="far fa-edit"></i></a><td><td><a title="Remove Strategy" href="#/" onclick="rmStrategy(\'' + d.name + '\')"><i class="fas fa-times"></i></a></td></tr>');
+      $('#strategiesTable').append('<tr><td>' + d.name + '<td><td><a title="Edit Strategy" href="#newStrategyLabel" onclick="editStrategy(\'' + d.name + '\')" ><i class="far fa-edit"></i></a><td><td><a title="Remove Strategy" href="#/" onclick="rmStrategy(\'' + d.name + '\')"><i class="fas fa-trash"></i></a></td></tr>');
     });
   } catch (err) {
       log('error', 'loadStrategies', err.stack);

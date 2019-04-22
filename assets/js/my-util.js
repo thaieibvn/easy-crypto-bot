@@ -66,14 +66,8 @@ function openModalConfirmYes(msg, okFunc, calcelFunc) {
 }
 
 function openModalConfirmImpl(msg, okFunc, calcelFunc) {
-  $('.modal-big').hide();
-  $('.modal-small').hide();
-  $('#modalLoading').hide();
+  openModals();
   $('#modalConfirm').css('display', 'flex');
-  $('#wrapper').css('opacity', '0.5');
-  $('#wrapper').css('pointer-events', 'none');
-  $('#sidebar').css('opacity', '0.5');
-  $('#sidebar').css('pointer-events', 'none');
   $('#modalConfirm>div>div').html(msg);
   $('#modalConfirm').focus();
   if (typeof okFunc === 'function') {
@@ -100,17 +94,30 @@ function openModalInfoBig(msg, func) {
   openModalInfoImpl(msg, func);
 }
 
-function openModalInfoImpl(msg, func) {
+function openModals() {
   $('.modal-big').hide();
   $('.modal-small').hide();
   $('#modalLoading').hide();
-  $('#modalInfo').css('display', 'flex');
-  $('#wrapper').css('opacity', '0.5');
-  $('#wrapper').css('pointer-events', 'none');
-  $('#sidebar').css('opacity', '0.5');
-  $('#sidebar').css('pointer-events', 'none');
-  $('#modalInfo>div>div').html(msg);
 
+  if ($('#newStrategyWindow').is(':visible') || $('#executionResultsWindow').is(':visible') || $('#eidtExecutionWindow').is(':visible')) {
+    $('#wrapper').css('opacity', '0');
+    $('#footer').css('opacity', '0');
+
+    $('#wrapperModals').css('opacity', '0.5');
+    $('#wrapperModals').css('pointer-events', 'none');
+  } else {
+    $('#wrapper').css('opacity', '0.5');
+    $('#footer').css('opacity', '0.5');
+  }
+  $('#footer').css('pointer-events', 'none');
+  $('#wrapper').css('pointer-events', 'none');
+  $('#sidebar').css('pointer-events', 'none');
+}
+
+function openModalInfoImpl(msg, func) {
+  openModals();
+  $('#modalInfo').css('display', 'flex');
+  $('#modalInfo>div>div').html(msg);
   if (typeof func === 'function') {
     modalInfoFunc = func;
   } else {
@@ -119,23 +126,24 @@ function openModalInfoImpl(msg, func) {
 }
 
 function showLoading() {
-  $('.modal-big').hide();
-  $('.modal-small').hide();
+  openModals();
   $('#modalLoading').css('display', 'flex');
-  $('#wrapper').css('opacity', '0.5');
-  $('#wrapper').css('pointer-events', 'none');
-  $('#sidebar').css('opacity', '0.5');
-  $('#sidebar').css('pointer-events', 'none');
 }
 
 function hideLoading() {
-  $('.modal-big').hide();
-  $('.modal-small').hide();
-  $('#modalLoading').hide();
-  $('#wrapper').css('opacity', '1');
-  $('#wrapper').css('pointer-events', 'auto');
-  $('#sidebar').css('opacity', '1');
-  $('#sidebar').css('pointer-events', 'auto');
+  if ($('#modalLoading').is(':visible')) {
+    if (!$('#newStrategyWindow').is(':visible') && !$('#executionResultsWindow').is(':visible') && !$('#eidtExecutionWindow').is(':visible')) {
+      $('#wrapper').css('opacity', '1');
+      $('#wrapper').css('pointer-events', 'auto');
+      $('#sidebar').css('opacity', '1');
+      $('#sidebar').css('pointer-events', 'auto');
+    }else {
+      $('#wrapper').css('opacity', '0.5');
+    }
+    $('#wrapperModals').css('opacity', '1');
+    $('#wrapperModals').css('pointer-events', 'auto');
+    $('#modalLoading').hide();
+  }
 }
 
 function getEula() {
@@ -186,22 +194,12 @@ let suttingDown = false;
 ipcRenderer.on("shutdown", async (event, file) => {
   if (suttingDown) {
     openModalInfo("EasyCryptoBot is shutting down.<br>Please wait..", function() {
-      $('#wrapper').css('opacity', '0.5');
-      $('#wrapper').css('pointer-events', 'none');
-      $('#sidebar').css('opacity', '0.5');
-      $('#sidebar').css('pointer-events', 'none');
+      showLoading();
     });
   } else {
     openModalConfirmYes("Do you really want to quit?", async function() {
       try {
         suttingDown = true;
-        $('.modal-big').hide();
-        $('.modal-small').hide();
-        $('#modalLoading').css('display', 'flex');
-        $('#wrapper').css('opacity', '0.5');
-        $('#wrapper').css('pointer-events', 'none');
-        $('#sidebar').css('opacity', '0.5');
-        $('#sidebar').css('pointer-events', 'none');
         await stopAllExecutions();
       } catch (err) {
         log('error', 'ipcRenderer.on shutdown', err.stack);
