@@ -469,6 +469,7 @@ function openStrategyVariationStrategy(strategy) {
 function openStrategy(strategy) {
   try {
     clearStrategyFields();
+    $("#newStrategyWindowDiv").animate({ scrollTop: 0 }, 'fast');
     $('#newStrategyWindow').fadeIn();
     $('#btBody').css('opacity', '0.5');
     $('#btBody').css('pointer-events', 'none');

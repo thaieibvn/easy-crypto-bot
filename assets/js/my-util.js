@@ -99,11 +99,11 @@ function openModals() {
   $('.modal-small').hide();
   $('#modalLoading').hide();
 
-  if ($('#newStrategyWindow').is(':visible') || $('#executionResultsWindow').is(':visible') || $('#eidtExecutionWindow').is(':visible')) {
-    $('#wrapper').css('opacity', '0');
-    $('#footer').css('opacity', '0');
+  if ($('#newStrategyWindow').is(':visible') || $('#executionResultsWindow').is(':visible') || $('#editExecutionWindow').is(':visible')) {
+    $('#wrapper').css('opacity', '0.2');
+    $('#footer').css('opacity', '0.2');
 
-    $('#wrapperModals').css('opacity', '0.5');
+    $('#wrapperModals').css('opacity', '0.7');
     $('#wrapperModals').css('pointer-events', 'none');
   } else {
     $('#wrapper').css('opacity', '0.5');
@@ -132,7 +132,7 @@ function showLoading() {
 
 function hideLoading() {
   if ($('#modalLoading').is(':visible')) {
-    if (!$('#newStrategyWindow').is(':visible') && !$('#executionResultsWindow').is(':visible') && !$('#eidtExecutionWindow').is(':visible')) {
+    if (!$('#newStrategyWindow').is(':visible') && !$('#executionResultsWindow').is(':visible') && !$('#editExecutionWindow').is(':visible')) {
       $('#wrapper').css('opacity', '1');
       $('#wrapper').css('pointer-events', 'auto');
       $('#sidebar').css('opacity', '1');

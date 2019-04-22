@@ -45,7 +45,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 	</div>
 	<div id="wrapperModals">
 		<div id="newStrategyWindow" class="modal">
-			<div>
+			<div id="newStrategyWindowDiv">
 				<a class="close-modal" onclick="closeNewStrategy()" href="#/"><i class="text-red fas fa-times"></i></a>
 				<div>
 					<div class="text-center">
@@ -120,11 +120,12 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 					<a href="#/" onclick="saveStrategy()" class="button alt white">Save</a>
 					<a href="#/" onclick="closeNewStrategy()" class="button alt white">Cancel</a>
 				</div>
+				<br>
 			</div>
 		</div>
 
 		<div id="executionResultsWindow" class="modal">
-			<div>
+			<div id="executionResultsWindowDiv">
 				<a class="close-modal" onclick="closeExecutionWindow()" href="#/"><i class="text-red fas fa-times"></i></a>
 				<div class="text-center">
 					<h2 id="executionDetailsLabel" class="text-center ">Execution Details</h2>
@@ -173,17 +174,18 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 			</div>
 		</div>
 
-		<div id="eidtExecutionWindow" class="modal">
+		<div id="editExecutionWindow" class="modal alt">
 			<div>
 				<a class="close-modal" onclick="closeEditExecutionWindow()" href="#/"><i class="text-red fas fa-times"></i></a>
 				<div class="text-center">
+					<br>
 					<h2 class="text-center ">Edit Execution</h2>
-
+					<br>
 					<div class="features text-left">
 						<section>
 							<h3><i class=" fas fa-cog"></i>&nbsp;Setup</h3> <span class="inline-block min-width5">Mode:&nbsp;</span>
 							<span class="bold" id="executionModeEdit"></span><br> <span class="inline-block min-width5">Strategy:&nbsp;</span>
-							<span class="bold" id="executionStrategyEdit"></span>&nbsp;&nbsp;<atitle="Edit Strategy" onclick="editExecutionStrategy()" href="#/"><i class="far fa-edit"></i></a>
+							<span class="bold" id="executionStrategyEdit"></span>&nbsp;&nbsp;<a title="Edit Strategy" onclick="editExecutionStrategy()" href="#/"><i class="far fa-edit"></i></a>
 							<br> <span class="inline-block min-width5">Exchange:&nbsp;</span>
 							<span class="bold" id="executionExchangeEdit"></span><br> <span class="inline-block min-width5">Instrument:&nbsp;</span>
 							<span class="bold" id="executionInstrumentEdit"></span>
@@ -199,6 +201,10 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 							<div id="executionFeeRateEditDiv" class="inline"><br><span class="inline-block min-width5">Fee Rate %:&nbsp;</span>
 								<input style="width:200px;" autocomplete="off" class="search" id="executionFeeRateEdit" type="number" placeholder="Fee Rate %" />
 							</div>
+							<div id="executionOpenTradeEditDiv" class="inline"><br><span class="inline-block min-width5">Close Open Trade:</span>
+								<a href="#/" id="closeOpenTradeBtn" class="button alt white">Close Trade</a>
+							</div>
+
 						</section>
 					</div>
 
@@ -265,7 +271,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 		enablePowerSaveBlocker();
 
 		function modalsClosed() {
-			if (!$('#newStrategyWindow').is(':visible') && !$('#executionResultsWindow').is(':visible') && !$('#eidtExecutionWindow').is(':visible')) {
+			if (!$('#newStrategyWindow').is(':visible') && !$('#executionResultsWindow').is(':visible') && !$('#editExecutionWindow').is(':visible')) {
 				$('#wrapper').css('opacity', '1');
 				$('#wrapper').css('pointer-events', 'auto');
 				$('#sidebar').css('opacity', '1');

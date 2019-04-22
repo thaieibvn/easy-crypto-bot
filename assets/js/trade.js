@@ -34,6 +34,7 @@ async function verifyKeyAndSecret(exchange) {
       $('#tsExchangeCombobox').html('Choose Exchange');
       return false;
     }
+    fillBinanceBalancesTask();
     exchangesApiKeys[exchange] = {
       key: key,
       secret: secret
@@ -117,24 +118,7 @@ async function fillPosSizeDetails() {
   if (value.length > 0 && Number.parseFloat(value) > 0) {
     let ustdValue = await getBinanceUSDTValue(Number.parseFloat(value), instrument, getQuotedCurrency(instrument));
     if (ustdValue != null && !isNaN(ustdValue) && $('#tsPosSize').val() == value) {
-      $('#tsQuotedCurrency').html(getBaseCurrency(instrument) + ' ($' + ustdValue.toFixed(2) + ')');
-    }
-  }
-}
-
-async function fillMaxLossDetails() {
-  let instrument = $('#tsInstrumentSearch').val().toUpperCase();
-  if (instrument.length <= 0 || getQuotedCurrency(instrument) === '' || getBaseCurrency(instrument) === '') {
-    $('#tsMaxLossCurrency').html('');
-    return;
-  }
-  $('#tsMaxLossCurrency').html(getBaseCurrency(instrument));
-
-  let value = $('#tsMaxLoss').val();
-  if (value.length > 0 && Number.parseFloat(value) > 0) {
-    let ustdValue = await getBinanceUSDTValue(Number.parseFloat(value), instrument, getQuotedCurrency(instrument));
-    if (ustdValue != null && !isNaN(ustdValue) && $('#tsMaxLoss').val() == value) {
-      $('#tsMaxLossCurrency').html(getBaseCurrency(instrument) + ' ($' + ustdValue.toFixed(2) + ')');
+      $('#tsQuotedCurrency').html(getBaseCurrency(instrument) + ' (~ $' + ustdValue.toFixed(2) + ' )');
     }
   }
 }
@@ -151,7 +135,25 @@ async function fillPosSizeDetailsEdit() {
   if (value.length > 0 && Number.parseFloat(value) > 0) {
     let ustdValue = await getBinanceUSDTValue(Number.parseFloat(value), instrument, getQuotedCurrency(instrument));
     if (ustdValue != null && !isNaN(ustdValue) && $('#executionPosSizeEdit').val() == value) {
-      $('#tsQuotedCurrencyEdit').html(getBaseCurrency(instrument) + ' ($' + ustdValue.toFixed(2) + ')');
+      $('#tsQuotedCurrencyEdit').html(getBaseCurrency(instrument) + ' (~ $' + ustdValue.toFixed(2) + ' )');
+    }
+  }
+}
+
+async function fillMaxLossDetails() {
+  let instrument = $('#tsInstrumentSearch').val().toUpperCase();
+  if (instrument.length <= 0 || getQuotedCurrency(instrument) === '' || getBaseCurrency(instrument) === '') {
+    $('#tsMaxLossCurrency').html('');
+    return;
+  }
+  $('#tsMaxLossCurrency').html(getQuotedCurrency(instrument));
+
+  let value = Math.abs(Number.parseFloat($('#tsMaxLoss').val()));
+  if (!isNaN(value) && value!= 0) {
+    let prices = await getLastBinancePrices();
+    let ustdValue = calculateUsdtValue(getQuotedCurrency(instrument), value, prices);
+    if (ustdValue != null && !isNaN(ustdValue) && Math.abs(Number.parseFloat($('#tsMaxLoss').val())) == value) {
+      $('#tsMaxLossCurrency').html(getQuotedCurrency(instrument) + ' (~ $' + ustdValue.toFixed(2) + ' )');
     }
   }
 }
@@ -162,13 +164,14 @@ async function fillMaxLossDetailsEdit() {
     $('#tsMaxLossCurrencyEdit').html('');
     return;
   }
-  $('#tsMaxLossCurrencyEdit').html(getBaseCurrency(instrument));
+  $('#tsMaxLossCurrencyEdit').html(getQuotedCurrency(instrument));
 
-  let value = $('#executionMasLossEdit').val();
-  if (value.length > 0 && Number.parseFloat(value) > 0) {
-    let ustdValue = await getBinanceUSDTValue(Number.parseFloat(value), instrument, getQuotedCurrency(instrument));
-    if (ustdValue != null && !isNaN(ustdValue) && $('#executionMasLossEdit').val() == value) {
-      $('#tsMaxLossCurrencyEdit').html(getBaseCurrency(instrument) + ' ($' + ustdValue.toFixed(2) + ')');
+  let value = Math.abs(Number.parseFloat($('#executionMasLossEdit').val()));
+  if (!isNaN(value) && value != 0) {
+    let prices = await getLastBinancePrices();
+    let ustdValue = calculateUsdtValue(getQuotedCurrency(instrument), value, prices);
+    if (ustdValue != null && !isNaN(ustdValue) && Math.abs(Number.parseFloat($('#executionMasLossEdit').val())) == value) {
+      $('#tsMaxLossCurrencyEdit').html(getQuotedCurrency(instrument) + ' (~ $' + ustdValue.toFixed(2) + ' )');
     }
   }
 }
@@ -270,8 +273,8 @@ async function executeStrategy() {
         return;
       }
       positionSize = posCheck[1];
-      let maxLossTmp = Number.parseFloat($('#tsMaxLoss').val());
-      if (!isNaN(maxLossTmp) && maxLossTmp !== 0) {
+      let maxLossTmp = Math.abs(Number.parseFloat($('#tsMaxLoss').val()));
+      if (!isNaN(maxLossTmp) && maxLossTmp != 0) {
         maxLoss = (-1) * Math.abs(maxLossTmp);
       }
     }
@@ -295,7 +298,7 @@ async function executeStrategy() {
       instrument: instrument,
       positionSize: positionSize,
       status: 'starting',
-      maxLoss: maxLoss,
+      maximumLoss: maxLoss,
       trades: [],
       trailingSlPriceUsed: null,
       email: email,
@@ -347,16 +350,12 @@ async function checkPositionSize(positionSize, exchange, instrument) {
     openModalInfo('Position Size for ' + instrument + ' cannot be greater than ' + instrumentInfo.maxQty + ' on ' + exchange + ' exchange!');
     return [false];
   }
-  let curPrice = null;
 
-  for (let i = 0; i < 10; i++) {
-    let bidAsk = await getBinanceBidAsk(instrument);
-    if (isNaN(bidAsk[0])) {
-      await sleep(100);
-    } else {
-      curPrice = bidAsk[0];
-      break;
-    }
+  let prices = await getLastBinancePrices();
+  curPrice = prices[instrument];
+  if (curPrice === undefined) {
+    openModalInfo('Cannot obtain information for ' + instrument + ' from ' + exchange + ' exchange. Plase try later!');
+    return [false];
   }
   if (curPrice !== null && curPrice * positionSize < instrumentInfo.minNotional) {
     openModalInfo('Position Size for ' + instrument + ' does not meet Binance requirement for minimum trading amount! Try with bigger size than ' + (
@@ -394,19 +393,19 @@ function fillExecResInTable(trades, id) {
 
 async function checkMaxLossReached(id) {
   let execution = await getExecutionById(id);
-  if (execution.maxLoss === null || execution.maxLoss === undefined) {
+  if (execution.maximumLoss === null || execution.maximumLoss === undefined) {
     return false;
   }
 
   let result = 0;
   for (let trade of execution.trades) {
-    result += trade.result;
+    result += trade.resultMoney;
   }
-  let totalGainLoss = execution.positionSize * (result / 100);
-  if (totalGainLoss <= execution.maxLoss) {
-    let errorMsg = 'Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' has reached the maximum loss.<br>The execution was stopped.';
+
+  if (result <= execution.maximumLoss) {
+    let errorMsg = 'Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' has reached the maximum loss of ' + execution.maximumLoss + ' ' + getQuotedCurrency(execution.instrument)+'. If you want to continue the execution, you have to edit the Max Loss field of the execution.';
     stopStrategyExecution(id, errorMsg);
-    openModalInfo(errorMsg);
+    openModalInfoBig('<h3 class="text-center">Error</h3>' + errorMsg + '<br>The execution was stopped.');
     execution.error = errorMsg;
     await updateExecutionDb(execution);
     return true;
@@ -617,7 +616,8 @@ function marketBuy(execution, execDetails) {
           let trade = {
             'openDate': new Date(),
             'entry': tradePrice[0],
-            'result': 0
+            'result': 0,
+            'resultMoney': 0
           };
           execution.trades.push(trade);
           await updateExecutionDb(execution);
@@ -657,11 +657,13 @@ async function marketSell(execution, execDetails) {
             execution.trades[tradeIndex]['closeDate'] = new Date();
             execution.trades[tradeIndex]['exit'] = finalPrice;
             execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (execution.feeRate * 2);
+            execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * finalPrice);
             execution.takeProfitOrderId = null;
             await updateExecutionDb(execution);
             fillExecResInTable(execution.trades, execution.id);
             $('#openTrade' + execution.id).html('');
             await checkMaxLossReached(execution.id);
+            fillBinanceBalances();
             resolve(true);
           }
         } catch (err) {
@@ -707,12 +709,14 @@ async function checkTakeProfitExecuted(execution, execDetails) {
     execution.trades[tradeIndex]['closeDate'] = new Date();
     execution.trades[tradeIndex]['exit'] = priceAndQty[0];
     execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (execution.feeRate * 2);
+    execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * priceAndQty[0]);
     execution.takeProfitOrderId = null;
     await updateExecutionDb(execution);
     fillExecResInTable(execution.trades, execution.id);
     $('#openTrade' + execution.id).html('');
     await checkMaxLossReached(execution.id);
   }
+  fillBinanceBalances();
   return priceAndQty[1];
 }
 
@@ -735,6 +739,7 @@ async function executionUpdate(data, execution, execDetails) {
     executionError
   }
 }
+
 function balanceUpdate(data) {}
 
 function cancelOrder(instrument, orderId) {
@@ -909,7 +914,7 @@ async function startBinanceWebsocket(execution, binanceObj, restartTries) {
                     //Get current ASK price and use it as a trade entry.
                     for (let i = 0; i < 10; i++) {
                       //There may not be ASK price at the moment. Try 10 times to find one.
-                      let bidAsk = await getBidAsk(execution.instrument);
+                      let bidAsk = await getBinanceBidAsk(execution.instrument);
                       if (isNaN(bidAsk[1])) {
                         await sleep(100);
                       } else {
@@ -932,7 +937,8 @@ async function startBinanceWebsocket(execution, binanceObj, restartTries) {
                     let trade = {
                       'openDate': new Date(),
                       'entry': curPrice,
-                      'result': 0
+                      'result': 0,
+                      'resultMoney': 0
                     };
                     execution.trades.push(trade);
                     if (execution.strategy.timeClose !== null && !isNaN(execution.strategy.timeClose)) {
@@ -960,6 +966,7 @@ async function startBinanceWebsocket(execution, binanceObj, restartTries) {
                     if (execution.strategy.target !== null && !isNaN(execution.strategy.target)) {
                       execDetails.target = execution.trades[execution.trades.length - 1].entry * (1 + (execution.strategy.target / 100));
                       execution.takeProfitOrderId = await placeTakeProfitLimit(execution, execDetails);
+                      fillBinanceBalances();
                       if (execution.takeProfitOrderId === null) {
                         return;
                       }
@@ -981,7 +988,7 @@ async function startBinanceWebsocket(execution, binanceObj, restartTries) {
                   //Get current BID price and use it as a trade exit.
                   for (let i = 0; i < 10; i++) {
                     //There may not be BID price at the moment. Try 10 times to find one
-                    let bidAsk = await getBidAsk(execution.instrument);
+                    let bidAsk = await getBinanceBidAsk(execution.instrument);
                     if (isNaN(bidAsk[0])) {
                       await sleep(100);
                     } else {
@@ -993,7 +1000,7 @@ async function startBinanceWebsocket(execution, binanceObj, restartTries) {
                   execution.trades[tradeIndex]['closeDate'] = new Date();
                   execution.trades[tradeIndex]['exit'] = curPrice;
                   execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (execution.feeRate * 2);
-
+                  execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * curPrice);
                   await updateExecutionDb(execution);
                   fillExecResInTable(execution.trades, execution.id);
                   $('#openTrade' + execution.id).html('');
@@ -1023,7 +1030,7 @@ async function startBinanceWebsocket(execution, binanceObj, restartTries) {
           //Get current BID price and use it as a trade exit.
           for (let i = 0; i < 10; i++) {
             //There may not be BID price at the moment. Try 10 times to find one
-            let bidAsk = await getBidAsk(execution.instrument);
+            let bidAsk = await getBinanceBidAsk(execution.instrument);
             if (isNaN(bidAsk[0])) {
               await sleep(100);
             } else {
@@ -1037,7 +1044,7 @@ async function startBinanceWebsocket(execution, binanceObj, restartTries) {
               execution.trades[tradeIndex]['closeDate'] = new Date();
               execution.trades[tradeIndex]['exit'] = curPrice;
               execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (execution.feeRate * 2);
-
+              execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * curPrice);
               await updateExecutionDb(execution);
               fillExecResInTable(execution.trades, execution.id);
               $('#openTrade' + execution.id).html('');
@@ -1143,6 +1150,10 @@ async function rmExecutionFromTable(id) {
     $('#executionTableItem' + id).remove();
     await sleep(100);
     await removeExecutionFromDb(id);
+    let executions = await getExecutionsFromDb();
+    if (executions.length == 0) {
+      $('#tsResultDiv').hide();
+    }
   });
 }
 
@@ -1173,8 +1184,7 @@ async function stopStrategyExecution(id, errorMsg, dontWait) {
 async function showExecutionResult(id) {
 
   let execution = await getExecutionById(id);
-  $('#executionStrategiesTable').html('<thead><tr><td class="text-left">Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead>');
-
+  $('#executionStrategiesTable').html('<thead><tr><td class="text-left">Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result %</td><td>Result ' + getQuotedCurrency(execution.instrument) + '</td> </tr></thead>');
   if (execution.type === 'Alerts') {
     $('#executionDetailsLabel').html('Alerts');
     $('.trade-section').hide();
@@ -1210,7 +1220,7 @@ async function showExecutionResult(id) {
     let loosingCount = 0;
     let avgLostPerTrade = 0;
     let biggestLost = 0;
-
+    let resultMoney = 0;
     let count = 1;
     if (execution.feeRate !== null && execution.feeRate !== undefined) {
       $('#executionFeeRate').html('Fee Rate per trade: ' + execution.feeRate.toFixed(4) + '%');
@@ -1239,9 +1249,10 @@ async function showExecutionResult(id) {
           resultClass = 'text-red';
         }
         totalReturn += trade.result;
-        $('#executionStrategiesTable').append('<tr><td class="text-left">' + count + '&nbsp;<i class="' + classes + '"></td><td>' + formatDateFull(trade.openDate) + '</td><td>' + formatDateFull(trade.closeDate) + '</td><td>' + trade.entry.toFixed(8) + '</td><td>' + trade.exit.toFixed(8) + '</td><td class="' + resultClass + '">' + trade.result.toFixed(2) + '%</td></tr>');
+        resultMoney += trade.resultMoney;
+        $('#executionStrategiesTable').append('<tr><td class="text-left">' + count + '&nbsp;<i class="' + classes + '"></td><td>' + formatDateFull(trade.openDate) + '</td><td>' + formatDateFull(trade.closeDate) + '</td><td>' + trade.entry.toFixed(8) + '</td><td>' + trade.exit.toFixed(8) + '</td><td class="' + resultClass + '">' + trade.result.toFixed(2) + '</td><td class="' + resultClass + '">' + trade.resultMoney.toFixed(8) + '</td></tr>');
       } else {
-        $('#executionStrategiesTable').append('<tr><td class="text-left">' + count + '</td><td>' + formatDateFull(trade.openDate) + '</td><td></td><td>' + trade.entry.toFixed(8) + '</td><td></td><td ></td></tr>');
+        $('#executionStrategiesTable').append('<tr><td class="text-left">' + count + '</td><td>' + formatDateFull(trade.openDate) + '</td><td></td><td>' + trade.entry.toFixed(8) + '</td><td></td><td ></td><td ></td></tr>');
         executedTrades--;
       }
       count++;
@@ -1250,7 +1261,6 @@ async function showExecutionResult(id) {
       avgGainLossPerTrade = totalReturn / executedTrades;
       winningPercent = (winnignCount / executedTrades) * 100;
       loosingPercent = (loosingCount / executedTrades) * 100;
-      resultWithUSD = execution.positionSize * (totalReturn / 100);
     }
     if (loosingCount > 0) {
       winLossRatio = winnignCount / loosingCount;
@@ -1268,7 +1278,7 @@ async function showExecutionResult(id) {
     $('#executionWinLoss').html(winLossRatio.toFixed(2));
     $('#executionAvgWinLossPerTrade').html(avgGainLossPerTrade.toFixed(2) + '%');
 
-    $('#executionResultWithUsd').html(resultWithUSD.toFixed(8) + '&nbsp;' + getBaseCurrency(execution.instrument));
+    $('#executionResultWithUsd').html(resultMoney.toFixed(8) + '&nbsp;' + getQuotedCurrency(execution.instrument));
     $('#executionExecutedTrades').html(executedTrades);
 
     $('#executionWinningTradesP').html(winningPercent.toFixed(2) + '%');
@@ -1284,13 +1294,13 @@ async function showExecutionResult(id) {
     $('#executionEmailResDiv').hide();
     $('#executionPosSizeResDiv').show();
     $('#executionPosSizeRes').html(execution.positionSize + ' ' + getBaseCurrency(execution.instrument));
-    if (execution.maxLoss !== null) {
+    if (execution.maximumLoss != null && execution.maximumLoss != undefined) {
       $('#executionMaxLossResDiv').show();
-      $('#executionMasLossRes').html(Math.abs(execution.maxLoss) + ' ' + getBaseCurrency(execution.instrument));
+      $('#executionMasLossRes').html(Math.abs(execution.maximumLoss) + ' ' + getQuotedCurrency(execution.instrument));
     } else {
       $('#executionMaxLossResDiv').hide();
     }
-    fillUSDFields(resultWithUSD, execution.positionSize, execution.maxLoss, execution.instrument);
+    fillUSDFields(resultMoney, execution.positionSize, execution.maximumLoss, execution.instrument);
 
     $('#executionDetailsLabel').html(
       execution.type === 'Simulation'
@@ -1305,25 +1315,29 @@ async function showExecutionResult(id) {
   $('#executionInstrumentRes').html(execution.instrument);
   openModals();
   $('body').css('overflow', 'hidden');
+  $("#executionResultsWindowDiv").animate({
+    scrollTop: 0
+  }, 'fast');
   $('#executionResultsWindow').fadeIn();
 }
 
-async function fillUSDFields(resultWithUSD, posSize, maxLoss, instrument) {
+async function fillUSDFields(resultMoney, posSize, maxLoss, instrument) {
   try {
-    let ustdValue = await getBinanceUSDTValue(resultWithUSD, instrument, getQuotedCurrency(instrument));
+    let prices = await getLastBinancePrices();
+    let ustdValue = calculateUsdtValue(getQuotedCurrency(instrument), resultMoney, prices);
     if (ustdValue == null) {
-      $('#executionResultWithUsd').html(resultWithUSD.toFixed(8) + '&nbsp;' + getBaseCurrency(instrument));
+      $('#executionResultWithUsd').html(resultMoney.toFixed(8) + '&nbsp;' + getQuotedCurrency(instrument));
       $('#executionPosSizeRes').html(posSize + '&nbsp;' + getBaseCurrency(instrument));
-      $('#executionMasLossRes').html(Math.abs(maxLoss) + '&nbsp;' + getBaseCurrency(instrument));
+      $('#executionMasLossRes').html(Math.abs(maxLoss) + '&nbsp;' + getQuotedCurrency(instrument));
       return;
     }
 
-    $('#executionResultWithUsd').html(resultWithUSD.toFixed(8) + '&nbsp;' + getBaseCurrency(instrument) + ' ( ~' + ustdValue.toFixed(2) + '$ )');
-    let posSizeUsd = await getBinanceUSDTValue(posSize, instrument, getQuotedCurrency(instrument));
-    $('#executionPosSizeRes').html(posSize + '&nbsp;' + getBaseCurrency(instrument) + ' ( ~' + posSizeUsd.toFixed(2) + '$ )');
+    $('#executionResultWithUsd').html(resultMoney.toFixed(8) + '&nbsp;' + getQuotedCurrency(instrument) + ' (~ $' + ustdValue.toFixed(2) + ' )');
+    let posSizeUsd = calculateUsdtValue(getBaseCurrency(instrument), posSize, prices);
+    $('#executionPosSizeRes').html(posSize + '&nbsp;' + getBaseCurrency(instrument) + ' (~ $' + posSizeUsd.toFixed(2) + ' )');
     if (maxLoss !== null) {
-      let maxLossUsd = await getBinanceUSDTValue(maxLoss, instrument, getQuotedCurrency(instrument));
-      $('#executionMasLossRes').html(Math.abs(maxLoss) + '&nbsp;' + getBaseCurrency(instrument) + ' ( ~' + maxLossUsd.toFixed(2) + '$ )');
+      let maxLossUsd = calculateUsdtValue(getQuotedCurrency(instrument), Math.abs(maxLoss), prices);
+      $('#executionMasLossRes').html(Math.abs(maxLoss) + '&nbsp;' + getQuotedCurrency(instrument) + ' (~ $' + maxLossUsd.toFixed(2) + ' )');
     }
   } catch (err) {
     log('error', 'fillUSDFields', err.stack);
@@ -1349,7 +1363,7 @@ function closeEditExecutionWindow() {
   $('#footer').css('opacity', '1');
   $('#footer').css('pointer-events', 'auto');
   $('body').css('overflow', 'auto');
-  $('#eidtExecutionWindow').hide();
+  $('#editExecutionWindow').hide();
 }
 
 var executionsDb = null;
@@ -1369,9 +1383,9 @@ async function fillOldExecutions() {
   if (!executionFilled) {
     executionFilled = true;
     let executions = await getExecutionsFromDb();
+    let isOldVersion = false;
     if (executions !== null && executions.length > 0) {
       for (let execution of executions) {
-
         //Check for old version strategies without individual rule timeframes
         let hasRuleWithNoTf = false;
         for (let rule of execution.strategy.buyRules) {
@@ -1388,7 +1402,27 @@ async function fillOldExecutions() {
         }
         if (hasRuleWithNoTf) {
           execution.error = 'This strategy contains rules without individual timeframes. You will not be able to resume the execution. You can remove this execution, edit the strategy by adding timeframes to each rule and then execute it again.';
-          updateExecutionDb(executions);
+          isOldVersion = true;
+        }
+
+        //Check for old version execution (v1.0.26) without resultMoney fields
+        for (let trade of execution.trades) {
+          if (trade.resultMoney === undefined && trade.exit != undefined && trade.exit != null) {
+            trade.resultMoney = (trade.result / 100) * (execution.positionSize * trade.exit);
+            isOldVersion = true;
+          }
+        }
+        if (execution.maxLoss != null && execution.maxLoss != undefined && !isNaN(execution.maxLoss)) {
+          let prices = await getLastBinancePrices();
+          let curPrice = prices[execution.instrument];
+          execution.maximumLoss = curPrice * execution.maxLoss;
+          execution.maxLoss = null;
+          delete execution.maxLoss;
+          isOldVersion = true;
+        }
+
+        if (isOldVersion) {
+          await updateExecutionDb(execution);
         }
 
         let status = 'Stopped';
@@ -1641,6 +1675,7 @@ async function editExecution(id) {
     $('#executionPosSizeEditDiv').hide();
     $('#executionMaxLosEditDiv').hide();
     $('#executionFeeRateEditDiv').hide();
+    $('#executionOpenTradeEditDiv').hide();
     $('#executionMailEditDiv').show();
     if (execution.email !== null && execution.email !== undefined && execution.email.length > 0) {
       $('#executionEmailEdit').val(execution.email);
@@ -1651,10 +1686,15 @@ async function editExecution(id) {
     $('#executionPosSizeEditDiv').show();
     $('#executionMaxLosEditDiv').show();
     $('#executionMailEditDiv').hide();
+    if (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit == null || execution.trades[execution.trades.length - 1].exit == undefined)) {
+      $('#executionOpenTradeEditDiv').show();
+    } else {
+      $('#executionOpenTradeEditDiv').hide();
+    }
 
     $('#executionPosSizeEdit').val(execution.positionSize);
-    if (execution.maxLoss !== null && execution.maxLoss !== undefined && !isNaN(execution.maxLoss)) {
-      $('#executionMasLossEdit').val(execution.maxLoss * -1);
+    if (execution.maximumLoss !== null && execution.maximumLoss !== undefined && !isNaN(execution.maximumLoss)) {
+      $('#executionMasLossEdit').val(Math.abs(execution.maximumLoss));
     } else {
       $('#executionMasLossEdit').val('');
     }
@@ -1678,12 +1718,65 @@ async function editExecution(id) {
   $('#editExecutionSaveBtn').click(function() {
     saveEditExecutionWindow(id)
   });
+  $('#closeOpenTradeBtn').unbind('click');
+  $('#closeOpenTradeBtn').click(function() {
+    openModalConfirm('Are you sure you want to close your open position at market price?', function() {
+      manualCloseOpenTrade(id);
+    });
+
+  });
 
   openModals();
   $('body').css('overflow', 'hidden');
-  $('#eidtExecutionWindow').fadeIn();
+  $('#editExecutionWindow').fadeIn();
 }
 
+async function manualCloseOpenTrade(id) {
+  let execution = await getExecutionById(id);
+  if (execution.type === 'Simulation') {
+    let curPrice = null;
+    for (let i = 0; i < 10; i++) {
+      let bidAsk = await getBinanceBidAsk(execution.instrument);
+      if (isNaN(bidAsk[0])) {
+        await sleep(100);
+      } else {
+        curPrice = bidAsk[0];
+        break;
+      }
+    }
+    if (curPrice == null) {
+      openModalInfo('Could not obtain data from Binance. Please try Later!');
+      return;
+    }
+    let tradeIndex = execution.trades.length - 1;
+    execution.trades[tradeIndex]['closeDate'] = new Date();
+    execution.trades[tradeIndex]['exit'] = curPrice;
+    execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (execution.feeRate * 2);
+    execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * curPrice);
+    await updateExecutionDb(execution);
+    fillExecResInTable(execution.trades, execution.id);
+    $('#openTrade' + execution.id).html('');
+  } else if (execution.type === 'Trading') {
+
+    if (binanceRealTrading == null) {
+      openModalConfirm('<div class="text-justify">Please provide your API key for ' + execution.exchange + '. </div><br><div class="text-left"><span class="inline-block min-width5">API Key:&nbsp;</span><input class="min-width20" id="exchangeApiKey" type="text" placeholder="API KEY" /><br>' + '<span class="inline-block min-width5">Secret:&nbsp;</span><input class="min-width20" id="exchangeApiSecret" type="text" placeholder="Secret" /></div><br><div class="text-justify">Your key and secret are not stored anywhere by this application.</div>', async function() {
+        let result = await verifyKeyAndSecret(execution.exchange);
+        if (result) {
+          manualCloseOpenTrade(id);
+        } else {
+          openModalInfoBig("Cannot close trade Real Trading mode without connection to the exchange via your API Key and Secret!");
+        }
+      }, function() {
+        openModalInfoBig("Cannot close trade in Real Trading mode without connection to the exchange via your API Key and Secret!");
+      });
+      return;
+    } else {
+      let execDetails = getExecutionDetails(execution);
+      await marketSell(execution, execDetails)
+    }
+
+  }
+}
 async function saveEditExecutionWindow(id) {
   try {
     showLoading();
@@ -1704,14 +1797,18 @@ async function saveEditExecutionWindow(id) {
         return;
       }
       positionSize = posCheck[1];
+      if (execution.positionSize !== positionSize && (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit == null || execution.trades[execution.trades.length - 1].exit == undefined))) {
+        openModalInfoBig('<h3 class="text-center">Error</h3>Editing of the position size is forbidden while there is an open trade on the execution.<br>You need to click on the "Close Open Trade" button before changing the position size!');
+        return;
+      }
       execution.positionSize = positionSize;
 
-      let maxLossTmp = Number.parseFloat($('#executionMasLossEdit').val());
+      let maxLossTmp = Math.abs(Number.parseFloat($('#executionMasLossEdit').val()));
 
       if (!isNaN(maxLossTmp) && maxLossTmp !== 0) {
-        execution.maxLoss = (-1) * Math.abs(maxLossTmp);
+        execution.maximumLoss = (-1) * maxLossTmp;
       } else {
-        execution.maxLoss = null;
+        execution.maximumLoss = null;
       }
       if (execution.type === 'Simulation') {
         let feeRate = Number.parseFloat($('#executionFeeRateEdit').val());
@@ -1731,4 +1828,80 @@ async function saveEditExecutionWindow(id) {
 
 function editExecutionStrategy() {
   openModalInfoBig('<h3 class="text-center">This option is not implemented yet!</h3>Currently there is no way to edit an executing strategy. If you really need to do it, please, remove the execution, edit the strategy and execute it again. ')
+}
+
+function calculateUsdtValue(coin, total, prices) {
+  if (prices[coin + 'BTC'] !== undefined) {
+    return calculateUsdtValue('BTC', Number.parseFloat(prices[coin + 'BTC']) * total, prices)
+  } else if (coin === 'USDT') {
+    return total;
+  } else if (coin === 'USDC') {
+    return total;
+  } else if (coin === 'PAX') {
+    return total;
+  } else if (coin === 'TUSD') {
+    return total;
+  } else if (coin === 'USDS') {
+    return total;
+  } else if (coin == 'BTC') {
+    return Number.parseFloat(prices['BTCUSDT']) * total;
+  } else if (coin == 'BNB') {
+    return Number.parseFloat(prices['BNBUSDT']) * total;
+  } else if (prices[coin + 'BNB'] !== undefined) {
+    return calculateUsdtValue('BNB', Number.parseFloat(prices[coin + 'BNB']) * total, prices)
+  } else if (coin == 'ETH') {
+    return Number.parseFloat(prices['ETHUSDT']) * total;
+  } else if (prices[coin + 'ETH'] !== undefined) {
+    return calculateUsdtValue('ETH', Number.parseFloat(prices[coin + 'ETH']) * total, prices)
+  } else {
+    return 0;
+  }
+}
+
+async function fillBinanceBalancesTask() {
+  while (true) {
+    await fillBinanceBalances();
+    await sleep(1000 * 60 * 5); // 5 minutes
+  }
+}
+
+let balanceMutex = new Mutex();
+async function fillBinanceBalances() {
+  try {
+    await balanceMutex.lock();
+    if (binanceRealTrading != null) {
+      let balance = await getBinanceBalances();
+      if (balance == null) {
+        return;
+      }
+      let prices = await getLastBinancePrices()
+      let totalBalances = [];
+      let totalUsdt = 0;
+      for (let coin of Object.keys(balance)) {
+        let available = Number.parseFloat(balance[coin].available);
+        let onOrder = Number.parseFloat(balance[coin].onOrder);
+        let total = available + onOrder;
+        let usdt = calculateUsdtValue(coin, total, prices);
+        totalUsdt += usdt;
+        if (total > 0) {
+          totalBalances.push({coin: coin, total: total, available: available, onOrder: onOrder, usdt: usdt})
+        }
+      }
+      totalBalances.sort(function(a, b) {
+        return b.usdt - a.usdt;
+      });
+
+      $('#tsBalancesDiv').show();
+      $('#binanceEstValue').html('<h3>Binance ~ $' + totalUsdt.toFixed(2) + '</h3>as of ' + formatDateFull(new Date()));
+      $('#binanceBalanceTable').html('');
+      for (let row of totalBalances) {
+        $('#binanceBalanceTable').append('<tr><td>' + row.coin + '</td><td>' + row.total + '</td><td>' + row.available + '</td><td>' + row.onOrder + '</td><td>' + row.usdt.toFixed(2) + '</td></tr>')
+      }
+
+    }
+  } catch (err) {
+    log('error', 'fillBinanceBalances', err.stack)
+  } finally {
+    balanceMutex.release();
+  }
 }

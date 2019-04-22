@@ -151,6 +151,14 @@ hr.major {
   font-size: 1.25em;
 }
 
+.font-small {
+  font-size: small;
+}
+
+.font-normal {
+  font-size: normal;
+}
+
 .content p {
   margin-bottom: 0;
   text-align: justify;
@@ -210,6 +218,14 @@ hr.major {
 
 .margin-l7 {
   margin-left: 7em
+}
+
+.padding-t10 {
+  padding-top: .625em;
+}
+
+.padding-b10 {
+  padding-bottom: .625em;
 }
 
 .text-center {
@@ -548,6 +564,7 @@ table {
   margin: 0 0 2em 0;
   width: 100%;
 }
+
 table.white:hover {
   background-color: rgba(255, 255, 255, 0.85);
   border-color: rgba(17, 112, 196, 0.45);
@@ -572,6 +589,7 @@ td {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 td:first-child {
   padding-left: 0.5em;
 }
@@ -610,6 +628,10 @@ table.alt tr:nth-child(2n) {
 table.alt thead tr {
   background-color: rgba(17, 112, 196, 0.65);
   color: #fff;
+}
+
+table.alt thead tr:nth-child(2n) {
+  background-color: rgba(17, 112, 196, 0.65);
 }
 
 table.alt thead {
@@ -897,7 +919,7 @@ input[type="submit"]:hover:active:after, input[type="reset"]:hover:active:after,
 }
 
 .additional-field {
-  font-size:12pt;
+  font-size: 12pt;
   max-width: 12.5em;
   position: absolute;
   text-overflow: ellipsis;
@@ -1581,6 +1603,14 @@ body.is-preload #sidebar nav ul li {
   margin: auto;
 }
 
+.modal.alt>div {
+  height: auto;
+}
+
+.modal.alt .features section {
+  width: 100%;
+}
+
 .modal .features {
   border: solid 1px rgba(17, 112, 196, 0.15);
   background: rgba(17, 112, 196, 0.05);
@@ -1986,6 +2016,7 @@ a.expanded>span.caret {
     line-height: inherit;
     padding: 0;
   }
+
   #updateAvailable {
     top: 0em !important;
   }
@@ -2100,6 +2131,7 @@ a.expanded>span.caret {
     width: auto;
     max-width: 80vw;
   }
+
   .additional-field {
     max-width: 9.2em;
   }

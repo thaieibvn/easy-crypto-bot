@@ -61,6 +61,20 @@ function getLastBinancePrice(instrument) {
   });
 }
 
+function getLastBinancePrices() {
+  return new Promise((resolve, reject) => {
+    binance.useServerTime(function() {
+      binance.prices((error, ticker) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(ticker);
+        }
+      })
+    });
+  });
+}
+
 function getBinanceTicksImpl(instrument, timeframe, startTime, endTime) {
   return new Promise((resolve, reject) => {
     binance.useServerTime(function() {
@@ -539,21 +553,6 @@ function getPrecisionFromTickSize(tickSize) {
   return 8;
 }
 
-function getBidAsk(pair) {
-  return new Promise((resolve, reject) => {
-    binance.useServerTime(function() {
-      binance.depth(pair, (error, depth, symbol) => {
-        let bids = binance.sortBids(depth.bids);
-        let asks = binance.sortAsks(depth.asks);
-        resolve([
-          Number.parseFloat(binance.first(bids)),
-          Number.parseFloat(binance.first(asks))
-        ]);
-      });
-    });
-  });
-}
-
 function getBalance(instrument) {
   return new Promise((resolve, reject) => {
     binanceRealTrading.useServerTime(function() {
@@ -567,6 +566,21 @@ function getBalance(instrument) {
     })
   });
 }
+
+function getBinanceBalances() {
+  return new Promise((resolve, reject) => {
+    binanceRealTrading.useServerTime(function() {
+      binanceRealTrading.balance((error, balances) => {
+        if (error) {
+          resolve(null);
+          return;
+        }
+        resolve(balances);
+      })
+    })
+  });
+}
+
 
 function getBinanceTicks300(instrument, timeframe) {
   return new Promise((resolve, reject) => {
