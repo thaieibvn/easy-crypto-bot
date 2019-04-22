@@ -1296,7 +1296,7 @@ async function showExecutionResult(id) {
     $('#executionPosSizeRes').html(execution.positionSize + ' ' + getBaseCurrency(execution.instrument));
     if (execution.maximumLoss != null && execution.maximumLoss != undefined) {
       $('#executionMaxLossResDiv').show();
-      $('#executionMasLossRes').html(Math.abs(execution.maximumLoss) + ' ' + getQuotedCurrency(execution.instrument));
+      $('#executionMasLossRes').html(Math.abs(execution.maximumLoss).toFixed(8) + ' ' + getQuotedCurrency(execution.instrument));
     } else {
       $('#executionMaxLossResDiv').hide();
     }
@@ -1328,7 +1328,7 @@ async function fillUSDFields(resultMoney, posSize, maxLoss, instrument) {
     if (ustdValue == null) {
       $('#executionResultWithUsd').html(resultMoney.toFixed(8) + '&nbsp;' + getQuotedCurrency(instrument));
       $('#executionPosSizeRes').html(posSize + '&nbsp;' + getBaseCurrency(instrument));
-      $('#executionMasLossRes').html(Math.abs(maxLoss) + '&nbsp;' + getQuotedCurrency(instrument));
+      $('#executionMasLossRes').html(Math.abs(maxLoss).toFixed(8) + '&nbsp;' + getQuotedCurrency(instrument));
       return;
     }
 
@@ -1337,7 +1337,7 @@ async function fillUSDFields(resultMoney, posSize, maxLoss, instrument) {
     $('#executionPosSizeRes').html(posSize + '&nbsp;' + getBaseCurrency(instrument) + ' (~ $' + posSizeUsd.toFixed(2) + ' )');
     if (maxLoss !== null) {
       let maxLossUsd = calculateUsdtValue(getQuotedCurrency(instrument), Math.abs(maxLoss), prices);
-      $('#executionMasLossRes').html(Math.abs(maxLoss) + '&nbsp;' + getQuotedCurrency(instrument) + ' (~ $' + maxLossUsd.toFixed(2) + ' )');
+      $('#executionMasLossRes').html(Math.abs(maxLoss).toFixed(8) + '&nbsp;' + getQuotedCurrency(instrument) + ' (~ $' + maxLossUsd.toFixed(2) + ' )');
     }
   } catch (err) {
     log('error', 'fillUSDFields', err.stack);

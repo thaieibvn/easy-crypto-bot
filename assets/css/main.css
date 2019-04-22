@@ -389,6 +389,7 @@ hr.major {
 
 .features.alt span {
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .features section {
