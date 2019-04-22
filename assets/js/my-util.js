@@ -135,9 +135,13 @@ function hideLoading() {
     if (!$('#newStrategyWindow').is(':visible') && !$('#executionResultsWindow').is(':visible') && !$('#editExecutionWindow').is(':visible')) {
       $('#wrapper').css('opacity', '1');
       $('#wrapper').css('pointer-events', 'auto');
+      $('#footer').css('opacity', '1');
+      $('#footer').css('pointer-events', 'auto');
+      $('#wrapper').css('pointer-events', 'auto');
       $('#sidebar').css('opacity', '1');
       $('#sidebar').css('pointer-events', 'auto');
     }else {
+      $('#footer').css('opacity', '0.5');
       $('#wrapper').css('opacity', '0.5');
     }
     $('#wrapperModals').css('opacity', '1');
