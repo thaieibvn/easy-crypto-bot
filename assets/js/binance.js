@@ -432,33 +432,6 @@ function getBinanceUSDTValue(ammount, pair, quoted) {
   });
 }
 
-function binanceBalanceUpdate(data) {}
-
-var binanceExecutions = [];
-async function binanceExecutionUpdate(data) {
-  try {
-    let {
-      x: executionType,
-      s: symbol,
-      p: price,
-      q: quantity,
-      S: side,
-      o: orderType,
-      i: orderId,
-      X: orderStatus
-    } = data;
-    if (orderType == 'LIMIT' && orderStatus == 'FILLED') {
-      for (let execution of binanceExecutions) {
-        if (orderId == execution.takeProfitOrderId) {
-          execution.checkStatus = true;
-          break;
-        }
-      }
-    }
-
-  } catch (err) {}
-}
-
 function checkBinanceApiKey(key, secret) {
   if (binanceRealTrading == null) {
     binanceRealTrading = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, recvWindow: 60000, test: false});
@@ -469,7 +442,6 @@ function checkBinanceApiKey(key, secret) {
             binanceRealTrading = null;
             resolve(false);
           } else {
-            binanceRealTrading.websockets.userData(binanceBalanceUpdate, binanceExecutionUpdate);
             resolve(true);
           }
         })
@@ -569,7 +541,10 @@ async function getBinanceInstrumentsInfo(instrument) {
 }
 
 function binanceRoundAmmount(amount, stepSize) {
-  return Number.parseFloat(binance.roundStep(amount, stepSize));
+  let precision = stepSize.toString().split(".")[1].length || 0; // easier version: binance.getPrecision(number)
+
+  //return Number.parseFloat(binance.roundStep(amount, stepSize))
+  return Number.parseFloat(amount.toFixed(precision));
 }
 
 function getPrecisionFromTickSize(tickSize) {
@@ -619,6 +594,77 @@ function getBinanceTicks300(instrument, timeframe) {
           resolve(ticks);
         }
       }, {limit: 300});
+    });
+  });
+}
+
+function binanceGetOrderTradePrice(instrument, orderId, type) {
+  return new Promise((resolve, reject) => {
+    binanceRealTrading.useServerTime(function() {
+      binanceRealTrading.trades(instrument, async (error, tradesTmp, symbol) => {
+        let qty = 0;
+        let sum = 0;
+        for (let i = tradesTmp.length - 1; i >= 0; i--) {
+          if (tradesTmp[i].orderId == orderId) {
+            sum += Number.parseFloat(tradesTmp[i].price) * Number.parseFloat(tradesTmp[i].qty);
+            qty += Number.parseFloat(tradesTmp[i].qty);
+          }
+        }
+        if (qty !== 0) {
+          resolve([
+            Number.parseFloat((sum / qty).toFixed(8)),
+            Number.parseFloat((qty).toFixed(8))
+          ]);
+        } else {
+          resolve(null);
+        }
+      })
+    });
+  });
+}
+
+function binanceCancelOrder(instrument, orderId) {
+  if (binanceRealTrading == null || orderId === null || orderId === undefined) {
+    return;
+  }
+  return new Promise((resolve, reject) => {
+    binanceRealTrading.useServerTime(function() {
+      binanceRealTrading.cancel(instrument, orderId, (error, response, symbol) => {
+        resolve(response);
+      });
+    });
+  });
+}
+
+async function binanceMarketSell(execution) {
+  if (binanceRealTrading == null) {
+    return null;
+  }
+  await binanceCancelOrder(execution.instrument, execution.takeProfitOrderId);
+  let positionSize = execution.positionSize
+  let priceAndQty = await binanceGetOrderTradePrice(execution.instrument, execution.takeProfitOrderId, 'sell');
+  if (priceAndQty !== null) {
+    if (priceAndQty[1] === execution.positionSize) {
+      return priceAndQty[0];
+    } else {
+      positionSize = execution.positionSize - priceAndQty[1];
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    binanceRealTrading.useServerTime(function() {
+      binanceRealTrading.marketSell(execution.instrument, positionSize, async (error, response) => {
+        try {
+          if (error !== null) {
+            resolve(null);
+          } else {
+            let tradePrice = await binanceGetOrderTradePrice(execution.instrument, response.orderId, 'sell');
+            resolve(tradePrice[0]);
+          }
+        } catch (err) {
+          resolve(null);
+        }
+      })
     });
   });
 }
