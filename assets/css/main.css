@@ -85,10 +85,10 @@ h1.major.alt {
 }
 
 h1.major:after {
-  background: -moz-linear-gradient(to right, #fff, #db1c96);
-  background: -webkit-linear-gradient(to right, #fff, #db1c96);
-  background: -ms-linear-gradient(to right, #fff, #db1c96);
-  background: linear-gradient(to right, #fff, #db1c96);
+  background: -moz-linear-gradient(to right, #fff, #7437ad, #db1c96);
+  background: -webkit-linear-gradient(to right, #fff, #7437ad, #db1c96);
+  background: -ms-linear-gradient(to right, #fff, #7437ad, #db1c96);
+  background: linear-gradient(to right, #fff, #7437ad, #db1c96);
   -moz-transition: max-width 0.2s ease;
   -webkit-transition: max-width 0.2s ease;
   -ms-transition: max-width 0.2s ease;
@@ -135,9 +135,10 @@ h6 {
 
 hr {
   border: 0;
-  border-bottom: solid 1px rgba(255, 255, 255, 0.15);
+  border-bottom: solid 1px #f9b8e1;
   margin: 2em 0;
 }
+
 
 hr.major {
   margin: 3em 0;

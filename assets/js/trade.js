@@ -474,7 +474,13 @@ async function fillOldExecutions() {
         if (execution.type === 'Alerts' && execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].type === 'Sell')) {
           openTrade = '';
         }
-        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td>' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td><td class="text-center" id="openTrade' + execution.id + '">' + openTrade + '</td><td><span id="executionRes' + execution.id + '"></span></td><td><a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + execution.id + ')"><i class="far fa-file-alt"></i></a></td>' + '<td class="text-center" id="lastUpdatedExecution' + execution.id + '"></td><td id="statusStr' + execution.id + '"></td><td id="actionsBtns' + execution.id + '"></td></tr>');
+        $('#tsStrategiesTable').append('<tr id="executionTableItem' +
+        execution.id + '"><td>' + execution.type + '</td><td>' + execution.name + '</td><td>' +
+         execution.exchange + '</td><td>' + execution.instrument + '</td><td class="text-center" id="executedTrades' +
+          execution.id + '">' + execution.trades.length + '</td><td class="text-center" id="openTrade' + execution.id + '">' +
+           openTrade + '</td><td class="text-right"><span id="executionRes' + execution.id + '"></span></td><td><a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' +
+            execution.id + ')"><i class="far fa-file-alt"></i></a></td>' + '<td class="text-center" id="lastUpdatedExecution' + execution.id +
+            '"></td><td id="statusStr' + execution.id + '"></td><td id="actionsBtns' + execution.id + '"></td></tr>');
         setStatusAndActions(execution.id, status, execution.error);
         if (execution.type !== 'Alerts') {
           fillExecResInTable(execution.trades, execution.id);
@@ -966,7 +972,12 @@ async function executeStrategy() {
       resStr = '';
     }
 
-    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td>' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="executedTrades' + dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td><span id="executionRes' + dbId + '">' + resStr + '</span></td><td><a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + dbId + '\')"><i class="far fa-file-alt"></i></a></td><td class="text-center" id="lastUpdatedExecution' + dbId + '"></td><td id="statusStr' + dbId + '">Starting</td><td id="actionsBtns' + dbId + '"></td></tr>');
+    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType +
+    '</td><td>' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="executedTrades' +
+     dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td class="text-right"><span id="executionRes' + dbId + '">' + resStr +
+      '</span></td><td><a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + dbId +
+      '\')"><i class="far fa-file-alt"></i></a></td><td class="text-center" id="lastUpdatedExecution' + dbId + '"></td><td id="statusStr' + dbId +
+       '">Starting</td><td id="actionsBtns' + dbId + '"></td></tr>');
 
     await runStrategy(dbId);
 
