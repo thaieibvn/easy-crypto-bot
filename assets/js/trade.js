@@ -1129,6 +1129,9 @@ async function runStrategy(id) {
             case 'TAKE_PROFIT_ORDER_ID':
               execution.takeProfitOrderId = data;
               await updateExecutionDb(execution);
+              if (execution.type === 'Trading') {
+                fillBinanceBalances();
+              }
               break;
             case 'BUY':
               if (execution.type === 'Alerts') {
