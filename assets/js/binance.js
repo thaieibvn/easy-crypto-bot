@@ -432,6 +432,33 @@ function getBinanceUSDTValue(ammount, pair, quoted) {
   });
 }
 
+function binanceBalanceUpdate(data) {}
+
+var binanceExecutions = [];
+async function binanceExecutionUpdate(data) {
+  try {
+    let {
+      x: executionType,
+      s: symbol,
+      p: price,
+      q: quantity,
+      S: side,
+      o: orderType,
+      i: orderId,
+      X: orderStatus
+    } = data;
+    if (orderType == 'LIMIT' && orderStatus == 'FILLED') {
+      for (let execution of binanceExecutions) {
+        if (orderId == execution.takeProfitOrderId) {
+          execution.checkStatus = true;
+          break;
+        }
+      }
+    }
+
+  } catch (err) {}
+}
+
 function checkBinanceApiKey(key, secret) {
   if (binanceRealTrading == null) {
     binanceRealTrading = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, recvWindow: 60000, test: false});
@@ -442,6 +469,7 @@ function checkBinanceApiKey(key, secret) {
             binanceRealTrading = null;
             resolve(false);
           } else {
+            binanceRealTrading.websockets.userData(binanceBalanceUpdate, binanceExecutionUpdate);
             resolve(true);
           }
         })
@@ -580,7 +608,6 @@ function getBinanceBalances() {
     })
   });
 }
-
 
 function getBinanceTicks300(instrument, timeframe) {
   return new Promise((resolve, reject) => {
