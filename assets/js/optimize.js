@@ -5,8 +5,10 @@ async function opFillBinanceInstruments() {
   await getBinanceInstruments();
 }
 
+let instrumentMutex = new Mutex();
 async function opInstrumentKeyup() {
   try {
+    instrumentMutex.lock();
     let search = $('#opInstrumentSearch').val().toLowerCase();
     $('#opInstrumentList>ul').html('');
     let instruments = null;
@@ -36,6 +38,8 @@ async function opInstrumentKeyup() {
     }
   } catch (err) {
     log('error', 'opInstrumentKeyup', err.stack);
+  } finally {
+    instrumentMutex.release();
   }
 }
 
@@ -62,7 +66,7 @@ async function addOpResult(result) {
   try {
     await addOpResultMutex.lock();
     opCompleted++;
-    if (result !== null && result.executedTrades > 0) {
+    if (result !== null && result.totalReturn > 0) {
       strategyVariationsResults.push(result);
     }
     return opCompleted;
@@ -72,6 +76,8 @@ async function addOpResult(result) {
 }
 
 let strategyVariations = [];
+let strategyVariationsTested = 0;
+let fineTune = 0;
 let strategyVariationsResults = [];
 let opExecutionCanceled = false;
 let opExecutionWorkers = {};
@@ -82,6 +88,15 @@ let webWorkersInitialized = false;
 let optimizationRunning = false;
 let runningWorkiers = 0;
 let marketReturn;
+let timeframes = null
+let startDate = null;
+let ticks = {};
+let feeRate = null;
+let optType = 'return';
+let stoplossVariations;
+let etaLastDate = null;
+let etaStr = '';
+let etaLastNum = null;
 const executionOpMutex = new Mutex();
 const addOpResultMutex = new Mutex();
 const opWorkerTerminateMutex = new Mutex();
@@ -118,7 +133,7 @@ async function runOptimize() {
   let strategyName = $('#opStrategyCombobox').text();
   let exchange = $('#opExchangeCombobox').text();
   let instrument = $('#opInstrumentSearch').val().toUpperCase();
-  let feeRate = $('#opFeeSearch').val();
+  feeRate = $('#opFeeSearch').val();
   if (strategyName === 'Choose Strategy') {
     openModalInfo('Please Choose a Strategy!');
     $('#runOptBtn').removeClass('disabled');
@@ -145,7 +160,7 @@ async function runOptimize() {
   let startDateStr = $('#opFromDate').val();
   let endDateStr = $('#opToDate').val();
 
-  let startDate = new Date(startDateStr);
+  startDate = new Date(startDateStr);
   if (isNaN(startDate.getTime())) {
     openModalInfo('Please Choose a Start Date!');
     $('#runOptBtn').removeClass('disabled');
@@ -180,6 +195,18 @@ async function runOptimize() {
     return;
   }
 
+  if ($('#opTypeMaxReturn').is(':checked')) {
+    optType = 'return';
+  } else if ($('#opTypeConsistency').is(':checked')) {
+    optType = 'consistency';
+  } else if ($('#opTypeRiskReward').is(':checked')) {
+    optType = 'riskReward';
+  } else if ($('#opTypeSpikes').is(':checked')) {
+    optType = 'spikes';
+  }
+
+  stoplossVariations = $('#opChangeStoplossYes').is(':checked');
+
   try {
     optimizationRunning = true;
     opExecutionCanceled = false;
@@ -193,6 +220,7 @@ async function runOptimize() {
     }
 
     $('#opRunPercent').html('Starting Optimization..');
+    $('#opRunRemaining').html('&nbsp;');
     $('#opRunPercent2').hide();
     $('#opRunRocket').hide();
     $('#opCancelDiv').hide();
@@ -205,18 +233,37 @@ async function runOptimize() {
     $('#opStrategiesTable').html('<thead><tr><td>Strategy</td><td>Total Return</td><td>Max Drawdown</td><td>Winning %</td><td>Avg. Trade</td><td>Best Trade</td><td>Worst Trade</td><td>Trades N.</td><td>Save</td></tr></thead><tbody>');
     $('#opCancelDiv').show();
 
-    let timeframes = getTimeframes(strategy);
+    timeframes = getTimeframes(strategy);
     if (timeframes === null) {
       $('#runOptBtn').removeClass('disabled');
       $('#opRunning').hide();
       $('#opResult').hide();
       openModalInfo('Your strategy contains a rule without a timeframe. Please edit your strategy!');
       optimizationRunning = false;
-      $('#runBacktestBtn').removeClass('disabled');
       return;
     }
 
-    let ticks = {};
+    let rulesNumber = strategy.buyRules.length + strategy.sellRules.length;
+    if (rulesNumber > 5) {
+      openModalInfo('The Optimization feature is not available for strategies that have more than 5 rules. If you want to use this feature, please, edit your strategy!');
+      $('#runOptBtn').removeClass('disabled');
+      $('#opRunning').hide();
+      $('#opResult').hide();
+      optimizationRunning = false;
+      return;
+    }
+
+    if (stoplossVariations && rulesNumber > 4) {
+      openModalInfo('The Stoploss & Target Change option is not available for strategies that have more than 4 rules. If you want to use this option, please, edit your strategy!');
+      $('#runOptBtn').removeClass('disabled');
+      $('#opRunning').hide();
+      $('#opResult').hide();
+      optimizationRunning = false;
+      $("#opChangeStoplossNo").prop("checked", true);
+      return;
+    }
+
+    ticks = {};
     for (let tf of timeframes) {
       let tfTicks = await getBinanceTicks(instrument, getShortTimeframe(tf), getStartDate(tf, startDate), endDate, false);
       if (tfTicks === null) {
@@ -227,7 +274,6 @@ async function runOptimize() {
           openModalInfo('Could not optain data from ' + exchange + ' for the given period. The period may be too long. Please try with smaller period or try again later!');
         }
         optimizationRunning = false;
-        $('#runBacktestBtn').removeClass('disabled');
         return;
       }
       ticks[tf] = tfTicks;
@@ -248,48 +294,22 @@ async function runOptimize() {
 
     $('#opRunPercent2').hide();
     $('#opRunPercent').html('Optimization Execution: 0%');
+    $('#opRunRemaining').html('&nbsp;');
     $('#opRunRocket').show();
 
     strategyVariations = [];
-    let fullOptimization = $('#opOptimizationFull').is(':checked');
-    let changeStoploss = $('#opChangeStoplossYes').is(':checked');
-    let rulesCount = (strategy.buyRules.length + strategy.sellRules.length);
-    let maxStrategyVariations = 250000;
-    for (let rule of strategy.buyRules) {
-      let rulesTmp = fullOptimization
-        ? getFullRulesVariations(rule, rulesCount, changeStoploss)
-        : getFineTuneRulesVariations(rule, rulesCount, changeStoploss);
-      strategyVariations = await getNewStrategyVariations(rulesTmp, strategyVariations, 'buy', strategy, instrument);
-      if (checkTooManyVariations()) {
-        optimizationRunning = false;
-        return;
-      }
-    }
-    for (let rule of strategy.sellRules) {
-      let rulesTmp = fullOptimization
-        ? getFullRulesVariations(rule, rulesCount, changeStoploss)
-        : getFineTuneRulesVariations(rule, rulesCount, changeStoploss);
-      strategyVariations = await getNewStrategyVariations(rulesTmp, strategyVariations, 'sell', strategy, instrument);
-      if (checkTooManyVariations()) {
-        optimizationRunning = false;
-        return;
-      }
-    }
-    if (changeStoploss) {
-      strategyVariations = fullOptimization
-        ? await getFullStoplossAndTargetVariations(strategyVariations, rulesCount)
-        : await getFineTuneStoplossAndTargetVariations(strategyVariations, strategy, rulesCount);
-    }
-    if (checkTooManyVariations()) {
-      optimizationRunning = false;
-      return;
-    }
-    //alert(strategyVariations.length);
+    fineTune = 0;
+    strategyVariationsTested = 0;
+    strategyVariations = getStrategyVariations(strategy, fineTune, stoplossVariations);
+    strategyVariationsTested = strategyVariations.length;
+
     strategyVariationsResults = [];
     opExecutedIndex = 0;
     opExecutionCanceled = false;
     opCompleted = 0;
-
+    etaLastDate = null;
+    etaStr = '';
+    etaLastNum = null;
     //Initialize webworkers
     if (!webWorkersInitialized) {
       let cpus = os.cpus().length;
@@ -300,11 +320,13 @@ async function runOptimize() {
       for (let i = 0; i < maxOpWorkers; i++) {
         opExecutionWorkers[i] = new Worker("./assets/js/optimize-execution.js");
         opExecutionWorkers[i].addEventListener('error', async function(e) {
+          log('error', 'opExecutionWorkers.EventListener error', e.message + '<br>' + e.filename + ' ' + e.lineno);
           openModalInfo('Internal Error Occurred!<br>' + e.message + '<br>' + e.filename + ' ' + e.lineno);
         }, false);
         opExecutionWorkers[i].addEventListener("message", async function(e) {
           try {
             if (typeof e.data === 'string' && e.data.startsWith('ERR')) {
+              log('error', 'opExecutionWorkers.EventListener error', e.data);
               openModalInfo('Internal Error Occurred!<br>' + e.data);
               return;
             } else if (e.data instanceof Array && e.data[0] === 'STARTED') {
@@ -348,17 +370,55 @@ async function runOptimize() {
               }
               let completed = await addOpResult(e.data[2]);
 
-              $('#opRunPercent').html('Optimization Execution: ' + (
-              (completed / strategyVariations.length) * 100).toFixed(0) + '%');
+              let percentCompleted = (100 / (fineTuneMaxCycles + 1) * fineTune) + (completed / strategyVariations.length) * (100 / (fineTuneMaxCycles + 1));
+              if (percentCompleted > 100) {
+                percentCompleted = 100;
+              }
+
+              let lap = 2;
+              if (percentCompleted > (100 / (fineTuneMaxCycles + 1))) {
+                if (etaLastDate == null) {
+                  etaLastDate = new Date();
+                  etaLastNum = percentCompleted;
+                } else if (etaLastNum + lap <= percentCompleted) {
+                  let dateNow = new Date();
+                  let dateDiff = (Math.abs((dateNow.getTime() - etaLastDate.getTime()) / 1000)) * (100 - percentCompleted) / lap;
+
+                  let minutes = Math.floor(dateDiff / 60);
+                  let seconds = dateDiff % 60;
+                  if (minutes > 0) {
+                    if (seconds > 30) {
+                      minutes++;
+                    }
+                    if (minutes === 1) {
+                      etaStr = '~ ' + minutes.toFixed(0) + ' min';
+                    } else {
+                      etaStr = '~ ' + minutes.toFixed(0) + ' mins';
+                    }
+                  } else {
+                    etaStr = '< 1 min';
+                  }
+
+                  etaLastDate = new Date();
+                  etaLastNum = percentCompleted;
+                  $('#opRunRemaining').html('time left ' + etaStr);
+                }
+              }
+              $('#opRunPercent').html('Optimization Execution: ' + percentCompleted.toFixed(0) + '%');
 
               if (completed === strategyVariations.length) {
                 if (opExecutionCanceled) {
                   return;
                 }
-                fillOptimizationResult(marketReturn);
+                if (fineTune < fineTuneMaxCycles) {
+                  doFineTuneOfResult();
+                } else {
+                  fillOptimizationResult(marketReturn);
+                }
               }
 
             } else {
+              log('error', 'opExecutionWorkers.EventListener error', e.data);
               openModalInfo('Unexpected Internal Error Occurred!<br>' + e.data);
             }
           } catch (err) {
@@ -402,9 +462,652 @@ async function runOptimize() {
   }
 }
 
+function getStrategyVariationsFromResult(biggestTradeMultiplier, strategiesToAdd) {
+  let addedStrategies = 0;
+  let result = [];
+  for (let strategyRes of strategyVariationsResults) {
+    if (strategyRes.biggestGain * biggestTradeMultiplier > strategyRes.totalReturn) {
+      continue;
+    }
+
+    let strategyVariationsTmp = getStrategyVariations(strategyRes.strategy, fineTune, stoplossVariations);
+    for (let strategyTmp of strategyVariationsTmp) {
+      result.push(strategyTmp);
+    }
+    addedStrategies++;
+    if (addedStrategies >= strategiesToAdd) {
+      break;
+    }
+  }
+  return result;
+}
+
+function compareStrategyResults(a, b) {
+  let ratioA = null;
+  let ratioB = null;
+  //Max return for lowest risk
+  if (optType === 'riskReward') {
+    ratioA = (a.maxDrawdown != 0)
+      ? a.totalReturn / Math.abs(a.maxDrawdown)
+      : a.totalReturn;
+    ratioB = (b.maxDrawdown != 0)
+      ? b.totalReturn / Math.abs(b.maxDrawdown)
+      : b.totalReturn;
+  } else if (optType === 'return') {
+    ratioA = a.totalReturn;
+    ratioB = b.totalReturn;
+  } else if (optType === 'spikes') {
+    ratioA = a.totalReturn * a.biggestGain;
+    ratioB = b.totalReturn * b.biggestGain;
+
+  } else if (optType === 'consistency') {
+    let returnWithoutBestTradeA = a.totalReturn - a.biggestGain;
+    let returnWithoutBestTradeB = b.totalReturn - b.biggestGain;
+
+    let avgTradesCountA = a.executedTrades - 1;
+    let avgTradesCountB = b.executedTrades - 1;
+
+    let avgTradeWithoutBestTradeA = (avgTradesCountA > 0)
+      ? returnWithoutBestTradeA / avgTradesCountA
+      : 0;
+    let avgTradeWithoutBestTradeB = (avgTradesCountB > 0)
+      ? returnWithoutBestTradeB / avgTradesCountB
+      : 0;
+
+    let totalReturnToMaxDrawdownA = (a.maxDrawdown != 0)
+      ? returnWithoutBestTradeA / Math.abs(a.maxDrawdown)
+      : returnWithoutBestTradeA;
+    let totalReturnToMaxDrawdownB = (b.maxDrawdown != 0)
+      ? returnWithoutBestTradeB / Math.abs(b.maxDrawdown)
+      : returnWithoutBestTradeB;
+
+    ratioA = (totalReturnToMaxDrawdownA < 0 && avgTradeWithoutBestTradeA < 0)
+      ? (-1) * totalReturnToMaxDrawdownA * avgTradeWithoutBestTradeA
+      : totalReturnToMaxDrawdownA * avgTradeWithoutBestTradeA;
+
+    ratioB = (totalReturnToMaxDrawdownB < 0 && avgTradeWithoutBestTradeB < 0)
+      ? (-1) * totalReturnToMaxDrawdownB * avgTradeWithoutBestTradeB
+      : totalReturnToMaxDrawdownB * avgTradeWithoutBestTradeB;
+  }
+
+  return (ratioA < ratioB)
+    ? 1
+    : (
+      (ratioB < ratioA)
+      ? -1
+      : 0);
+}
+
+async function doFineTuneOfResult() {
+  try {
+    if (strategyVariationsResults.length == 0) {
+      fineTune = fineTuneMaxCycles;
+      fillOptimizationResult(marketReturn);
+      return;
+    }
+    await terminateOpWorkers();
+    strategyVariationsResults.sort(function(a, b) {
+      return compareStrategyResults(a, b)
+    });
+
+    fineTune++;
+    strategyVariations = [];
+    opExecutedIndex = 0;
+    opExecutionCanceled = false;
+    opCompleted = 0;
+
+    let strategiesToAdd = 5;
+
+    let strategyVariationsTmp = [];
+    if (optType === 'consistency') {
+      strategyVariationsTmp = getStrategyVariationsFromResult(4, strategiesToAdd);
+      if (strategyVariationsTmp.length === 0) {
+        strategyVariationsTmp = getStrategyVariationsFromResult(3, strategiesToAdd);
+        if (strategyVariationsTmp.length === 0) {
+          strategyVariationsTmp = getStrategyVariationsFromResult(2, strategiesToAdd);
+          if (strategyVariationsTmp.length === 0) {
+            strategyVariationsTmp = getStrategyVariationsFromResult(1, strategiesToAdd);
+            if (strategyVariationsTmp.length === 0) {
+              strategyVariationsTmp = getStrategyVariationsFromResult(0, strategiesToAdd);
+            }
+          }
+        }
+      }
+    } else {
+      strategyVariationsTmp = getStrategyVariationsFromResult(0, strategiesToAdd);
+    }
+
+    for (let strategyTmp of strategyVariationsTmp) {
+      strategyVariations.push(strategyTmp);
+    }
+    strategyVariationsTested += strategyVariationsTmp.length;
+
+    if (strategyVariations.length == 0) {
+      fineTune = fineTuneMaxCycles;
+      fillOptimizationResult(marketReturn);
+      return;
+    }
+    strategyVariationsResults = [];
+
+    for (let i = 0; i < maxOpWorkers; i++) {
+      try {
+        await opWorkerTerminateMutex.lock();
+        if (opExecutionCanceled) {
+          optimizationRunning = false;
+          return;
+        }
+        opExecutionWorkers[i].postMessage([
+          'INITIALIZE',
+          i,
+          timeframes,
+          startDate,
+          ticks,
+          feeRate
+        ]);
+        runningWorkiers++;
+      } finally {
+        opWorkerTerminateMutex.release();
+      }
+    }
+
+  } catch (err) {
+    optimizationRunning = false;
+    $('#runOptBtn').removeClass('disabled');
+    $('#opCancelBtn').removeClass('disabled');
+    log('error', 'doFineTuneOfResult', err.stack);
+  }
+}
+
+function createRuleVariation(rule, period, value, crossDirection, type2, period2, period3) {
+  let newRule = {};
+  newRule.indicator = rule.indicator;
+  newRule.timeframe = rule.timeframe;
+  newRule.direction = rule.direction;
+  newRule.type = rule.type;
+  newRule.crossDirection = rule.crossDirection;
+  newRule.period = period;
+  if (value != undefined && value != null) {
+    newRule.value = value;
+  }
+  if (crossDirection != undefined && crossDirection != null) {
+    newRule.crossDirection = crossDirection;
+  }
+  if (type2 != undefined && type2 != null) {
+    newRule.type2 = type2;
+  }
+  if (period2 != undefined && period2 != null) {
+    newRule.period2 = period2;
+  }
+  if (period3 != undefined && period3 != null) {
+    newRule.period3 = period3;
+  }
+  return newRule;
+}
+
+let fineTuneMaxCycles = 3;
+
+let maPeriods = [10, 31, 42];
+let maValues = [1, 3];
+
+let rsiPeriods = [6, 15, 24];
+let rsiValues = [25, 56, 77];
+
+let macdPeriods = [6, 15, 24];
+let macdPeriods2 = [10, 19, 28];
+let macdPeriods3 = [6, 15];
+let macdValues = [1, 3];
+
+function getRuleVariations(rule) {
+  let ruleVariations = [];
+  if (rule.indicator === 'sma' || rule.indicator === 'ema') {
+    if (rule.direction !== 'crossing') {
+      for (let period of maPeriods) {
+        for (let value of maValues) {
+          ruleVariations.push(createRuleVariation(rule, period, value));
+        }
+      }
+    } else {
+      for (let period of maPeriods) {
+        ruleVariations.push(createRuleVariation(rule, period, null));
+      }
+    }
+  } else if (rule.indicator === 'cma') {
+    for (let period of maPeriods) {
+      for (let period2 of maPeriods) {
+        if (period >= period2) {
+          continue;
+        }
+        ruleVariations.push(createRuleVariation(rule, period, null, rule.crossDirection, rule.type2, period2));
+      }
+    }
+  } else if (rule.indicator === 'rsi') {
+    for (let period of rsiPeriods) {
+      for (let value of rsiValues) {
+        ruleVariations.push(createRuleVariation(rule, period, value));
+      }
+    }
+  } else if (rule.indicator === 'macd') {
+    if (rule.type === 'signal line') {
+      if (rule.direction !== 'crossing') {
+        for (let period of macdPeriods) {
+          for (let period2 of macdPeriods2) {
+            if (period >= period2) {
+              continue;
+            }
+            for (let period3 of macdPeriods3) {
+              for (let value of macdValues) {
+                ruleVariations.push(createRuleVariation(rule, period, value, null, null, period2, period3));
+              }
+            }
+          }
+        }
+      } else {
+        for (let period of macdPeriods) {
+          for (let period2 of macdPeriods2) {
+            if (period >= period2) {
+              continue;
+            }
+            for (let period3 of macdPeriods3) {
+              ruleVariations.push(createRuleVariation(rule, period, null, rule.crossDirection, null, period2, period3));
+            }
+          }
+        }
+      }
+    } else {
+      for (let period of macdPeriods) {
+        for (let period2 of macdPeriods2) {
+          if (period >= period2) {
+            continue;
+          }
+          ruleVariations.push(createRuleVariation(rule, period, null, null, null, period2, null));
+        }
+      }
+    }
+  }
+  return ruleVariations;
+}
+
+let maPeriodsFineTune = [];
+let maValuesFineTune = [];
+let maPeriodsFineTune1 = [-5, 0, 5];
+let maValuesFineTune1 = [-0.5, 0, 0.5];
+let maPeriodsFineTune2 = [-3, 0, 3];
+let maValuesFineTune2 = [-0.25, 0, 0.25];
+let maPeriodsFineTune3 = [-1, 0, 1];
+let maValuesFineTune3 = [-0.1, 0, 0.1];
+
+let rsiPeriodsFineTune = [];
+let rsiValuesFineTune = [];
+let rsiPeriodsFineTune1 = [-2, 0, 2];
+let rsiValuesFineTune1 = [-8, 0, 8];
+let rsiPeriodsFineTune2 = [-1, 0, 1];
+let rsiValuesFineTune2 = [-5, 0, 5];
+let rsiPeriodsFineTune3 = [-1, 0, 1];
+let rsiValuesFineTune3 = [-2, 0, 2];
+
+let macdPeriodsFineTune = [];
+let macdPeriods2FineTune = [];
+let macdPeriods3FineTune = [];
+let macdValuesFineTune = [];
+
+let macdPeriodsFineTune1 = [-2, 0, 2];
+let macdPeriods2FineTune1 = [-2, 0, 2];
+let macdPeriods3FineTune1 = [-2, 0, 2];
+let macdValuesFineTune1 = [-0.5, 0, 0.5];
+
+let macdPeriodsFineTune2 = [-1, 0, 1];
+let macdPeriods2FineTune2 = [-1, 0, 1];
+let macdPeriods3FineTune2 = [-1, 0, 1];
+let macdValuesFineTune2 = [-0.25, 0, 0.25];
+
+let macdPeriodsFineTune3 = [-1, 0, 1];
+let macdPeriods2FineTune3 = [-1, 0, 1];
+let macdPeriods3FineTune3 = [-1, 0, 1];
+let macdValuesFineTune3 = [0];
+
+function getRuleVariationsFineTune(rule) {
+  let ruleVariations = [];
+
+  if (rule.indicator === 'sma' || rule.indicator === 'ema') {
+    if (rule.direction !== 'crossing') {
+      for (let period of maPeriodsFineTune) {
+        let periodToUse = rule.period + period;
+        if (periodToUse < 2) {
+          continue;
+        }
+        for (let value of maValuesFineTune) {
+          let valueToUse = rule.value + value;
+          if (valueToUse === 0) {
+            valueToUse = 0.1
+          }
+          ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse));
+        }
+      }
+    } else {
+      for (let period of maPeriodsFineTune) {
+        let periodToUse = rule.period + period;
+        if (periodToUse < 2) {
+          continue;
+        }
+        ruleVariations.push(createRuleVariation(rule, periodToUse, null));
+      }
+    }
+  } else if (rule.indicator === 'cma') {
+    for (let period of maPeriodsFineTune) {
+      let periodToUse = rule.period + period;
+      if (periodToUse < 2) {
+        continue;
+      }
+      for (let period2 of maPeriodsFineTune) {
+        let periodToUse2 = rule.period2 + period2;
+        if (periodToUse >= periodToUse2) {
+          continue;
+        }
+        ruleVariations.push(createRuleVariation(rule, periodToUse, null, rule.crossDirection, rule.type2, periodToUse2));
+      }
+    }
+  } else if (rule.indicator === 'rsi') {
+    for (let period of rsiPeriodsFineTune) {
+      let periodToUse = rule.period + period;
+      if (periodToUse < 2) {
+        continue;
+      }
+      for (let value of rsiValuesFineTune) {
+        ruleVariations.push(createRuleVariation(rule, periodToUse, rule.value + value));
+      }
+    }
+  } else if (rule.indicator === 'macd') {
+    if (rule.type === 'signal line') {
+      if (rule.direction !== 'crossing') {
+        for (let period of macdPeriodsFineTune) {
+          for (let period2 of macdPeriods2FineTune) {
+            let periodToUse = rule.period + period;
+            let periodToUse2 = rule.period + period2;
+            if (periodToUse >= periodToUse2 || periodToUse < 2) {
+              continue;
+            }
+            for (let period3 of macdPeriods3FineTune) {
+              for (let value of macdValuesFineTune) {
+                let valueToUse = rule.value + value;
+                if (valueToUse === 0) {
+                  valueToUse = 0.1
+                }
+                ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, null, null, periodToUse2, period3));
+              }
+            }
+          }
+        }
+      } else {
+        for (let period of macdPeriodsFineTune) {
+          for (let period2 of macdPeriods2FineTune) {
+            let periodToUse = rule.period + period;
+            let periodToUse2 = rule.period + period2;
+            if (periodToUse >= periodToUse2 || periodToUse < 2) {
+              continue;
+            }
+            for (let period3 of macdPeriods3FineTune) {
+              ruleVariations.push(createRuleVariation(rule, periodToUse, null, rule.crossDirection, null, periodToUse2, period3));
+            }
+          }
+        }
+      }
+    } else {
+      for (let period of macdPeriodsFineTune) {
+        for (let period2 of macdPeriods2FineTune) {
+          let periodToUse = rule.period + period;
+          let periodToUse2 = rule.period + period2;
+          if (periodToUse >= periodToUse2 || periodToUse < 2) {
+            continue;
+          }
+          ruleVariations.push(createRuleVariation(rule, periodToUse, null, null, null, periodToUse2, null));
+        }
+      }
+    }
+
+  }
+
+  return ruleVariations;
+}
+
+function getRulesVariations(rules, fineTune) {
+  if (rules == null || rules == undefined || rules.length === 0) {
+    return [];
+  }
+
+  let rulesVariations = [];
+
+  for (let rule of rules) {
+    let ruleVariations = null;
+    switch (fineTune) {
+      case 0:
+        ruleVariations = getRuleVariations(rule);
+        break;
+      case 1:
+        maPeriodsFineTune = maPeriodsFineTune1;
+        maValuesFineTune = maValuesFineTune1;
+        rsiPeriodsFineTune = rsiPeriodsFineTune1;
+        rsiValuesFineTune = rsiValuesFineTune1;
+        macdPeriodsFineTune = macdPeriodsFineTune1;
+        macdPeriods2FineTune = macdPeriods2FineTune1;
+        macdPeriods3FineTune = macdPeriods3FineTune1;
+        macdValuesFineTune = macdValuesFineTune1;
+        ruleVariations = getRuleVariationsFineTune(rule);
+        break;
+      case 2:
+        maPeriodsFineTune = maPeriodsFineTune2;
+        maValuesFineTune = maValuesFineTune2;
+        rsiPeriodsFineTune = rsiPeriodsFineTune2;
+        rsiValuesFineTune = rsiValuesFineTune2;
+        macdPeriodsFineTune = macdPeriodsFineTune2;
+        macdPeriods2FineTune = macdPeriods2FineTune2;
+        macdPeriods3FineTune = macdPeriods3FineTune2;
+        macdValuesFineTune = macdValuesFineTune2;
+        ruleVariations = getRuleVariationsFineTune(rule);
+        break;
+      case 3:
+        maPeriodsFineTune = maPeriodsFineTune3;
+        maValuesFineTune = maValuesFineTune3;
+        rsiPeriodsFineTune = rsiPeriodsFineTune3;
+        rsiValuesFineTune = rsiValuesFineTune3;
+        macdPeriodsFineTune = macdPeriodsFineTune3;
+        macdPeriods2FineTune = macdPeriods2FineTune3;
+        macdPeriods3FineTune = macdPeriods3FineTune3;
+        macdValuesFineTune = macdValuesFineTune3;
+        ruleVariations = getRuleVariationsFineTune(rule);
+        break;
+      default:
+        ruleVariations = getRuleVariations(rule);
+        break;
+    };
+    rulesVariations.push(ruleVariations);
+  }
+  return rulesVariations;
+}
+
+function createStrategyVariationWithBuyRules(strategy, buyRules) {
+  let newStrategy = {};
+  newStrategy.name = strategy.name;
+  newStrategy.timeClose = strategy.timeClose;
+  newStrategy.buyRules = [];
+  newStrategy.sellRules = [];
+  for (let buyRule of buyRules) {
+    newStrategy.buyRules.push(buyRule);
+  }
+  newStrategy.stoploss = strategy.stoploss;
+  newStrategy.trailingSl = strategy.trailingSl;
+  newStrategy.target = strategy.target;
+  return newStrategy;
+}
+
+function createStrategyVariationWithSellRules(finalStrategiesList, strategiesWithBuyOnly, sellRules) {
+  for (let strategy of strategiesWithBuyOnly) {
+    let newStrategy = {};
+    newStrategy.name = strategy.name;
+    newStrategy.timeClose = strategy.timeClose;
+    newStrategy.buyRules = [];
+    newStrategy.sellRules = [];
+    for (let buyRule of strategy.buyRules) {
+      newStrategy.buyRules.push(buyRule);
+    }
+    for (let sellRule of sellRules) {
+      newStrategy.sellRules.push(sellRule);
+    }
+    newStrategy.stoploss = strategy.stoploss;
+    newStrategy.trailingSl = strategy.trailingSl;
+    newStrategy.target = strategy.target;
+    finalStrategiesList.push(newStrategy);
+  }
+}
+
+let stoplossesFineTune0 = [2, 4.5, 7];
+let stoplossesFineTune1 = [-0.5, 0, 0.5];
+let stoplossesFineTune2 = [-0.25, 0, 0.25];
+let stoplossesFineTune3 = [-0.25, 0, 0.25];
+
+let targetsFineTune0 = [3, 8.5, 14];
+let targetsFineTune1 = [-1, 0, 1];
+let targetsFineTune2 = [-1, 0, 1];
+let targetsFineTune3 = [-0.5, 0, 0.5];
+
+function createStrategyVariationWithStoplossRules(finalStrategiesList, strategiesWithBuySellOnly, fineTune) {
+  let stoplosses = [];
+  let targets = [];
+
+  switch (fineTune) {
+    case 0:
+      stoplosses = stoplossesFineTune0;
+      targets = targetsFineTune0;
+      break;
+    case 1:
+      stoplosses = stoplossesFineTune1;
+      targets = targetsFineTune1;
+      break;
+    case 2:
+      stoplosses = stoplossesFineTune2;
+      targets = targetsFineTune2;
+      break;
+    case 3:
+      stoplosses = stoplossesFineTune3;
+      targets = targetsFineTune3;
+      break;
+    default:
+      break;
+  };
+  let useTrailingStop = strategiesWithBuySellOnly.length > 0 && strategiesWithBuySellOnly[0].trailingSl !== null && !isNaN(strategiesWithBuySellOnly[0].trailingSl);
+  for (let stoploss of stoplosses) {
+    for (let target of targets) {
+      for (let strategy of strategiesWithBuySellOnly) {
+        let newStrategy = {};
+        newStrategy.name = strategy.name;
+        newStrategy.timeClose = strategy.timeClose;
+        newStrategy.buyRules = [];
+        newStrategy.sellRules = [];
+        for (let buyRule of strategy.buyRules) {
+          newStrategy.buyRules.push(buyRule);
+        }
+        for (let sellRule of strategy.sellRules) {
+          newStrategy.sellRules.push(sellRule);
+        }
+        if (fineTune > 0) {
+          if (useTrailingStop) {
+            newStrategy.trailingSl = strategy.trailingSl + stoploss;
+          } else {
+            newStrategy.stoploss = strategy.stoploss + stoploss;
+          }
+          newStrategy.target = strategy.target + target;
+        } else {
+          if (useTrailingStop) {
+            newStrategy.trailingSl = stoploss;
+          } else {
+            newStrategy.stoploss = stoploss;
+          }
+          newStrategy.target = target;
+        }
+
+        finalStrategiesList.push(newStrategy);
+      }
+    }
+  }
+  return finalStrategiesList;
+}
+
+function getStrategyVariations(strategy, fineTune, stoplossVariations) {
+  try {
+    let buyRulesVariations = getRulesVariations(strategy.buyRules, fineTune);
+    let sellRulesVariations = getRulesVariations(strategy.sellRules, fineTune);
+
+    let strategiesWithBuyRuleVariations = [];
+    let strategiesWithBuySellRuleVariations = [];
+    for (let ruleVariations of buyRulesVariations[0]) {
+      if (buyRulesVariations.length > 1) {
+        for (let rule2Variations of buyRulesVariations[1]) {
+          if (buyRulesVariations.length > 2) {
+            for (let rule3Variations of buyRulesVariations[2]) {
+              if (buyRulesVariations.length > 3) {
+                for (let rule4Variations of buyRulesVariations[3]) {
+                  if (buyRulesVariations.length > 4) {
+                    for (let rule5Variations of buyRulesVariations[4]) {
+                      strategiesWithBuyRuleVariations.push(createStrategyVariationWithBuyRules(strategy, [ruleVariations, rule2Variations, rule3Variations, rule4Variations, rule5Variations]));
+                    }
+                  } else {
+                    strategiesWithBuyRuleVariations.push(createStrategyVariationWithBuyRules(strategy, [ruleVariations, rule2Variations, rule3Variations, rule4Variations]));
+                  }
+                }
+              } else {
+                strategiesWithBuyRuleVariations.push(createStrategyVariationWithBuyRules(strategy, [ruleVariations, rule2Variations, rule3Variations]));
+              }
+            }
+          } else {
+            strategiesWithBuyRuleVariations.push(createStrategyVariationWithBuyRules(strategy, [ruleVariations, rule2Variations]));
+          }
+        }
+      } else {
+        strategiesWithBuyRuleVariations.push(createStrategyVariationWithBuyRules(strategy, [ruleVariations]));
+      }
+    }
+    if (sellRulesVariations.length !== 0) {
+      for (let ruleVariations of sellRulesVariations[0]) {
+        if (sellRulesVariations.length > 1) {
+          for (let rule2Variations of sellRulesVariations[1]) {
+            if (sellRulesVariations.length > 2) {
+              for (let rule3Variations of sellRulesVariations[2]) {
+                if (sellRulesVariations.length > 3) {
+                  for (let rule4Variations of sellRulesVariations[3]) {
+                    createStrategyVariationWithSellRules(strategiesWithBuySellRuleVariations, strategiesWithBuyRuleVariations, [ruleVariations, rule2Variations, rule3Variations, rule4Variations]);
+                  }
+                } else {
+                  createStrategyVariationWithSellRules(strategiesWithBuySellRuleVariations, strategiesWithBuyRuleVariations, [ruleVariations, rule2Variations, rule3Variations]);
+                }
+              }
+            } else {
+              createStrategyVariationWithSellRules(strategiesWithBuySellRuleVariations, strategiesWithBuyRuleVariations, [ruleVariations, rule2Variations]);
+            }
+          }
+        } else {
+          createStrategyVariationWithSellRules(strategiesWithBuySellRuleVariations, strategiesWithBuyRuleVariations, [ruleVariations]);
+        }
+      }
+    } else {
+      strategiesWithBuySellRuleVariations = strategiesWithBuyRuleVariations;
+    }
+
+    if (stoplossVariations) {
+      let strategiesWithBuySellAndStoplossRuleVariations = [];
+      createStrategyVariationWithStoplossRules(strategiesWithBuySellAndStoplossRuleVariations, strategiesWithBuySellRuleVariations, fineTune);
+      return strategiesWithBuySellAndStoplossRuleVariations;
+    } else {
+      return strategiesWithBuySellRuleVariations;
+    }
+
+  } catch (err) {
+    alert(err.stack)
+  }
+}
+
 function opResultShowRows(from, to) {
   $('#opStrategiesTable').html('<thead><tr><td>Strategy</td><td>Total Return</td><td>Max Drawdown</td><td>Winning %</td><td>Avg. Trade</td><td>Best Trade</td><td>Worst Trade</td><td>Trades N.</td><td>Save</td></tr></thead><tbody>');
   for (let i = from; i < Math.min(strategyVariationsResults.length, to); i++) {
+
     let res = strategyVariationsResults[i];
     let classes = '';
     let resultClass = '';
@@ -445,9 +1148,11 @@ async function terminateOpWorkers() {
     while (runningWorkiers > 0) {
       await sleep(500);
     }
-    optimizationRunning = false;
-    $('#runOptBtn').removeClass('disabled');
-    $('#opCancelBtn').removeClass('disabled');
+    if (fineTune >= fineTuneMaxCycles) {
+      optimizationRunning = false;
+      $('#runOptBtn').removeClass('disabled');
+      $('#opCancelBtn').removeClass('disabled');
+    }
   } catch (err) {
     log('error', 'terminateOpWorkers', err.stack);
   } finally {
@@ -461,12 +1166,7 @@ async function fillOptimizationResult(marketReturn) {
     $('#opCancelBtn').addClass('disabled');
 
     strategyVariationsResults.sort(function(a, b) {
-      return (a.totalReturn < b.totalReturn)
-        ? 1
-        : (
-          (b.totalReturn < a.totalReturn)
-          ? -1
-          : 0);
+      return compareStrategyResults(a, b)
     });
 
     let rowsShown = 100;
@@ -475,7 +1175,7 @@ async function fillOptimizationResult(marketReturn) {
     $('#opStrategiesTableNav').html('');
     let rowsTotal = strategyVariationsResults.length;
     let numPages = rowsTotal / rowsShown;
-    for (let i = 0; i < numPages; i++) {
+    /*for (let i = 0; i < numPages; i++) {
       var pageNum = i + 1;
       $('#opStrategiesTableNav').append('<a href="#/" rel="' + i + '">' + pageNum + '</a> ');
     }
@@ -487,7 +1187,7 @@ async function fillOptimizationResult(marketReturn) {
       let startItem = currPage * rowsShown;
       let endItem = startItem + rowsShown;
       opResultShowRows(startItem, endItem);
-    });
+    });*/
 
     $('#opRunning').hide();
 
@@ -497,1565 +1197,16 @@ async function fillOptimizationResult(marketReturn) {
         ? 'text-red'
         : '';
 
-    $('#opResultH').html('Tested ' + strategyVariations.length + ' variations. Strategies that didn\'t generate trades are excluded.<br>Market Return for the same period: <span class="' + marketReturnClass + '">' + marketReturn.toFixed(2) + '%</span>');
+    $('#opResultH').html('Tested ' + strategyVariationsTested + ' variations. Showing top 100 by total return. Strategies that didn\'t generate positive return are excluded.<br>Market Return for the same period: <span class="' + marketReturnClass + '">' + marketReturn.toFixed(2) + '%</span>');
     $('#opResult').show();
 
     await terminateOpWorkers();
+    strategyVariations = null;
+    strategyVariationsResults = null;
   } catch (err) {
     log('error', 'fillOptimizationResult', err.stack);
     openModalInfo('Internal Error Occurred!<br>' + err.stack);
   }
-}
-
-function getFineTuneRulesVariations(rule, rulesCount, changeStoploss) {
-  let rulesTmp = [];
-
-  let rP = rule.period;
-  let rP2 = rule.period2;
-  let rP3 = rule.period3;
-  let rV = rule.value;
-
-  let maStepP = [
-    rP - 3,
-    rP,
-    rP + 3
-  ];
-  let maStepV = [
-    rV - 1,
-    rV + 1
-  ];
-  let cmaStepP2 = [
-    rP2 - 1,
-    rP2,
-    rP2 + 1
-  ];
-  let cmaStepP = [
-    rP - 1,
-    rP + 1
-  ];
-  let rsiStepP = [7, 10, 14];
-  let rsiStepV = [30, 70];
-  let macdStepP2 = [
-    rP2 - 1,
-    rP2,
-    rP2 + 1
-  ];
-  let macdStepP = [
-    rP - 1,
-    rP,
-    rP + 1
-  ];
-  let macdStepP3 = [rP3];
-  let macdStepV = [rV];
-  if (changeStoploss) {
-    switch (rulesCount) {
-      case 1:
-        maStepP = [
-          rP - 5,
-          rP - 4,
-          rP - 3,
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2,
-          rP + 3,
-          rP + 4,
-          rP + 5
-        ];
-        maStepV = [
-          rV - 3,
-          rV - 2.5,
-          rV - 2,
-          rV - 1.5,
-          rV - 1,
-          rV - 0.5,
-          rV - 0.25,
-          rV,
-          rV + 0.25,
-          rV + 0.5,
-          rV + 1,
-          rV + 1.5,
-          rV + 2,
-          rV + 2.5,
-          rV + 3
-        ];
-        cmaStepP2 = [
-          rP2 - 5,
-          rP2 - 4,
-          rP2 - 3,
-          rP2 - 2,
-          rP2 - 1,
-          rP2,
-          rP2 + 1,
-          rP2 + 2,
-          rP2 + 3,
-          rP2 + 4,
-          rP2 + 5
-        ];
-        cmaStepP = [
-          rP - 5,
-          rP - 4,
-          rP - 3,
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2,
-          rP + 3,
-          rP + 4,
-          rP + 5
-        ];
-        rsiStepP = [
-          rP - 5,
-          rP - 4,
-          rP - 3,
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2,
-          rP + 3,
-          rP + 4,
-          rP + 5
-        ];
-        rsiStepV = [
-          rV - 10,
-          rV - 7,
-          rV - 5,
-          rV - 3,
-          rV - 2,
-          rV - 1,
-          rV,
-          rV + 1,
-          rV + 2,
-          rV + 3,
-          rV + 5,
-          rV + 7,
-          rV + 10
-        ];
-        macdStepP2 = [
-          rP2 - 2,
-          rP2 - 1,
-          rP2,
-          rP2 + 1,
-          rP2 + 2
-        ];
-        macdStepP = [
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2
-        ];
-        macdStepP3 = [
-          rP3 - 2,
-          rP3 - 1,
-          rP3,
-          rP3 + 1,
-          rP3 + 2
-        ];
-        macdStepV = [
-          rV - 1,
-          rV - 0.5,
-          rV,
-          rV + 0.5,
-          rV + 1
-        ];
-        break;
-      case 2:
-        maStepP = [
-          rP - 5,
-          rP - 3,
-          rP - 2,
-          rP,
-          rP + 2,
-          rP + 3,
-          rP + 5
-        ];
-        maStepV = [
-          rV - 1.5,
-          rV - 1,
-          rV - 0.5,
-          rV,
-          rV + 0.5,
-          rV + 1,
-          rV + 1.5
-        ];
-        cmaStepP2 = [
-          rP2 - 3,
-          rP2 - 2,
-          rP2 - 1,
-          rP2,
-          rP2 + 1,
-          rP2 + 2,
-          rP2 + 3
-        ];
-        cmaStepP = [
-          rP - 3,
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2,
-          rP + 3
-        ];
-        rsiStepP = [
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2
-        ];
-        rsiStepV = [
-          rV - 10,
-          rV - 5,
-          rV - 3,
-          rV - 1,
-          rV,
-          rV + 1,
-          rV + 3,
-          rV + 5,
-          rV + 10
-        ];
-        macdStepP2 = [
-          rP2 - 1,
-          rP2,
-          rP2 + 1
-        ];
-        macdStepP = [
-          rP - 1,
-          rP,
-          rP + 1
-        ];
-        macdStepP3 = [
-          rP3 - 1,
-          rP3,
-          rP3 + 1
-        ];
-        macdStepV = [rV];
-        break;
-      case 3:
-        maStepP = [
-          rP - 3,
-          rP,
-          rP + 3
-        ];
-        maStepV = [
-          rV - 1,
-          rV - 0.5,
-          rV,
-          rV + 0.5,
-          rV + 1
-        ];
-        cmaStepP2 = [
-          rP2 - 2,
-          rP2 - 1,
-          rP2,
-          rP2 + 1,
-          rP2 + 2
-        ];
-        cmaStepP = [
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2
-        ];
-        rsiStepP = [
-          rP - 1,
-          rP,
-          rP + 1
-        ];
-        rsiStepV = [
-          rV - 5,
-          rV - 3,
-          rV - 1,
-          rV,
-          rV + 1,
-          rV + 3,
-          rV + 5
-        ];
-        macdStepP2 = [
-          rP2 - 1,
-          rP2,
-          rP2 + 1
-        ];
-        macdStepP = [
-          rP - 1,
-          rP,
-          rP + 1
-        ];
-        macdStepP3 = [
-          rP3 - 1,
-          rP3,
-          rP3 + 1
-        ];
-        macdStepV = [rV];
-        break;
-      case 4:
-        maStepP = [
-          rP - 3,
-          rP,
-          rP + 3
-        ];
-        maStepV = [
-          rV - 1,
-          rV,
-          rV + 1
-        ];
-        cmaStepP2 = [
-          rP2 - 2,
-          rP2 - 1,
-          rP2,
-          rP2 + 1,
-          rP2 + 2
-        ];
-        cmaStepP = [
-          rP - 1,
-          rP,
-          rP + 1
-        ];
-        rsiStepP = [
-          rP - 1,
-          rP,
-          rP + 1
-        ];
-        rsiStepV = [
-          rV - 3,
-          rV,
-          rV + 3
-        ];
-        break;
-      default:
-    }
-  } else {
-    switch (rulesCount) {
-      case 1:
-      case 2:
-        maStepP = [
-          rP - 5,
-          rP - 4,
-          rP - 3,
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2,
-          rP + 3,
-          rP + 4,
-          rP + 5
-        ];
-        maStepV = [
-          rV - 3,
-          rV - 2.5,
-          rV - 2,
-          rV - 1.5,
-          rV - 1,
-          rV - 0.5,
-          rV - 0.25,
-          rV,
-          rV + 0.25,
-          rV + 0.5,
-          rV + 1,
-          rV + 1.5,
-          rV + 2,
-          rV + 2.5,
-          rV + 3
-        ];
-        cmaStepP2 = [
-          rP2 - 5,
-          rP2 - 4,
-          rP2 - 3,
-          rP2 - 2,
-          rP2 - 1,
-          rP2,
-          rP2 + 1,
-          rP2 + 2,
-          rP2 + 3,
-          rP2 + 4,
-          rP2 + 5
-        ];
-        cmaStepP = [
-          rP - 5,
-          rP - 4,
-          rP - 3,
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2,
-          rP + 3,
-          rP + 4,
-          rP + 5
-        ];
-        rsiStepP = [
-          rP - 5,
-          rP - 4,
-          rP - 3,
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2,
-          rP + 3,
-          rP + 4,
-          rP + 5
-        ];
-        rsiStepV = [
-          rV - 10,
-          rV - 7,
-          rV - 5,
-          rV - 3,
-          rV - 2,
-          rV - 1,
-          rV,
-          rV + 1,
-          rV + 2,
-          rV + 3,
-          rV + 5,
-          rV + 7,
-          rV + 10
-        ];
-        macdStepP2 = [
-          rP2 - 2,
-          rP2 - 1,
-          rP2,
-          rP2 + 1,
-          rP2 + 2
-        ];
-        macdStepP = [
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2
-        ];
-        macdStepP3 = [
-          rP3 - 2,
-          rP3 - 1,
-          rP3,
-          rP3 + 1,
-          rP3 + 2
-        ];
-        macdStepV = [
-          rV - 1,
-          rV - 0.5,
-          rV,
-          rV + 0.5,
-          rV + 1
-        ];
-        break;
-      case 3:
-        maStepP = [
-          rP - 5,
-          rP - 3,
-          rP - 2,
-          rP,
-          rP + 2,
-          rP + 3,
-          rP + 5
-        ];
-        maStepV = [
-          rV - 1.5,
-          rV - 1,
-          rV - 0.5,
-          rV,
-          rV + 0.5,
-          rV + 1,
-          rV + 1.5
-        ];
-        cmaStepP2 = [
-          rP2 - 3,
-          rP2 - 2,
-          rP2 - 1,
-          rP2,
-          rP2 + 1,
-          rP2 + 2,
-          rP2 + 3
-        ];
-        cmaStepP = [
-          rP - 3,
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2,
-          rP + 3
-        ];
-        rsiStepP = [
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2
-        ];
-        rsiStepV = [
-          rV - 10,
-          rV - 5,
-          rV - 3,
-          rV - 1,
-          rV,
-          rV + 1,
-          rV + 3,
-          rV + 5,
-          rV + 10
-        ];
-        macdStepP2 = [
-          rP2 - 1,
-          rP2,
-          rP2 + 1
-        ];
-        macdStepP = [
-          rP - 1,
-          rP,
-          rP + 1
-        ];
-        macdStepP3 = [
-          rP3 - 1,
-          rP3,
-          rP3 + 1
-        ];
-        macdStepV = [rV];
-        break;
-      case 4:
-        maStepP = [
-          rP - 3,
-          rP,
-          rP + 3
-        ];
-        maStepV = [
-          rV - 1,
-          rV - 0.5,
-          rV,
-          rV + 0.5,
-          rV + 1
-        ];
-        cmaStepP2 = [
-          rP2 - 2,
-          rP2 - 1,
-          rP2,
-          rP2 + 1,
-          rP2 + 2
-        ];
-        cmaStepP = [
-          rP - 2,
-          rP - 1,
-          rP,
-          rP + 1,
-          rP + 2
-        ];
-        rsiStepP = [
-          rP - 1,
-          rP,
-          rP + 1
-        ];
-        rsiStepV = [
-          rV - 5,
-          rV - 3,
-          rV - 1,
-          rV,
-          rV + 1,
-          rV + 3,
-          rV + 5
-        ];
-        macdStepP2 = [
-          rP2 - 1,
-          rP2,
-          rP2 + 1
-        ];
-        macdStepP = [
-          rP - 1,
-          rP,
-          rP + 1
-        ];
-        macdStepP3 = [
-          rP3 - 1,
-          rP3,
-          rP3 + 1
-        ];
-        macdStepV = [rV];
-        break;
-      case 5:
-        maStepP = [
-          rP - 3,
-          rP,
-          rP + 3
-        ];
-        maStepV = [
-          rV - 1,
-          rV,
-          rV + 1
-        ];
-        cmaStepP2 = [
-          rP2 - 2,
-          rP2 - 1,
-          rP2,
-          rP2 + 1,
-          rP2 + 2
-        ];
-        cmaStepP = [
-          rP - 1,
-          rP,
-          rP + 1
-        ];
-        rsiStepP = [
-          rP - 1,
-          rP,
-          rP + 1
-        ];
-        rsiStepV = [
-          rV - 3,
-          rV,
-          rV + 3
-        ];
-        break;
-      default:
-    }
-  }
-
-  if (rule.indicator === 'sma' || rule.indicator === 'ema') {
-    for (let p of maStepP) {
-      if (p < 2) {
-        continue;
-      }
-      if (rule.direction !== 'crossing') {
-        for (let v of maStepV) {
-          if (v < 0.1) {
-            continue;
-          }
-          let ruleTmp = {};
-          ruleTmp.indicator = rule.indicator;
-          ruleTmp.timeframe = rule.timeframe;
-          ruleTmp.direction = rule.direction;
-          ruleTmp.crossDirection = rule.crossDirection;
-          ruleTmp.period = p;
-          ruleTmp.value = v;
-          rulesTmp.push(ruleTmp);
-        }
-      } else {
-        let ruleTmp = {};
-        ruleTmp.indicator = rule.indicator;
-        ruleTmp.timeframe = rule.timeframe;
-        ruleTmp.direction = rule.direction;
-        ruleTmp.crossDirection = rule.crossDirection;
-        ruleTmp.period = p;
-        rulesTmp.push(ruleTmp);
-      }
-    }
-  } else if (rule.indicator === "cma") {
-    for (let p2 of cmaStepP2) {
-      if (p2 < 2) {
-        continue;
-      }
-      for (let p of cmaStepP) {
-        if (p < 2 || p >= p2) {
-          continue;
-        }
-        let ruleTmp = {};
-        ruleTmp.indicator = rule.indicator;
-        ruleTmp.timeframe = rule.timeframe;
-        ruleTmp.type = rule.type;
-        ruleTmp.type2 = rule.type2;
-        ruleTmp.crossDirection = rule.crossDirection;
-        ruleTmp.period = p;
-        ruleTmp.period2 = p2;
-        rulesTmp.push(ruleTmp);
-
-      }
-    }
-  } else if (rule.indicator === "rsi") {
-
-    for (let p of rsiStepP) {
-      if (p < 2) {
-        continue;
-      }
-      for (let v of rsiStepV) {
-        if (v < 2) {
-          continue;
-        }
-        let ruleTmp = {};
-        ruleTmp.indicator = rule.indicator;
-        ruleTmp.timeframe = rule.timeframe;
-        ruleTmp.direction = rule.direction;
-        ruleTmp.crossDirection = rule.crossDirection;
-        ruleTmp.period = p;
-        ruleTmp.value = v;
-        rulesTmp.push(ruleTmp);
-      }
-    }
-  } else if (rule.indicator === "macd") {
-    for (let p2 of macdStepP2) {
-      if (p2 < 2) {
-        continue;
-      }
-      for (let p of macdStepP) {
-        if (p < 2 || p >= p2) {
-          continue;
-        }
-        if (rule.type === 'signal line') {
-          for (let p3 of macdStepP3) {
-            if (p3 < 2) {
-              continue;
-            }
-            if (rule.direction !== 'crossing') {
-              for (let v of macdStepV) {
-                if (v < 0.1) {
-                  continue;
-                }
-                let ruleTmp = {};
-                ruleTmp.indicator = rule.indicator;
-                ruleTmp.timeframe = rule.timeframe;
-                ruleTmp.type = rule.type;
-                ruleTmp.direction = rule.direction;
-                ruleTmp.crossDirection = rule.crossDirection;
-                ruleTmp.period = p;
-                ruleTmp.period2 = p2;
-                ruleTmp.period3 = p3;
-                ruleTmp.value = v;
-                rulesTmp.push(ruleTmp);
-              }
-            } else {
-              let ruleTmp = {};
-              ruleTmp.indicator = rule.indicator;
-              ruleTmp.timeframe = rule.timeframe;
-              ruleTmp.type = rule.type;
-              ruleTmp.direction = rule.direction;
-              ruleTmp.crossDirection = rule.crossDirection;
-              ruleTmp.period = p;
-              ruleTmp.period2 = p2;
-              ruleTmp.period3 = p3;
-              rulesTmp.push(ruleTmp);
-            }
-          }
-        } else {
-          let ruleTmp = {};
-          ruleTmp.indicator = rule.indicator;
-          ruleTmp.timeframe = rule.timeframe;
-          ruleTmp.type = rule.type;
-          ruleTmp.direction = rule.direction;
-          ruleTmp.crossDirection = rule.crossDirection;
-          ruleTmp.period = p;
-          ruleTmp.period2 = p2;
-          rulesTmp.push(ruleTmp);
-        }
-      }
-    }
-  }
-
-  return rulesTmp;
-}
-
-function getFullRulesVariations(rule, rulesCount, changeStoploss) {
-  let rulesTmp = [];
-
-  let maStepP = [10, 20, 30];
-  let maStepV = [1, 3];
-  let cmaStepP2 = [20, 30, 40];
-  let cmaStepP = [5, 10];
-  let rsiStepP = [7, 10, 14];
-  let rsiStepV = [30, 70];
-  let macdStepP2 = [12, 26];
-  let macdStepP = [6, 12];
-  let macdStepP3 = [5, 9];
-  let macdStepV = [1];
-  if (changeStoploss) {
-    switch (rulesCount) {
-      case 1:
-        maStepP = [
-          5,
-          8,
-          10,
-          12,
-          15,
-          18,
-          20,
-          25,
-          30,
-          35,
-          40,
-          50
-        ];
-        maStepV = [
-          0.2,
-          0.3,
-          0.5,
-          0.8,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8
-        ];
-        cmaStepP2 = [
-          5,
-          8,
-          10,
-          12,
-          15,
-          18,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50
-        ];
-        cmaStepP = [
-          3,
-          5,
-          8,
-          10,
-          12,
-          15,
-          18,
-          20,
-          25,
-          30,
-          35,
-          40
-        ];
-        rsiStepP = [
-          3,
-          5,
-          7,
-          10,
-          12,
-          14,
-          16,
-          18,
-          22
-        ];
-        rsiStepV = [
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          50,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90
-        ];
-        macdStepP2 = [
-          6,
-          12,
-          18,
-          22,
-          26,
-          32
-        ];
-        macdStepP = [
-          3,
-          6,
-          12,
-          14,
-          18,
-          22
-        ];
-        macdStepP3 = [3, 5, 9, 12];
-        macdStepV = [0.5, 1, 2, 5];
-        break;
-      case 2:
-        maStepP = [
-          5,
-          8,
-          10,
-          15,
-          20,
-          30,
-          40
-        ];
-        maStepV = [
-          0.2,
-          0.5,
-          1,
-          2,
-          5,
-          8
-        ];
-        cmaStepP2 = [
-          5,
-          8,
-          10,
-          12,
-          15,
-          20,
-          30,
-          40,
-          50
-        ];
-        cmaStepP = [
-          3,
-          5,
-          8,
-          10,
-          12,
-          15,
-          20,
-          30
-        ];
-        rsiStepP = [5, 7, 10, 14, 18];
-        rsiStepV = [
-          15,
-          20,
-          30,
-          40,
-          60,
-          70,
-          80,
-          85
-        ];
-        macdStepP2 = [12, 22, 26, 32];
-        macdStepP = [6, 12, 18];
-        macdStepP3 = [5, 9];
-        macdStepV = [0.5, 3];
-        break;
-      case 3:
-        maStepP = [5, 10, 20, 30];
-        maStepV = [0.2, 1, 2, 3, 5];
-        cmaStepP2 = [
-          5,
-          10,
-          20,
-          30,
-          40,
-          50
-        ];
-        cmaStepP = [3, 5, 10, 15, 20];
-        rsiStepP = [7, 10, 14, 18];
-        rsiStepV = [15, 30, 50, 70, 85];
-        macdStepP2 = [12, 22, 26, 32];
-        macdStepP = [6, 12, 18];
-        macdStepP3 = [5, 9];
-        macdStepV = [1];
-        break;
-      case 4:
-        maStepP = [10, 20, 30];
-        maStepV = [0.2, 1, 3];
-        cmaStepP2 = [10, 20, 30, 40];
-        cmaStepP = [5, 10, 20];
-        rsiStepP = [7, 10, 14];
-        rsiStepV = [30, 50, 70];
-        macdStepP2 = [12, 26, 32];
-        macdStepP = [6, 12];
-        macdStepP3 = [5, 9];
-        macdStepV = [1];
-        break;
-      default:
-    }
-  } else {
-    switch (rulesCount) {
-      case 1:
-      case 2:
-        maStepP = [
-          5,
-          8,
-          10,
-          12,
-          15,
-          18,
-          20,
-          25,
-          30,
-          35,
-          40,
-          50
-        ];
-        maStepV = [
-          0.2,
-          0.3,
-          0.5,
-          0.8,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8
-        ];
-        cmaStepP2 = [
-          5,
-          8,
-          10,
-          12,
-          15,
-          18,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50
-        ];
-        cmaStepP = [
-          3,
-          5,
-          8,
-          10,
-          12,
-          15,
-          18,
-          20,
-          25,
-          30,
-          35,
-          40
-        ];
-        rsiStepP = [
-          3,
-          5,
-          7,
-          10,
-          12,
-          14,
-          16,
-          18,
-          22
-        ];
-        rsiStepV = [
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          50,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90
-        ];
-        macdStepP2 = [
-          6,
-          12,
-          18,
-          22,
-          26,
-          32
-        ];
-        macdStepP = [
-          3,
-          6,
-          12,
-          14,
-          18,
-          22
-        ];
-        macdStepP3 = [3, 5, 9, 12];
-        macdStepV = [0.5, 1, 2, 5];
-        break;
-      case 3:
-        maStepP = [
-          5,
-          8,
-          10,
-          15,
-          20,
-          30,
-          40
-        ];
-        maStepV = [
-          0.2,
-          0.5,
-          1,
-          2,
-          5,
-          8
-        ];
-        cmaStepP2 = [
-          5,
-          8,
-          10,
-          12,
-          15,
-          20,
-          30,
-          40,
-          50
-        ];
-        cmaStepP = [
-          3,
-          5,
-          8,
-          10,
-          12,
-          15,
-          20,
-          30
-        ];
-        rsiStepP = [5, 7, 10, 14, 18];
-        rsiStepV = [
-          15,
-          20,
-          30,
-          40,
-          60,
-          70,
-          80,
-          85
-        ];
-        macdStepP2 = [12, 22, 26, 32];
-        macdStepP = [6, 12, 18];
-        macdStepP3 = [5, 9];
-        macdStepV = [0.5, 3];
-        break;
-      case 4:
-        maStepP = [5, 10, 20, 30];
-        maStepV = [0.2, 1, 2, 3, 5];
-        cmaStepP2 = [
-          5,
-          10,
-          20,
-          30,
-          40,
-          50
-        ];
-        cmaStepP = [3, 5, 10, 15, 20];
-        rsiStepP = [7, 10, 14, 18];
-        rsiStepV = [15, 30, 50, 70, 85];
-        macdStepP2 = [12, 22, 26, 32];
-        macdStepP = [6, 12, 18];
-        macdStepP3 = [5, 9];
-        macdStepV = [1];
-        break;
-      case 5:
-        maStepP = [10, 20, 30];
-        maStepV = [0.2, 1, 3];
-        cmaStepP2 = [10, 20, 30, 40];
-        cmaStepP = [5, 10, 20];
-        rsiStepP = [7, 10, 14];
-        rsiStepV = [30, 50, 70];
-        macdStepP2 = [12, 26, 32];
-        macdStepP = [6, 12];
-        macdStepP3 = [5, 9];
-        macdStepV = [1];
-        break;
-      default:
-    }
-  }
-
-  if (rule.indicator === 'sma' || rule.indicator === 'ema') {
-    for (let p of maStepP) {
-      if (rule.direction !== 'crossing') {
-        for (let v of maStepV) {
-          let ruleTmp = {};
-          ruleTmp.indicator = rule.indicator;
-          ruleTmp.timeframe = rule.timeframe;
-          ruleTmp.direction = rule.direction;
-          ruleTmp.crossDirection = rule.crossDirection;
-          ruleTmp.period = p;
-          ruleTmp.value = v;
-          rulesTmp.push(ruleTmp);
-        }
-      } else {
-        let ruleTmp = {};
-        ruleTmp.indicator = rule.indicator;
-        ruleTmp.timeframe = rule.timeframe;
-        ruleTmp.direction = rule.direction;
-        ruleTmp.crossDirection = rule.crossDirection;
-        ruleTmp.period = p;
-        rulesTmp.push(ruleTmp);
-      }
-    }
-  } else if (rule.indicator === "cma") {
-    for (let p2 of cmaStepP2) {
-      for (let p of cmaStepP) {
-        if (p >= p2) {
-          break;
-        }
-        let ruleTmp = {};
-        ruleTmp.indicator = rule.indicator;
-        ruleTmp.timeframe = rule.timeframe;
-        ruleTmp.type = rule.type;
-        ruleTmp.type2 = rule.type2;
-        ruleTmp.crossDirection = rule.crossDirection;
-        ruleTmp.period = p;
-        ruleTmp.period2 = p2;
-        rulesTmp.push(ruleTmp);
-
-      }
-    }
-  } else if (rule.indicator === "rsi") {
-
-    for (let p of rsiStepP) {
-      for (let v of rsiStepV) {
-        let ruleTmp = {};
-        ruleTmp.indicator = rule.indicator;
-        ruleTmp.timeframe = rule.timeframe;
-        ruleTmp.direction = rule.direction;
-        ruleTmp.crossDirection = rule.crossDirection;
-        ruleTmp.period = p;
-        ruleTmp.value = v;
-        rulesTmp.push(ruleTmp);
-      }
-    }
-  } else if (rule.indicator === "macd") {
-    for (let p2 of macdStepP2) {
-      for (let p of macdStepP) {
-        if (p >= p2) {
-          break;
-        }
-        if (rule.type === 'signal line') {
-          for (let p3 of macdStepP3) {
-            if (rule.direction !== 'crossing') {
-              for (let v of macdStepV) {
-                let ruleTmp = {};
-                ruleTmp.indicator = rule.indicator;
-                ruleTmp.timeframe = rule.timeframe;
-                ruleTmp.type = rule.type;
-                ruleTmp.direction = rule.direction;
-                ruleTmp.crossDirection = rule.crossDirection;
-                ruleTmp.period = p;
-                ruleTmp.period2 = p2;
-                ruleTmp.period3 = p3;
-                ruleTmp.value = v;
-                rulesTmp.push(ruleTmp);
-              }
-            } else {
-              let ruleTmp = {};
-              ruleTmp.indicator = rule.indicator;
-              ruleTmp.timeframe = rule.timeframe;
-              ruleTmp.type = rule.type;
-              ruleTmp.direction = rule.direction;
-              ruleTmp.crossDirection = rule.crossDirection;
-              ruleTmp.period = p;
-              ruleTmp.period2 = p2;
-              ruleTmp.period3 = p3;
-              rulesTmp.push(ruleTmp);
-            }
-          }
-        } else {
-          let ruleTmp = {};
-          ruleTmp.indicator = rule.indicator;
-          ruleTmp.timeframe = rule.timeframe;
-          ruleTmp.type = rule.type;
-          ruleTmp.direction = rule.direction;
-          ruleTmp.crossDirection = rule.crossDirection;
-          ruleTmp.period = p;
-          ruleTmp.period2 = p2;
-          rulesTmp.push(ruleTmp);
-        }
-      }
-    }
-  }
-
-  return rulesTmp;
-}
-async function getFineTuneStoplossAndTargetVariations(strategyVariations, strategy, rulesCount) {
-  let newStrategyVariations = [];
-
-  let useStoploss = false;
-  let isTrailing = false;
-  let sl = 0;
-  if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
-    sl = strategy.trailingSl;
-    isTrailing = true;
-    useStoploss = true;
-  } else if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
-    sl = strategy.stoploss;
-    useStoploss = true;
-  }
-  let tt = 0;
-  let useTarget = false;
-  if (strategy.target !== null && !isNaN(strategy.target)) {
-    tt = strategy.target;
-    useTarget = true;
-  }
-  let stops = [
-    sl - 1,
-    sl,
-    sl + 1
-  ];
-  let targets = [
-    sl - 1,
-    sl,
-    sl + 1
-  ];
-  switch (rulesCount) {
-    case 1:
-      stops = [
-        sl - 1.5,
-        sl - 1,
-        sl - 0.5,
-        sl,
-        sl + 0.5,
-        sl + 1,
-        sl + 1.5
-      ];
-      targets = [
-        tt - 1.5,
-        tt - 1,
-        tt - 0.5,
-        tt,
-        tt + 0.5,
-        tt + 1,
-        tt + 1.5
-      ];
-      break;
-    case 2:
-      stops = [
-        sl - 1,
-        sl - 0.5,
-        sl,
-        sl - 0.5,
-        sl + 1
-      ];
-      targets = [
-        tt - 1,
-        tt - 0.5,
-        tt,
-        tt + 0.5,
-        tt + 1
-      ];
-      break;
-    default:
-  }
-
-  let count = 0;
-  if (!useStoploss) {
-    if (!useTarget) {
-      return strategyVariations;
-    } else {
-      for (let target of targets) {
-        if (target < 0.5) {
-          continue;
-        }
-        for (let strategy of strategyVariations) {
-          if (count > 1000 && count % 1000 === 0) {
-            await sleep(0);
-          }
-          count++;
-          let newSstrategy = {};
-          newSstrategy.name = strategy.name;
-          newSstrategy.timeClose = strategy.timeClose;
-          newSstrategy.buyRules = [];
-          newSstrategy.sellRules = [];
-          for (let buyRule of strategy.buyRules) {
-            newSstrategy.buyRules.push(buyRule);
-          }
-          for (let sellRule of strategy.sellRules) {
-            newSstrategy.sellRules.push(sellRule);
-          }
-          newSstrategy.stoploss = strategy.stoploss;
-          newSstrategy.trailingSl = strategy.trailingSl;
-          newSstrategy.target = target;
-          newStrategyVariations.push(newSstrategy)
-        }
-      }
-    }
-  } else {
-    count = 0;
-    for (let stoploss of stops) {
-      if (stoploss < 0.5) {
-        continue;
-      }
-      if (!useTarget) {
-        for (let strategy of strategyVariations) {
-          if (count > 1000 && count % 1000 === 0) {
-            await sleep(0);
-          }
-          count++;
-          let newSstrategy = {};
-          newSstrategy.name = strategy.name;
-          newSstrategy.timeClose = strategy.timeClose;
-          newSstrategy.buyRules = [];
-          newSstrategy.sellRules = [];
-          for (let buyRule of strategy.buyRules) {
-            newSstrategy.buyRules.push(buyRule);
-          }
-          for (let sellRule of strategy.sellRules) {
-            newSstrategy.sellRules.push(sellRule);
-          }
-          newSstrategy.stoploss = strategy.stoploss;
-          newSstrategy.trailingSl = strategy.trailingSl;
-          if (isTrailing) {
-            newSstrategy.trailingSl = stoploss;
-          } else {
-            newSstrategy.stoploss = stoploss;
-          }
-          newSstrategy.target = strategy.target;
-          newStrategyVariations.push(newSstrategy)
-        }
-      } else {
-        for (let target of targets) {
-          if (target < 0.5) {
-            continue;
-          }
-          for (let strategy of strategyVariations) {
-            if (count > 1000 && count % 1000 === 0) {
-              await sleep(0);
-            }
-            count++;
-            let newSstrategy = {};
-            newSstrategy.name = strategy.name;
-            newSstrategy.timeClose = strategy.timeClose;
-            newSstrategy.buyRules = [];
-            newSstrategy.sellRules = [];
-            for (let buyRule of strategy.buyRules) {
-              newSstrategy.buyRules.push(buyRule);
-            }
-            for (let sellRule of strategy.sellRules) {
-              newSstrategy.sellRules.push(sellRule);
-            }
-            newSstrategy.stoploss = strategy.stoploss;
-            newSstrategy.trailingSl = strategy.trailingSl;
-            if (isTrailing) {
-              newSstrategy.trailingSl = stoploss;
-            } else {
-              newSstrategy.stoploss = stoploss;
-            }
-            newSstrategy.target = target;
-            newStrategyVariations.push(newSstrategy)
-          }
-        }
-      }
-    }
-  }
-  return newStrategyVariations;
-}
-
-async function getFullStoplossAndTargetVariations(strategyVariations, rulesCount) {
-  let newStrategyVariations = [];
-  stops = [1, 2, 3];
-  targets = [2, 3, 7];
-  switch (rulesCount) {
-    case 1:
-      stops = [1, 2, 3, 4, 5];
-      targets = [
-        1,
-        2,
-        3,
-        5,
-        7,
-        10
-      ];
-      break;
-    case 2:
-      stops = [1, 2, 3];
-      targets = [2, 3, 5, 7, 10];
-      break;
-    case 3:
-    case 4:
-      stops = [1, 2, 3];
-      targets = [2, 3, 5, 7];
-      break;
-    default:
-  }
-  if ((strategyVariations[0].stoploss === null || isNaN(strategyVariations[0].stoploss)) && (strategyVariations[0].trailingSl === null || isNaN(strategyVariations[0].trailingSl))) {
-    stops = [null];
-  }
-  if (strategyVariations[0].target === null || isNaN(strategyVariations[0].target)) {
-    targets = [null];
-  }
-  let count = 0;
-  for (let stoploss of stops) {
-    for (let target of targets) {
-      if (stoploss !== null && target !== null && stoploss - 2 >= target) {
-        continue;
-      }
-      for (let strategy of strategyVariations) {
-        if (count > 1000 && count % 1000 === 0) {
-          await sleep(0);
-        }
-        count++;
-        let newSstrategy = {};
-        newSstrategy.name = strategy.name;
-        newSstrategy.timeClose = strategy.timeClose;
-        newSstrategy.buyRules = [];
-        newSstrategy.sellRules = [];
-        for (let buyRule of strategy.buyRules) {
-          newSstrategy.buyRules.push(buyRule);
-        }
-        for (let sellRule of strategy.sellRules) {
-          newSstrategy.sellRules.push(sellRule);
-        }
-
-        if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
-          newSstrategy.trailingSl = stoploss;
-        } else {
-          newSstrategy.stoploss = stoploss;
-        }
-
-        newSstrategy.target = target;
-        newStrategyVariations.push(newSstrategy)
-      }
-    }
-  }
-  return newStrategyVariations;
-}
-
-async function getNewStrategyVariations(newRules, strategyVariations, type, strategy, instrument) {
-  let newStrategyVariations = [];
-  let count = 0;
-  for (let newRule of newRules) {
-    if (strategyVariations.length !== 0) {
-      for (let strategyTmp of strategyVariations) {
-        if (count > 1000 && count % 1000 === 0) {
-          await sleep(0);
-        }
-        count++;
-        let newSstrategy = {};
-        newSstrategy.name = strategy.name + ' (' + instrument + ' Opt.)';
-        newSstrategy.timeClose = strategy.timeClose;
-        newSstrategy.buyRules = [];
-        newSstrategy.sellRules = [];
-        newSstrategy.stoploss = strategy.stoploss;
-        newSstrategy.trailingSl = strategy.trailingSl;
-        newSstrategy.target = strategy.target;
-
-        for (let buyRuleTmp of strategyTmp.buyRules) {
-          newSstrategy.buyRules.push(buyRuleTmp);
-        }
-        for (let sellRuleTmp of strategyTmp.sellRules) {
-          newSstrategy.sellRules.push(sellRuleTmp);
-        }
-        if (type === 'buy') {
-          newSstrategy.buyRules.push(newRule);
-        } else {
-          newSstrategy.sellRules.push(newRule);
-        }
-        newStrategyVariations.push(newSstrategy);
-      }
-    } else {
-      let newSstrategy = {};
-      newSstrategy.name = strategy.name + ' (' + instrument + ' Opt.)';
-      newSstrategy.timeClose = strategy.timeClose;
-      newSstrategy.buyRules = [];
-      newSstrategy.sellRules = [];
-      newSstrategy.stoploss = strategy.stoploss;
-      newSstrategy.trailingSl = strategy.trailingSl;
-      newSstrategy.target = strategy.target;
-      if (type === 'buy') {
-        newSstrategy.buyRules.push(newRule);
-      } else {
-        newSstrategy.sellRules.push(newRule);
-      }
-      newStrategyVariations.push(newSstrategy);
-    }
-  }
-  return newStrategyVariations;
 }
 
 async function editOpStrategy() {
@@ -2076,9 +1227,13 @@ async function editOpStrategy() {
 async function opCancel() {
   $('#opCancelBtn').addClass('disabled');
   $('#opRunPercent').html('Stopping Optimization..');
+  $('#opRunRemaining').html('&nbsp;');
   await sleep(1000);
   cancelGetBinanceData();
+  fineTune = fineTuneMaxCycles;
   await terminateOpWorkers();
+  strategyVariations = [];
+  strategyVariationsResults = [];
   $('#opResultDiv').hide();
   $('#opExecInfo').show();
 }
@@ -2088,7 +1243,7 @@ function openOpStrategy(index) {
 }
 
 function opOptInfo() {
-  openModalInfoBig('<div class="text-center">Optimization Type</div>Rough Tune - uses a default wide range of parameters, ignoring yours.<br>Fine Tune - uses detailed variations around your parameters.<br>For more details please visit <span class="one-click-select">https://easycryptobot.com/optimization</span>');
+  openModalInfoBig('<h2 class="text-center">Optimize For:</h2><strong>Max Return</strong> - optimize the parameters to find the strategies that generate the highest return.<br><br>' + '<strong>Risk/Reward</strong> - optimize the parameters to find the strategies that generate the highest return for the lowest drawdown.<br><br>' + '<strong>Consistency</strong> - optimize the parameters to find the strategies that generate relatively consistent trades. Usually, those strategies generate less return as they are not designed to catch price spikes but they have more predictable results. Use this type for stable coins whithout too many spikes in the price.<br><br>' + '<strong>Spikes</strong> - optimize the parameters to find the strategies that are able to catch spikes in the price of the asset. Use this for coins that do not have a stable price and have many spikes in the price.');
 }
 function opCpuInfo() {
   openModalInfoBig('<div class="text-center">CPU Use</div>1 Core - uses only 1 CPU core. Will run slower but will not consume much CPU power.<br>Half Cores - uses half of your CPU cores. Runs faster but you should close some of the running apps.<br>All Cores - uses all of your CPU cores. The fastest but you should close all other apps.');
@@ -2121,17 +1276,4 @@ function fillOpTestPeriod() {
   } catch (err) {
     log('error', 'fillOpTestPeriod', err.stack);
   }
-}
-
-function checkTooManyVariations() {
-  let maxStrategyVariations = 250000;
-  if (strategyVariations.length > maxStrategyVariations) {
-    openModalInfoBig('Your strategy is too complicated and the possible variations exceed the maximum allowed number of 250 000.<br>Try to remove some rules from your strategy.');
-    $('#runOptBtn').removeClass('disabled');
-    $('#opResultDiv').hide();
-    $('#opExecInfo').show();
-    $('#opCancelBtn').removeClass('disabled');
-    return true;
-  }
-  return false;
 }

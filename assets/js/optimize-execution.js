@@ -19,6 +19,7 @@ const mutex = new Mutex();
 let isRunning = false;
 let feeRate = 0.075;
 self.addEventListener('message', async function(e) {
+  let strategy = null;
   try {
     //await mutex.lock();
     if (typeof e.data[0] === 'string' && e.data[0].startsWith('INITIALIZE')) {
@@ -47,7 +48,7 @@ self.addEventListener('message', async function(e) {
         return;
       }
       isRunning = true;
-      let strategy = e.data[1];
+       strategy = e.data[1];
       let result = await executeBacktest(strategy, ticks, startDate, false, feeRate * 2)
       if (result !== null && !opExecutionCanceled) {
         self.postMessage([

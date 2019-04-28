@@ -600,3 +600,13 @@ function reportBug(e) {
   }, function(data, status) {});
 
 }
+
+function clearLogs(e) {
+  e.preventDefault();
+  openModalConfirmYes('Are you sure you want to clear the logs?', function(){
+    try {
+      $('#bugLogs').html("No logs available!");
+      fs.writeFileSync(getLogFilename(), '', 'utf-8');
+    } catch (err) {}
+  });
+}
