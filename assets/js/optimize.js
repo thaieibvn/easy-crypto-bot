@@ -97,6 +97,7 @@ let stoplossVariations;
 let etaLastDate = null;
 let etaStr = '';
 let etaLastNum = null;
+let strategyNameToUse = '';
 const executionOpMutex = new Mutex();
 const addOpResultMutex = new Mutex();
 const opWorkerTerminateMutex = new Mutex();
@@ -218,7 +219,7 @@ async function runOptimize() {
       $('#runOptBtn').removeClass('disabled');
       return;
     }
-
+    strategyNameToUse =strategy.name + ' (' + instrument + ' Opt.)';
     $('#opRunPercent').html('Starting Optimization..');
     $('#opRunRemaining').html('&nbsp;');
     $('#opRunPercent2').hide();
@@ -926,7 +927,7 @@ function getRulesVariations(rules, fineTune) {
 
 function createStrategyVariationWithBuyRules(strategy, buyRules) {
   let newStrategy = {};
-  newStrategy.name = strategy.name;
+  newStrategy.name = strategyNameToUse;
   newStrategy.timeClose = strategy.timeClose;
   newStrategy.buyRules = [];
   newStrategy.sellRules = [];
@@ -1196,13 +1197,18 @@ async function fillOptimizationResult(marketReturn) {
       : marketReturn < 0
         ? 'text-red'
         : '';
-
-    $('#opResultH').html('Tested ' + strategyVariationsTested + ' variations. Showing top 100 by total return. Strategies that didn\'t generate positive return are excluded.<br>Market Return for the same period: <span class="' + marketReturnClass + '">' + marketReturn.toFixed(2) + '%</span>');
+        //'Tested ' + strategyVariationsTested + ' variations.
+    $('#opResultH').html('Showing top 100. Strategies that didn\'t generate positive return are excluded.<br>Market Return for the same period: <span class="' + marketReturnClass + '">' + marketReturn.toFixed(2) + '%</span>');
     $('#opResult').show();
 
     await terminateOpWorkers();
-    strategyVariations = null;
-    strategyVariationsResults = null;
+    strategyVariations = [];
+    let resTmp=[]
+    for(let i=0;i<Math.min(rowsShown, strategyVariationsResults.length);i++){
+      resTmp.push(strategyVariationsResults[0]);
+    }
+    strategyVariationsResults = [];
+    strategyVariationsResults=resTmp;
   } catch (err) {
     log('error', 'fillOptimizationResult', err.stack);
     openModalInfo('Internal Error Occurred!<br>' + err.stack);
