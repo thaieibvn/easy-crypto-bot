@@ -5,11 +5,10 @@ async function opFillBinanceInstruments() {
   await getBinanceInstruments();
 }
 
-let instrumentMutex = new Mutex();
+let opInstrumentMutex = new Mutex();
 async function opInstrumentKeyup() {
   try {
-    instrumentMutex.lock();
-    let search = $('#opInstrumentSearch').val().toLowerCase();
+    opInstrumentMutex.lock();
     $('#opInstrumentList>ul').html('');
     let instruments = null;
     if ($('#opExchangeCombobox').text() === 'Binance') {
@@ -24,6 +23,7 @@ async function opInstrumentKeyup() {
 
     if (instruments !== null) {
       let instrumentsToAdd = '';
+      let search = $('#opInstrumentSearch').val().toLowerCase();
       Object.keys(instruments).forEach(function(key) {
         if (key.toLowerCase().indexOf(search) != -1) {
           lastKey = key.toLowerCase();
@@ -39,7 +39,7 @@ async function opInstrumentKeyup() {
   } catch (err) {
     log('error', 'opInstrumentKeyup', err.stack);
   } finally {
-    instrumentMutex.release();
+    opInstrumentMutex.release();
   }
 }
 
@@ -645,19 +645,6 @@ function createRuleVariation(rule, period, value, crossDirection, type2, period2
   return newRule;
 }
 
-let fineTuneMaxCycles = 3;
-
-let maPeriods = [10, 31, 42];
-let maValues = [1, 3];
-
-let rsiPeriods = [6, 15, 24];
-let rsiValues = [25, 56, 77];
-
-let macdPeriods = [6, 15, 24];
-let macdPeriods2 = [10, 19, 28];
-let macdPeriods3 = [6, 15];
-let macdValues = [1, 3];
-
 function getRuleVariations(rule) {
   let ruleVariations = [];
   if (rule.indicator === 'sma' || rule.indicator === 'ema') {
@@ -728,6 +715,21 @@ function getRuleVariations(rule) {
   return ruleVariations;
 }
 
+let fineTuneMaxCycles = 3;
+
+let maPeriods = [10, 31, 42];
+let maValues = [1, 3];
+
+let rsiPeriods = [6, 15, 24];
+let rsiValues = [25, 56, 77];
+
+let macdPeriods = [6, 15, 24];
+let macdPeriods2 = [10, 19, 28];
+let macdPeriods3 = [6, 15];
+let macdValues = [1, 3];
+
+//Fina tune values
+
 let maPeriodsFineTune = [];
 let maValuesFineTune = [];
 let maPeriodsFineTune1 = [-5, 0, 5];
@@ -765,6 +767,16 @@ let macdPeriodsFineTune3 = [-1, 0, 1];
 let macdPeriods2FineTune3 = [-1, 0, 1];
 let macdPeriods3FineTune3 = [-1, 0, 1];
 let macdValuesFineTune3 = [0];
+
+let stoplossesFineTune0 = [2, 4.5, 7];
+let stoplossesFineTune1 = [-0.5, 0, 0.5];
+let stoplossesFineTune2 = [-0.25, 0, 0.25];
+let stoplossesFineTune3 = [-0.25, 0, 0.25];
+
+let targetsFineTune0 = [3, 8.5, 14];
+let targetsFineTune1 = [-1, 0, 1];
+let targetsFineTune2 = [-1, 0, 1];
+let targetsFineTune3 = [-0.5, 0, 0.5];
 
 function getRuleVariationsFineTune(rule) {
   let ruleVariations = [];
@@ -959,16 +971,6 @@ function createStrategyVariationWithSellRules(finalStrategiesList, strategiesWit
     finalStrategiesList.push(newStrategy);
   }
 }
-
-let stoplossesFineTune0 = [2, 4.5, 7];
-let stoplossesFineTune1 = [-0.5, 0, 0.5];
-let stoplossesFineTune2 = [-0.25, 0, 0.25];
-let stoplossesFineTune3 = [-0.25, 0, 0.25];
-
-let targetsFineTune0 = [3, 8.5, 14];
-let targetsFineTune1 = [-1, 0, 1];
-let targetsFineTune2 = [-1, 0, 1];
-let targetsFineTune3 = [-0.5, 0, 0.5];
 
 function createStrategyVariationWithStoplossRules(finalStrategiesList, strategiesWithBuySellOnly, fineTune) {
   let stoplosses = [];
@@ -1175,8 +1177,8 @@ async function fillOptimizationResult(marketReturn) {
     //pagination
     $('#opStrategiesTableNav').html('');
     let rowsTotal = strategyVariationsResults.length;
-    let numPages = rowsTotal / rowsShown;
-    /*for (let i = 0; i < numPages; i++) {
+    /*let numPages = rowsTotal / rowsShown;
+    for (let i = 0; i < numPages; i++) {
       var pageNum = i + 1;
       $('#opStrategiesTableNav').append('<a href="#/" rel="' + i + '">' + pageNum + '</a> ');
     }
@@ -1190,16 +1192,19 @@ async function fillOptimizationResult(marketReturn) {
       opResultShowRows(startItem, endItem);
     });*/
 
-    $('#opRunning').hide();
-
     let marketReturnClass = marketReturn > 0
       ? 'text-green'
       : marketReturn < 0
         ? 'text-red'
         : '';
         //'Tested ' + strategyVariationsTested + ' variations.
-    $('#opResultH').html('Showing top 100. Strategies that didn\'t generate positive return are excluded.<br>Market Return for the same period: <span class="' + marketReturnClass + '">' + marketReturn.toFixed(2) + '%</span>');
-    $('#opResult').show();
+    if(strategyVariationsResults.length > 0) {
+    $('#opResultH').html('Showing top 100 of the optimized strategies. Market Return for the same period: <span class="' + marketReturnClass + '">' + marketReturn.toFixed(2) + '%</span>');
+    $('#opStrategiesTable').show();
+  } else {
+    $('#opResultH').html('The optimiaztion didn\'t generate any strategies with positive return.');
+    $('#opStrategiesTable').hide();
+  }
 
     await terminateOpWorkers();
     strategyVariations = [];
@@ -1209,6 +1214,8 @@ async function fillOptimizationResult(marketReturn) {
     }
     strategyVariationsResults = [];
     strategyVariationsResults=resTmp;
+    $('#opRunning').hide();
+    $('#opResult').show();
   } catch (err) {
     log('error', 'fillOptimizationResult', err.stack);
     openModalInfo('Internal Error Occurred!<br>' + err.stack);

@@ -4,9 +4,10 @@ async function btFillBinanceInstruments() {
   await getBinanceInstruments();
 }
 
+let btInstrumentMutex = new Mutex();
 async function btInstrumentKeyup() {
   try {
-    let search = $('#btInstrumentSearch').val().toLowerCase();
+    btInstrumentMutex.lock();
     $('#btInstrumentList>ul').html('');
     let instruments = null;
     if ($('#btExchangeCombobox').text() === 'Binance') {
@@ -21,6 +22,7 @@ async function btInstrumentKeyup() {
 
     if (instruments !== null) {
       let instrumentsToAdd = '';
+      let search = $('#btInstrumentSearch').val().toLowerCase();
       Object.keys(instruments).forEach(function(key) {
         if (key.toLowerCase().indexOf(search) != -1) {
           lastKey = key.toLowerCase();
@@ -35,6 +37,8 @@ async function btInstrumentKeyup() {
     }
   } catch (err) {
     log('error', 'btInstrumentKeyup', err.stack);
+  } finally {
+    btInstrumentMutex.release();
   }
 }
 

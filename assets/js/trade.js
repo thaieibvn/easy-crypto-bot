@@ -31,11 +31,12 @@ async function tsFillBinanceInstruments() {
   await getBinanceInstruments();
 }
 
+let tsInstrumentMutex = new Mutex();
 async function tsInstrumentKeyup() {
   try {
+    tsInstrumentMutex.lock();
     fillPosSizeDetails();
     fillMaxLossDetails();
-    let search = $('#tsInstrumentSearch').val().toLowerCase();
     $('#tsInstrumentList>ul').html('');
     let instruments = null;
     if ($('#tsExchangeCombobox').text() === 'Binance') {
@@ -50,6 +51,7 @@ async function tsInstrumentKeyup() {
 
     if (instruments !== null) {
       let instrumentsToAdd = '';
+      let search = $('#tsInstrumentSearch').val().toLowerCase();
       Object.keys(instruments).forEach(function(key) {
         if (key.toLowerCase().indexOf(search) != -1) {
           lastKey = key.toLowerCase();
@@ -64,6 +66,8 @@ async function tsInstrumentKeyup() {
     }
   } catch (err) {
     log('error', 'tsInstrumentKeyup', err.stack);
+  } finally {
+    tsInstrumentMutex.release();
   }
 }
 
