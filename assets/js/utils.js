@@ -6,8 +6,6 @@ function getShortTimeframe(value) {
       return '3m';
     case '5 minutes':
       return '5m';
-    case '5 minutes':
-      return '5m';
     case '15 minutes':
       return '15m';
     case '30 minutes':

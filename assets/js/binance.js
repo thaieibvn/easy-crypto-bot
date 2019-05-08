@@ -61,18 +61,30 @@ function getLastBinancePrice(instrument) {
   });
 }
 
+let lastBinancePricesTime = new Date();
+let binancePrices = null;
+let binancePricesCasheTimer = 20; //minutes
+
 function getLastBinancePrices() {
-  return new Promise((resolve, reject) => {
-    binance.useServerTime(function() {
-      binance.prices((error, ticker) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(ticker);
-        }
-      })
+  let date = new Date(lastBinancePricesTime.getTime());
+  date.setMinutes(date.getMinutes() + binancePricesCasheTimer, date.getSeconds());
+  if (binancePrices == null || date < new Date()) {
+    return new Promise((resolve, reject) => {
+      binance.useServerTime(function() {
+        binance.prices((error, ticker) => {
+          if (error) {
+            reject(error);
+          } else {
+            binancePrices = ticker;
+            lastBinancePricesTime = new Date();
+            resolve(ticker);
+          }
+        })
+      });
     });
-  });
+  } else {
+    return binancePrices;
+  }
 }
 
 function getBinanceTicksImpl(instrument, timeframe, startTime, endTime) {
@@ -414,24 +426,6 @@ async function downloadBinanceTicks(instrument, timeframe, startTime, endTime, b
   return ticksTmp;
 }
 
-function getBinanceUSDTValue(ammount, pair, quoted) {
-  return new Promise((resolve, reject) => {
-    binance.useServerTime(function() {
-      binance.prices((error, ticker) => {
-        if (error) {
-          resolve(null);
-          return;
-        }
-        if (pair.toLowerCase().endsWith('usdt')) {
-          resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]));
-        } else {
-          resolve(ammount * Number.parseFloat(ticker[pair.toUpperCase()]) * Number.parseFloat(ticker[quoted.toUpperCase() + 'USDT']));
-        }
-      })
-    });
-  });
-}
-
 function checkBinanceApiKey(key, secret) {
   if (binanceRealTrading == null) {
     binanceRealTrading = new Binance().options({APIKEY: key, APISECRET: secret, useServerTime: true, recvWindow: 60000, test: false});
@@ -598,6 +592,19 @@ function getBinanceTicks300(instrument, timeframe) {
   });
 }
 
+function binanceTest() {
+  return new Promise((resolve, reject) => {
+    binance.useServerTime(function() {
+      let instrument = "SCETH";
+      binance.prevDay(instrument, (error, prevDay, symbol) => {
+        //openModalInfoBig(JSON.stringify(prevDay.lastPrice));
+        openModalInfoBig('LastPrice: '+prevDay.lastPrice+'<br>LastQty: '+ prevDay.lastQty + '<br>LastId: '+ prevDay.lastId + '<br>Count:'+prevDay.count);
+        resolve(true);
+      });
+    });
+  });
+}
+
 function binanceGetOrderTradePrice(instrument, orderId, type) {
   return new Promise((resolve, reject) => {
     binanceRealTrading.useServerTime(function() {
@@ -656,6 +663,7 @@ async function binanceMarketSell(execution) {
       binanceRealTrading.marketSell(execution.instrument, positionSize, async (error, response) => {
         try {
           if (error !== null) {
+            openModalInfoBig('Error selling ' + positionSize + ' ' + execution.instrument + '. Error message from Binance: ' + JSON.parse(error.body).msg);
             resolve(null);
           } else {
             let tradePrice = await binanceGetOrderTradePrice(execution.instrument, response.orderId, 'sell');

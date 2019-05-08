@@ -10,6 +10,7 @@ function getStratetyDb() {
   }
   return strategy;
 }
+
 function getStrategies() {
   return new Promise((resolve, reject) => {
     getStratetyDb().find({}).sort({name: 1}).exec((error, strategies) => {
@@ -250,34 +251,59 @@ async function saveStrategy() {
     };
 
     let srtTmp = await getStrategyByName(strategy.name);
-    if (srtTmp !== null && orgStrategyName === null) {
-      openModalConfirm("Strategy with name " + strategy.name + " already exists.<br>Do you like to overwrite it?", function() {
-        overwriteStrategy(strategy);
-      });
+
+    let isRunnig = await isStrategyRunning(strategy.name);
+    if (isRunnig) {
+      openModalInfo('Strategy with name "' + strategy.name + '" already exists and is currently running.<br>Please stop the execution and then try to edit/remove it.');
       return;
-    } else if (srtTmp !== null && orgStrategyName !== null && srtTmp.name !== orgStrategyName) {
-      openModalConfirm("Strategy with name " + strategy.name + " already exists.<br>Do you like to overwrite it?", function() {
-        if ($('#btStrategyCombobox').text() === orgStrategyName) {
-          $('#btStrategyCombobox').text(strategy.name);
-        }
-        if ($('#tsStrategyCombobox').text() === orgStrategyName) {
-          $('#tsStrategyCombobox').text(strategy.name);
-        }
-        if ($('#opStrategyCombobox').text() === orgStrategyName) {
-          $('#opStrategyCombobox').text(strategy.name);
-        }
-        if ($('#tsStrategyCombobox').text() === orgStrategyName) {
-          $('#tsStrategyCombobox').text(strategy.name);
-        }
+    }
+
+    let hasOpenTrades = await hasStrategyOpenTrades(strategy.name);
+    let hasOpenTrades2 = await hasStrategyOpenTrades(orgStrategyName);
+
+    if (hasOpenTrades[0]) {
+      if ((isNaN(strategy.target) && hasOpenTrades[1] !== null) || (!isNaN(strategy.target) && (strategy.target !== hasOpenTrades[1]))) {
+        openModalInfo('Edit of the Target filed is not allowed for strategies with open trades.<br>If you want to edit the Target, please close the trade.')
+        return;
+      }
+    }
+    if (hasOpenTrades2[0]) {
+      if ((isNaN(strategy.target) && hasOpenTrades2[1] !== null) || (!isNaN(strategy.target) && (strategy.target !== hasOpenTrades2[1]))) {
+        openModalInfo('Edit of the Target filed is not allowed for strategies with open trades.<br>If you want to edit the Target, please close the trade.')
+        return;
+      }
+    }
+    let isUsedInExecutions = await isStrategyUsedInExecutions(strategy.name);
+
+    if (srtTmp !== null && orgStrategyName !== srtTmp.name) {
+      let label = isUsedInExecutions
+        ? 'Strategy with name ' + strategy.name + ' already exists and is also in the "Executions" list. Your changes will apply to the execution as well. <br>Do you like to overwrite it?'
+        : 'Strategy with name ' + strategy.name + ' already exists.<br>Do you like to overwrite it?';
+      openModalConfirm(label, function() {
         overwriteStrategy(strategy, orgStrategyName);
+        if (orgStrategyName !== null) {
+          if ($('#btStrategyCombobox').text() === orgStrategyName) {
+            $('#btStrategyCombobox').text(strategy.name);
+          }
+          if ($('#tsStrategyCombobox').text() === orgStrategyName) {
+            $('#tsStrategyCombobox').text(strategy.name);
+          }
+          if ($('#opStrategyCombobox').text() === orgStrategyName) {
+            $('#opStrategyCombobox').text(strategy.name);
+          }
+          if ($('#tsStrategyCombobox').text() === orgStrategyName) {
+            $('#tsStrategyCombobox').text(strategy.name);
+          }
+        }
+        if (isUsedInExecutions) {
+          updateExecutionStrategy(strategy.name, orgStrategyName);
+        }
       });
       return;
     }
-    if (orgStrategyName !== null) {
 
-      if (!strategyDuplicated) {
-        await removeStrategy(orgStrategyName);
-      }
+    if (orgStrategyName !== null) {
+      await removeStrategy(orgStrategyName)
       if ($('#btStrategyCombobox').text() === orgStrategyName) {
         $('#btStrategyCombobox').text(strategy.name);
       }
@@ -290,14 +316,18 @@ async function saveStrategy() {
       if ($('#tsStrategyCombobox').text() === orgStrategyName) {
         $('#tsStrategyCombobox').text(strategy.name);
       }
-
     }
-
     await addStrategy(strategy);
     const strategies = await getStrategies();
     loadStrategies();
     loadStrategiesBt();
     closeNewStrategy();
+    if (orgStrategyName !== null) {
+      isUsedInExecutions = await isStrategyUsedInExecutions(orgStrategyName);
+      if (isUsedInExecutions) {
+        updateExecutionStrategy(strategy.name, orgStrategyName);
+      }
+    }
   } catch (err) {
     //alert(err)
   }
@@ -312,9 +342,7 @@ function stoplossTypeChange(type) {
 }
 
 async function overwriteStrategy(strategy, name) {
-  if (!strategyDuplicated) {
-    await removeStrategy(strategy.name);
-  }
+  await removeStrategy(strategy.name);
   if (name !== undefined) {
     await removeStrategy(name);
   }
@@ -456,6 +484,7 @@ function duplicateStrategy() {
   $('#strategyName').val($('#strategyName').val() + ' (1)');
   strategyDuplicated = true;
   lastTFUsed = 'Choose Timeframe';
+  orgStrategyName = null;
 }
 
 function openStrategyVariationStrategy(strategy) {
@@ -469,7 +498,9 @@ function openStrategyVariationStrategy(strategy) {
 function openStrategy(strategy) {
   try {
     clearStrategyFields();
-    $("#newStrategyWindowDiv").animate({ scrollTop: 0 }, 'fast');
+    $("#newStrategyWindowDiv").animate({
+      scrollTop: 0
+    }, 'fast');
     $('#newStrategyWindow').fadeIn();
     $('#btBody').css('opacity', '0.5');
     $('#btBody').css('pointer-events', 'none');
@@ -607,6 +638,14 @@ function openStrategy(strategy) {
 }
 
 async function editStrategy(name) {
+  let isRunnig = await isStrategyRunning(name);
+  if (isRunnig) {
+    openModalInfo('The strategy "' + name + '" is currently running.<br>Please stop the execution and then try to edit it.');
+    return;
+  }
+
+  let isUsedInExecutions = await isStrategyUsedInExecutions(name);
+
   orgStrategyName = name;
   strategyDuplicated = false;
   $('#newStrategyLabel').html('Edit Strategy');
@@ -614,6 +653,9 @@ async function editStrategy(name) {
   const strategy = await getStrategyByName(name);
   lastTFUsed = 'Choose Timeframe';
   openStrategy(strategy);
+  if (isUsedInExecutions) {
+    openModalInfo('Please note that the strategy "' + name + '" is currently in the "Executions" list under the Traging tab. Your changes will apply to the execution as well.');
+  }
 }
 
 function clearStrategyFields() {
@@ -631,7 +673,13 @@ function clearStrategyFields() {
   $('#timeClose').val('');
 }
 
-function rmStrategy(name) {
+async function rmStrategy(name) {
+  let isUsedInExecutions = await isStrategyUsedInExecutions(name);
+  if (isUsedInExecutions) {
+    openModalInfo('The strategy "' + name + '" is in the "Executions" list under the Trades tab.<br>Please stop and remove the execution and then try to remove the strategy.');
+    return;
+  }
+
   openModalConfirm("Are you sure you want to remove " + name + " strategy?", function() {
     rmStrategy2(name);
     if ($('#btStrategyCombobox').text() === name) {
@@ -666,7 +714,7 @@ async function loadStrategies() {
       $('#strategiesTable').append('<tr><td>' + d.name + '<td><td><a title="Edit Strategy" href="#newStrategyLabel" onclick="editStrategy(\'' + d.name + '\')" ><i class="far fa-edit"></i></a><td><td><a title="Remove Strategy" href="#/" onclick="rmStrategy(\'' + d.name + '\')"><i class="fas fa-trash"></i></a></td></tr>');
     });
   } catch (err) {
-      log('error', 'loadStrategies', err.stack);
+    log('error', 'loadStrategies', err.stack);
   }
 }
 
@@ -682,7 +730,7 @@ async function fillDefaultStrategies() {
           'buyRules': [
             {
               'indicator': 'cma',
-              "timeframe":"5 minutes",
+              "timeframe": "5 minutes",
               'period': 7,
               'period2': 20,
               'type': 'EMA',
@@ -693,7 +741,7 @@ async function fillDefaultStrategies() {
           'sellRules': [
             {
               'indicator': 'cma',
-              "timeframe":"5 minutes",
+              "timeframe": "5 minutes",
               'period': 7,
               'period2': 20,
               'type': 'EMA',
@@ -709,7 +757,7 @@ async function fillDefaultStrategies() {
           'buyRules': [
             {
               'indicator': 'ema',
-              "timeframe":"5 minutes",
+              "timeframe": "5 minutes",
               'period': 5,
               'direction': 'bellow',
               'value': 0.5
@@ -718,7 +766,7 @@ async function fillDefaultStrategies() {
           'sellRules': [
             {
               'indicator': 'ema',
-              "timeframe":"5 minutes",
+              "timeframe": "5 minutes",
               'period': 5,
               'direction': 'above',
               'value': 0.5
@@ -733,13 +781,13 @@ async function fillDefaultStrategies() {
           'buyRules': [
             {
               'indicator': 'rsi',
-              "timeframe":"5 minutes",
+              "timeframe": "5 minutes",
               'period': 20,
               'direction': 'bellow',
               'value': 40
             }, {
               'indicator': 'cma',
-              "timeframe":"5 minutes",
+              "timeframe": "5 minutes",
               'period': 3,
               'period2': 10,
               'type': 'EMA',
@@ -750,13 +798,13 @@ async function fillDefaultStrategies() {
           'sellRules': [
             {
               'indicator': 'rsi',
-              "timeframe":"5 minutes",
+              "timeframe": "5 minutes",
               'period': 20,
               'direction': 'above',
               'value': 60
             }, {
               'indicator': 'cma',
-              "timeframe":"5 minutes",
+              "timeframe": "5 minutes",
               'period': 3,
               'period2': 10,
               'type': 'EMA',
@@ -773,13 +821,13 @@ async function fillDefaultStrategies() {
           "buyRules": [
             {
               "indicator": "sma",
-              "timeframe":"15 minutes",
+              "timeframe": "15 minutes",
               "period": 30,
               "direction": "bellow",
               "value": 3
             }, {
               "indicator": "rsi",
-              "timeframe":"15 minutes",
+              "timeframe": "15 minutes",
               "period": 10,
               "direction": "above",
               "value": 10
@@ -788,7 +836,7 @@ async function fillDefaultStrategies() {
           "sellRules": [
             {
               "indicator": "sma",
-              "timeframe":"15 minutes",
+              "timeframe": "15 minutes",
               "period": 30,
               "direction": "above",
               "value": 2

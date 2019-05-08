@@ -20,6 +20,9 @@ body {
   line-height: 1;
   background: #333333;
 }
+body.is-preload {
+  background: #fff;
+}
 
 body, input, select, textarea {
   color: rgba(255, 255, 255, 0.55);
@@ -1871,6 +1874,10 @@ a.expanded>span.caret {
 
 #strategyName {
   width: 46em;
+}
+
+#strategiesTable td:first-child {
+  width:80%
 }
 
 #btStrategiesTableNav, #opStrategiesTableNav {

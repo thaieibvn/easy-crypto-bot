@@ -181,7 +181,9 @@ function getOrderTradePrice(execution, orderId, type) {
               let info = await getBinanceInstrumentsInfo(execution.instrument);
               //Change position size as we don't have the initial ammount to sell because of the commision
               execution.positionSize = binance.roundStep(qty - commision, info.stepSize);
-              self.postMessage([execId, 'CH_POS_SIZE', execution.positionSize]);
+              if (execution.positionSizeQuoted == null || execution.positionSizeQuoted == undefined || execution.positionSizeQuoted <= 0) {
+                self.postMessage([execId, 'CH_POS_SIZE', execution.positionSize]);
+              }
             }
           }
           if (qty !== 0) {
@@ -200,14 +202,24 @@ function getOrderTradePrice(execution, orderId, type) {
   });
 }
 
-function marketBuy(execution, strategy) {
+async function updatePositionSize(curPrice) {
+  if (execution.positionSizeQuoted != null && execution.positionSizeQuoted != undefined && execution.positionSizeQuoted > 0) {
+    let tradeSize = execution.positionSizeQuoted / curPrice;
+    let info = await getBinanceInstrumentsInfo(execution.instrument);
+    execution.positionSize = binance.roundStep(tradeSize, info.stepSize);
+  }
+}
+
+async function marketBuy(execution, curPrice) {
+  await updatePositionSize(curPrice);
   return new Promise((resolve, reject) => {
     binance.useServerTime(function() {
       binance.marketBuy(execution.instrument, execution.positionSize, async (error, response) => {
         if (error !== null) {
           paused = true;
+          lastUpdated = null;
           self.postMessage([
-            execId, 'ERROR', 'Error buying ' + execution.positionSize + ' ' + execution.instrument + '.<br>Error message from Binance: ' + JSON.parse(error.body).msg
+            execId, 'ERROR', 'Error buying ' + execution.positionSize + ' ' + execution.instrument + '. Error message from Binance: ' + JSON.parse(error.body).msg
           ]);
           resolve(false);
         } else {
@@ -215,7 +227,8 @@ function marketBuy(execution, strategy) {
           let trade = {
             'openDate': new Date(),
             'entry': tradePrice[0],
-            'result': 0
+            'result': 0,
+            'posSize': execution.positionSize
           };
           execution.trades.push(trade);
           self.postMessage([execId, 'BUY', trade, feeRate]);
@@ -225,24 +238,52 @@ function marketBuy(execution, strategy) {
     });
   });
 }
-async function marketSell(execution) {
+
+async function marketSell(execution, curPrice) {
   await cancelOrder(execution.instrument, execution.takeProfitOrderId);
   let takeProfitExecutedQty = await checkTakeProfitExecuted();
-  if (takeProfitExecutedQty === execution.positionSize) {
+  let positionSize = execution.positionSize + execution.minNotionalAmountLeft;
+  if (takeProfitExecutedQty === positionSize) {
     return;
   }
-  let positionSize = execution.positionSize - takeProfitExecutedQty;
+  positionSize -= takeProfitExecutedQty;
+
+  let info = await getBinanceInstrumentsInfo(execution.instrument);
+  if (curPrice * positionSize < info.minNotional) {
+
+    let priceAndQty = await getOrderTradePrice(execution, execution.takeProfitOrderId, 'sell');
+    if (priceAndQty === null || priceAndQty[1] == null) {
+      self.postMessage([execId, 'ERROR', 'Connection to Binance Lost!']);
+      return;
+    }
+    execution.minNotionalAmountLeft = positionSize;
+    self.postMessage([execId, 'MIN_NOTIONAL', execution.minNotionalAmountLeft]);
+    tradeType = 'buy';
+    let tradeIndex = execution.trades.length - 1;
+    execution.trades[tradeIndex]['closeDate'] = new Date();
+    execution.trades[tradeIndex]['exit'] = priceAndQty[0];
+    execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (feeRate * 2);
+    execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (priceAndQty[1] * priceAndQty[0]);
+    execution.trades[tradeIndex]['posSize'] = priceAndQty[1];
+    self.postMessage([
+      execId, 'SELL', execution.trades[tradeIndex]
+    ]);
+    return;
+  }
 
   return new Promise((resolve, reject) => {
     binance.useServerTime(function() {
       binance.marketSell(execution.instrument, positionSize, async (error, response) => {
         if (error !== null) {
           paused = true;
+          lastUpdated = null;
           self.postMessage([
-            execId, 'ERROR', 'Error selling ' + positionSize + ' ' + execution.instrument + '.<br>Error message from Binance: ' + JSON.parse(error.body).msg
+            execId, 'ERROR', 'Error selling ' + positionSize + ' ' + execution.instrument + '. Error message from Binance: ' + JSON.parse(error.body).msg
           ]);
           resolve(false);
         } else {
+          execution.minNotionalAmountLeft = 0;
+          self.postMessage([execId, 'MIN_NOTIONAL', execution.minNotionalAmountLeft]);
           let tradePrice = await getOrderTradePrice(execution, response.orderId, 'sell');
           let finalPrice = tradePrice[0];
           if (takeProfitExecutedQty !== 0) {
@@ -268,14 +309,16 @@ function placeTakeProfitLimit(execution, target) {
   return new Promise(async (resolve, reject) => {
     let info = await getBinanceInstrumentsInfo(execution.instrument);
     let price = Number.parseFloat(target.toFixed(info.precision));
+    let positionSize = execution.positionSize + execution.minNotionalAmountLeft;
     binance.useServerTime(function() {
-      binance.sell(execution.instrument, execution.positionSize, price, {
+      binance.sell(execution.instrument, positionSize, price, {
         type: "LIMIT"
       }, (error, response) => {
         if (error) {
           paused = true;
+          lastUpdated = null;
           self.postMessage([
-            execId, 'ERROR', 'Error placing TAKE_PROFIT_LIMIT order for instrument ' + execution.instrument + '<br>Please take in mind that the strategy has bought and hasn\'t sell. You should manually sell on Binance the ammount or place the limit take profit order.<br>Error message from Binance: ' + JSON.parse(error.body).msg
+            execId, 'ERROR', 'Error placing TAKE_PROFIT_LIMIT order for instrument ' + execution.instrument + '. Please take in mind that the strategy has bought and hasn\'t sell. You should manually sell on Binance the ammount or place the limit take profit order. Error message from Binance: ' + JSON.parse(error.body).msg
           ]);
           resolve(null);
           return;
@@ -302,21 +345,24 @@ function cancelOrder(instrument, orderId) {
 function balanceUpdate(data) {}
 
 async function checkTakeProfitExecuted() {
-  if (execution.type !== 'Trading' || execution.takeProfitOrderId === null) {
+  if (execution.type !== 'Trading' || execution.takeProfitOrderId === null || execution.takeProfitOrderId === undefined) {
     return 0;
   }
   let priceAndQty = await getOrderTradePrice(execution, execution.takeProfitOrderId, 'sell');
   if (priceAndQty === null || priceAndQty[1] == null) {
     return 0;
   }
-  if (priceAndQty[1] == execution.positionSize) {
+  let positionSize = execution.positionSize + execution.minNotionalAmountLeft;
+  if (priceAndQty[1] == positionSize) {
+    execution.minNotionalAmountLeft = 0;
+    self.postMessage([execId, 'MIN_NOTIONAL', execution.minNotionalAmountLeft]);
     tradeType = 'buy';
 
     let tradeIndex = execution.trades.length - 1;
     execution.trades[tradeIndex]['closeDate'] = new Date();
     execution.trades[tradeIndex]['exit'] = priceAndQty[0];
     execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (feeRate * 2);
-    execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * priceAndQty[0]);
+    execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (positionSize * priceAndQty[0]);
     self.postMessage([
       execId, 'SELL', execution.trades[tradeIndex]
     ]);
@@ -358,7 +404,103 @@ function getBinanceTicks(timeframe) {
   });
 }
 
-function startBinanceWebsocket() {
+function getLastOrderId(instrument) {
+  return new Promise((resolve, reject) => {
+    binance.useServerTime(function() {
+      binance.prevDay(instrument, (error, prevDay, symbol) => {
+        if (error) {
+          reject(error);
+        }
+        resolve(prevDay.lastId);
+      });
+    });
+  });
+}
+
+async function verifyWebsocketIsAlive(timeframe) {
+  let minutes = 1;
+
+  switch (timeframe) {
+    case '1 minute':
+      minutes = 1;
+      break;
+    case '3 minutes':
+      minutes = 3;
+      break;
+    case '5 minutes':
+      minutes = 5;
+      break;
+    case '15 minutes':
+      minutes = 15;
+      break;
+    case '30 minutes':
+      minutes = 30;
+      break;
+    case '1 hour':
+      minutes = 60;
+      break;
+    case '2 hours':
+      minutes = 60 * 2;
+      break;
+    case '4 hours':
+      minutes = 60 * 4;
+      break;
+    case '6 hours':
+      minutes = 60 * 6;
+      break;
+    case '12 hours':
+      minutes = 60 * 12;
+      break;
+    case '1 day':
+      minutes = 60 * 24;
+      break;
+  }
+  let currentStart = startupsCount;
+  while (!paused) {
+    if (startupsCount !== currentStart) {
+      break;
+    }
+    if (lastUpdated != null) {
+      let date = null;
+      try {
+        await lastUpdateMutex.lock();
+        date = new Date(lastUpdated.getTime());
+        date.setMinutes(date.getMinutes() + minutes, date.getSeconds() + 30, date.getMilliseconds());
+      } finally {
+        await lastUpdateMutex.release();
+      }
+      if (date < new Date()) {
+
+        paused = true;
+        await mutex.release();
+        let endpoints = binance.websockets.subscriptions();
+        for (let endpoint in endpoints) {
+          binance.websockets.terminate(endpoint);
+        }
+        self.postMessage([
+          execId, 'LOG', 'Resetting Binance connection for strategy ' + execution.strategy.name + ' on instrumnet ' + execution.instrument + '..'
+        ]);
+        await sleep(1000);
+        await mutex.release();
+        await sleep(4000);
+        lastUpdated = null;
+        startBinanceWebsocket();
+        break;
+      }
+    }
+    await sleep(1000 * 10); // 10 sec
+  }
+}
+
+async function startBinanceWebsocket() {
+  let endpoints = binance.websockets.subscriptions();
+  if (endpoints.length > 0) {
+    self.postMessage([
+      execId, 'LOG', 'startBinanceWebsocket() is called while there are running endpoint for execution ' + execution.strategy.name + ' on instrumnet ' + execution.instrument + '.'
+    ]);
+    return;
+  }
+
   if (execution.type === 'Trading') {
     binance.websockets.userData(balanceUpdate, executionUpdate);
   }
@@ -377,18 +519,34 @@ function startBinanceWebsocket() {
       break;
     }
   }
-  let iterationCounter = 0;
-  let endCounterTime = new Date();
-  endCounterTime.setSeconds(endCounterTime.getSeconds() + 5);
+
+  startupsCount++;
+  paused = false;
+  lastUpdated = null;
+  verifyWebsocketIsAlive(smallTf);
+  await sleep(1000);
+  lastUpdated = new Date();
+
+  self.postMessage([execId, 'STARTED']);
+  if (execution.type === 'Trading' && tradeType === 'sell') {
+    if (execution.positionSizeQuoted != null && execution.positionSizeQuoted != undefined && execution.positionSizeQuoted > 0 && execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit === undefined || execution.trades[execution.trades.length - 1].exit === null)) {
+      execution.positionSize = execution.trades[execution.trades.length - 1].posSize;
+    }
+    await checkTakeProfitExecuted();
+  }
   binance.websockets.chart(execution.instrument, getShortTimeframe(smallTf), async (symbol, interval, chart) => {
     if (paused) {
       return;
     }
     try {
       await mutex.lock();
+      if (paused) {
+        return;
+      }
       let lastDate = binance.last(chart);
       if (chart[lastDate] === undefined) {
         paused = true;
+        lastUpdated = null;
         startTries++;
         let restart = startTries < 6
           ? 'restart'
@@ -397,30 +555,13 @@ function startBinanceWebsocket() {
         return;
       }
 
-      if (!statusSent) {
-        self.postMessage([execId, 'STARTED']);
-        statusSent = true;
-        if (execution.type === 'Trading' && tradeType === 'sell') {
-          await checkTakeProfitExecuted();
-        }
-      }
-
       self.postMessage([execId, 'LAST_UPDATED']);
-
-      let curCounterTime = new Date();
-      if (curCounterTime < endCounterTime) {
-        iterationCounter++;
-      } else {
-        endCounterTime = new Date();
-        endCounterTime.setSeconds(endCounterTime.getSeconds() + 5);
-        iterationCounter = 0;
+      try {
+        await lastUpdateMutex.lock();
+        lastUpdated = new Date();
+      } finally {
+        await lastUpdateMutex.release();
       }
-
-      if (iterationCounter > 500) {
-        crashed = true;
-        self.postMessage([execId, 'ERROR', 'Connection to Binance lost. Check Binance website for maintenance and try executing your strategy later.', 'crashed']);
-      }
-
       closePrices[smallTf] = [];
       Object.keys(chart).forEach(function(key) {
         try {
@@ -441,6 +582,7 @@ function startBinanceWebsocket() {
 
           if (bigTfTicks === null || bigTfTicks === undefined || bigTfTicks.length === 0) {
             paused = true;
+            lastUpdated = null;
             self.postMessage([execId, 'ERROR', 'Connection to Binance lost. Check Binance website for maintenance and try executing your strategy later.']);
             return;
           }
@@ -463,13 +605,13 @@ function startBinanceWebsocket() {
             if (alertType === 'buy') {
               if (!buyRulesHaveOnlyBigTf || bigTfEndDate !== lastCheckedDataBigTf) {
                 lastCheckedDataBigTf = bigTfEndDate;
-                if (checkTradeRules(strategy.buyRules, closePrices)) {
+                if (checkTradeRules(execution.strategy.buyRules, closePrices)) {
                   alertType = 'sell';
                   self.postMessage([execId, 'BUY', curPrice, new Date()]);
                 }
               }
             } else {
-              if (checkTradeRules(strategy.sellRules, closePrices)) {
+              if (checkTradeRules(execution.strategy.sellRules, closePrices)) {
                 alertType = 'buy';
                 self.postMessage([execId, 'SELL', curPrice, new Date()]);
               }
@@ -479,7 +621,7 @@ function startBinanceWebsocket() {
             if (tradeType === 'buy') {
               if (!buyRulesHaveOnlyBigTf || bigTfEndDate !== lastCheckedDataBigTf) {
                 lastCheckedDataBigTf = bigTfEndDate;
-                if (checkTradeRules(strategy.buyRules, closePrices)) {
+                if (checkTradeRules(execution.strategy.buyRules, closePrices)) {
                   //Should buy at market
                   if (execution.type === 'Simulation') {
                     //Get current ASK price and use it as a trade entry.
@@ -493,53 +635,56 @@ function startBinanceWebsocket() {
                         break;
                       }
                     }
-                    if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
-                      stoploss = curPrice * (1 - (strategy.stoploss / 100));
+                    if (execution.strategy.stoploss !== null && !isNaN(execution.strategy.stoploss)) {
+                      stoploss = curPrice * (1 - (execution.strategy.stoploss / 100));
                     }
-                    if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
+                    if (execution.strategy.trailingSl !== null && !isNaN(execution.strategy.trailingSl)) {
                       trailingSlPriceUsed = curPrice;
-                      stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+                      stoploss = trailingSlPriceUsed * (1 - (execution.strategy.trailingSl / 100));
                       self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
                     }
-                    if (strategy.target !== null && !isNaN(strategy.target)) {
-                      target = curPrice * (1 + (strategy.target / 100));
+                    if (execution.strategy.target !== null && !isNaN(execution.strategy.target)) {
+                      target = curPrice * (1 + (execution.strategy.target / 100));
                     }
+                    await updatePositionSize(curPrice);
                     let trade = {
                       'openDate': new Date(),
                       'entry': curPrice,
-                      'result': 0
+                      'result': 0,
+                      'posSize': execution.positionSize
                     };
+
                     execution.trades.push(trade);
-                    if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
+                    if (execution.strategy.timeClose !== null && !isNaN(execution.strategy.timeClose)) {
                       timeClose = new Date(trade.openDate.getTime());
-                      timeClose.setHours(timeClose.getHours() + strategy.timeClose);
+                      timeClose.setHours(timeClose.getHours() + execution.strategy.timeClose);
                     }
                     self.postMessage([execId, 'BUY', trade, feeRate]);
                   } else {
                     //Real trading - market buy
-                    let marketBuyOk = await marketBuy(execution, strategy);
+                    let marketBuyOk = await marketBuy(execution, curPrice);
                     if (!marketBuyOk) {
                       return;
                     }
-                    if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
-                      stoploss = execution.trades[execution.trades.length - 1].entry * (1 - (strategy.stoploss / 100));
+                    if (execution.strategy.stoploss !== null && !isNaN(execution.strategy.stoploss)) {
+                      stoploss = execution.trades[execution.trades.length - 1].entry * (1 - (execution.strategy.stoploss / 100));
                     }
-                    if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
+                    if (execution.strategy.trailingSl !== null && !isNaN(execution.strategy.trailingSl)) {
                       trailingSlPriceUsed = execution.trades[execution.trades.length - 1].entry;
-                      stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+                      stoploss = trailingSlPriceUsed * (1 - (execution.strategy.trailingSl / 100));
                       self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
                     }
-                    if (strategy.target !== null && !isNaN(strategy.target)) {
-                      target = execution.trades[execution.trades.length - 1].entry * (1 + (strategy.target / 100));
+                    if (execution.strategy.target !== null && !isNaN(execution.strategy.target)) {
+                      target = execution.trades[execution.trades.length - 1].entry * (1 + (execution.strategy.target / 100));
                       execution.takeProfitOrderId = await placeTakeProfitLimit(execution, target);
                       if (execution.takeProfitOrderId === null) {
                         return;
                       }
                       self.postMessage([execId, 'TAKE_PROFIT_ORDER_ID', execution.takeProfitOrderId]);
                     }
-                    if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
+                    if (execution.strategy.timeClose !== null && !isNaN(execution.strategy.timeClose)) {
                       timeClose = new Date(execution.trades[execution.trades.length - 1].openDate.getTime());
-                      timeClose.setHours(timeClose.getHours() + strategy.timeClose);
+                      timeClose.setHours(timeClose.getHours() + execution.strategy.timeClose);
                     }
                   } //Real trading - market buy
                   tradeType = 'sell';
@@ -548,7 +693,7 @@ function startBinanceWebsocket() {
               } //checkTradeRules - buyRules
             } else {
               // tradeType === 'sell'
-              if (checkTradeRules(strategy.sellRules, closePrices)) {
+              if (checkTradeRules(execution.strategy.sellRules, closePrices)) {
                 if (execution.type === 'Simulation') {
                   //Get current BID price and use it as a trade exit.
                   for (let i = 0; i < 10; i++) {
@@ -570,7 +715,7 @@ function startBinanceWebsocket() {
                     execId, 'SELL', execution.trades[tradeIndex]
                   ]);
                 } else {
-                  await marketSell(execution);
+                  await marketSell(execution, curPrice);
                 }
                 tradeType = 'buy';
                 return;
@@ -585,24 +730,25 @@ function startBinanceWebsocket() {
       //Same candle check only stoploss and target
       if (tradeType === 'sell') {
         if (execution.type !== 'Alerts') {
-          if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < curPrice) {
+          if (execution.strategy.trailingSl !== null && !isNaN(execution.strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < curPrice) {
             trailingSlPriceUsed = curPrice;
-            stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+            stoploss = trailingSlPriceUsed * (1 - (execution.strategy.trailingSl / 100));
             self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
           }
-          //Get current BID price and use it as a trade exit.
-          for (let i = 0; i < 10; i++) {
-            //There may not be BID price at the moment. Try 10 times to find one
-            let bidAsk = await getBidAsk(execution.instrument);
-            if (isNaN(bidAsk[0])) {
-              await sleep(100);
-            } else {
-              curPrice = bidAsk[0];
-              break;
-            }
-          }
-          if ((stoploss !== null && stoploss >= curPrice) || (target !== null && target <= curPrice) || (timeClose !== null && timeClose <= new Date())) {
-            if (execution.type === 'Simulation') {
+          if (execution.type === 'Simulation') {
+            if ((stoploss !== null && stoploss >= curPrice) || (target !== null && target <= curPrice) || (timeClose !== null && timeClose <= new Date())) {
+              //Get current BID price and use it as a trade exit.
+              for (let i = 0; i < 10; i++) {
+                //There may not be BID price at the moment. Try 10 times to find one
+                let bidAsk = await getBidAsk(execution.instrument);
+                if (isNaN(bidAsk[0])) {
+                  await sleep(100);
+                } else {
+                  curPrice = bidAsk[0];
+                  break;
+                }
+              }
+
               let tradeIndex = execution.trades.length - 1;
               execution.trades[tradeIndex]['closeDate'] = new Date();
               execution.trades[tradeIndex]['exit'] = curPrice;
@@ -614,9 +760,9 @@ function startBinanceWebsocket() {
               tradeType = 'buy';
             }
           }
-          if ((stoploss !== null && stoploss >= curPrice) || (timeClose !== null && timeClose <= new Date())) {
-            if (execution.type === 'Trading') {
-              await marketSell(execution);
+          if (execution.type === 'Trading') {
+            if ((stoploss !== null && stoploss >= curPrice) || (timeClose !== null && timeClose <= new Date())) {
+              await marketSell(execution, curPrice);
               tradeType = 'buy';
             }
           }
@@ -624,11 +770,15 @@ function startBinanceWebsocket() {
         }
 
       }
-    } catch (err) {
+    } catch (err2) {
+      //self.postMessage([execId, 'STALLED']);
       paused = true;
-      self.postMessage([execId, 'ERROR', err]);
+      lastUpdated = null;
+      self.postMessage([
+        execId, 'ERROR', 'Connection to Binance lost: Details: ' + err2.stack
+      ]);
     } finally {
-      mutex.release();
+      await mutex.release();
     }
 
   });
@@ -638,7 +788,6 @@ let binance = null;
 let execution = null;
 let apiKey = null;
 let apiSecret = null;
-let strategy = null;
 let testMode = true;
 let tradeType = 'buy';
 let stoploss = null;
@@ -647,27 +796,32 @@ let timeClose = null;
 let trailingSlPriceUsed = -1;
 let alertType = 'buy';
 let feeRate = null;
-let statusSent = false;
 let execId = null;
 let mutex = new Mutex();
+let lastUpdateMutex = new Mutex();
+let startupsCount = 0;
 let lastCheckedData = -1;
 let lastCheckedDataBigTf = -1;
 let firstCande = true; // skip the first candle
 let binanceInstrumentsInfo = null;
 let paused = false;
 let startTries = 0;
+let lastUpdated = null;
 
 self.addEventListener('message', async function(e) {
   try {
     if (typeof e.data === 'string' && e.data === ('PAUSE')) {
       paused = true;
+      lastUpdated = null;
       let endpoints = binance.websockets.subscriptions();
       for (let endpoint in endpoints) {
         binance.websockets.terminate(endpoint);
       }
+      await mutex.release();
       return;
     }
     if (typeof e.data === 'string' && e.data === ('DELAYED_TERMINATE')) {
+      await mutex.release();
       await sleep(5000)
       self.close();
     }
@@ -676,12 +830,12 @@ self.addEventListener('message', async function(e) {
       for (let endpoint in endpoints) {
         binance.websockets.terminate(endpoint);
       }
+      await mutex.release();
       //Reset to deaults
       binance = null;
       execution = null;
       apiKey = null;
       apiSecret = null;
-      strategy = null;
       testMode = true;
       tradeType = 'buy';
       stoploss = null;
@@ -690,7 +844,6 @@ self.addEventListener('message', async function(e) {
       trailingSlPriceUsed = -1;
       alertType = 'buy';
       feeRate = null;
-      statusSent = false;
       execId = null;
       mutex = new Mutex();
       lastCheckedData = -1;
@@ -699,14 +852,14 @@ self.addEventListener('message', async function(e) {
       binanceInstrumentsInfo = null;
       paused = false;
       startTries = 0;
+      lastUpdated = null;
       return;
     } else if (typeof e.data === 'string' && e.data === ('RESUME')) {
-      statusSent = false;
-      paused = false;
       startBinanceWebsocket();
       return;
     } else if (typeof e.data[0] === 'string' && e.data[0] === ('UPDATE_EXECUTION')) {
       execution.positionSize = e.data[1].positionSize;
+      execution.positionSizeQuoted = e.data[1].positionSizeQuoted;
       execution.feeRate = e.data[1].feeRate;
       return;
     } else if (typeof e.data[0] === 'string' && e.data[0] === ('UPDATE_TRADE')) {
@@ -714,9 +867,36 @@ self.addEventListener('message', async function(e) {
       execution.trades[tradeIndex]['closeDate'] = new Date();
       execution.trades[tradeIndex]['exit'] = e.data[1];
       execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (execution.feeRate * 2);
-      execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * e.data[1]);
+      if (execution.positionSizeQuoted != null && execution.positionSizeQuoted != undefined && execution.positionSizeQuoted > 0) {
+        execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSizeQuoted);
+      } else {
+        execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * e.data[1]);
+      }
       execution.takeProfitOrderId = null;
       tradeType = 'buy';
+      return;
+    } else if (typeof e.data[0] === 'string' && e.data[0] === ('UPDATE_STRATEGY')) {
+      execution.strategy = e.data[1];
+
+      if (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit === undefined || execution.trades[execution.trades.length - 1].exit === null)) {
+        if (execution.strategy.stoploss !== null && !isNaN(execution.strategy.stoploss)) {
+          stoploss = execution.trades[execution.trades.length - 1].entry * (1 - (execution.strategy.stoploss / 100));
+        }
+        if (execution.strategy.trailingSl !== null && !isNaN(execution.strategy.trailingSl)) {
+          if (execution.trailingSlPriceUsed !== undefined && execution.trailingSlPriceUsed !== null) {
+            trailingSlPriceUsed = execution.trailingSlPriceUsed;
+            stoploss = trailingSlPriceUsed * (1 - (execution.strategy.trailingSl / 100));
+          } else {
+            trailingSlPriceUsed = execution.trades[execution.trades.length - 1].entry;
+            stoploss = trailingSlPriceUsed * (1 - (execution.strategy.trailingSl / 100));
+          }
+        }
+
+        if (execution.strategy.timeClose !== null && !isNaN(execution.strategy.timeClose)) {
+          timeClose = new Date(execution.trades[execution.trades.length - 1].openDate.getTime());
+          timeClose.setHours(timeClose.getHours() + execution.strategy.timeClose);
+        }
+      }
       return;
     }
 
@@ -728,37 +908,44 @@ self.addEventListener('message', async function(e) {
     if (execution.feeRate === null || execution.feeRate === undefined) {
       feeRate = execution.feeRate;
     }
-    strategy = execution.strategy;
     if (execution.type === 'Trading') {
       testMode = false;
     }
-    binance = new Binance().options({APIKEY: apiKey, APISECRET: apiSecret, useServerTime: true, recvWindow: 60000, test: testMode});
+    binance = new Binance().options({
+      APIKEY: apiKey,
+      APISECRET: apiSecret,
+      'reconnect': false,
+      useServerTime: true,
+      recvWindow: 60000,
+      test: testMode
+    });
 
     if (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit === undefined || execution.trades[execution.trades.length - 1].exit === null)) {
       tradeType = 'sell';
-      if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
-        stoploss = execution.trades[execution.trades.length - 1].entry * (1 - (strategy.stoploss / 100));
+      if (execution.strategy.stoploss !== null && !isNaN(execution.strategy.stoploss)) {
+        stoploss = execution.trades[execution.trades.length - 1].entry * (1 - (execution.strategy.stoploss / 100));
       }
-      if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl)) {
+      if (execution.strategy.trailingSl !== null && !isNaN(execution.strategy.trailingSl)) {
         if (execution.trailingSlPriceUsed !== undefined && execution.trailingSlPriceUsed !== null) {
           trailingSlPriceUsed = execution.trailingSlPriceUsed;
-          stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+          stoploss = trailingSlPriceUsed * (1 - (execution.strategy.trailingSl / 100));
         } else {
           trailingSlPriceUsed = execution.trades[execution.trades.length - 1].entry;
-          stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+          stoploss = trailingSlPriceUsed * (1 - (execution.strategy.trailingSl / 100));
         }
       }
-      if (strategy.target !== null && !isNaN(strategy.target)) {
-        target = execution.trades[execution.trades.length - 1].entry * (1 + (strategy.target / 100));
+      if (execution.strategy.target !== null && !isNaN(execution.strategy.target)) {
+        target = execution.trades[execution.trades.length - 1].entry * (1 + (execution.strategy.target / 100));
       }
-      if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
+      if (execution.strategy.timeClose !== null && !isNaN(execution.strategy.timeClose)) {
         timeClose = new Date(execution.trades[execution.trades.length - 1].openDate.getTime());
-        timeClose.setHours(timeClose.getHours() + strategy.timeClose);
+        timeClose.setHours(timeClose.getHours() + execution.strategy.timeClose);
       }
     }
     startBinanceWebsocket();
   } catch (err) {
     paused = true;
-    self.postMessage([execId, 'ERROR', err]);
+    lastUpdated = null;
+    self.postMessage([execId, 'ERROR', err.stack]);
   }
 }, false);

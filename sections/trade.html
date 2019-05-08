@@ -48,11 +48,17 @@
             <span class="inline-block min-width5">E-mail:&nbsp;</span>
             <div class="drop-down-white"><input class="search main-field white" id="emailBox" type="text" placeholder="E-mail to receive Alerts" /></div>
           </div>
-          <div>
-            <div class="display-none" id="tsPosSizeDiv" class="drop-down-white">
+          <div class="display-none" id="tsPosSizeDiv" >
+            <div class="drop-down-white">
               <span class="inline-block min-width5">Trade size:&nbsp;</span>
-              <div class="drop-down-white"><input class="search main-field white" id="tsPosSize" onkeyup="fillPosSizeDetails()" type="number" placeholder="Ammount per Trade" />&nbsp;<span class="additional-field text-white inline-block min-width5"
+              <div class="drop-down-white"><input class="search main-field white" id="tsPosSize" onkeyup="fillPosSizeDetails('base')" type="number" placeholder="Amount in Base Coin" />&nbsp;<span class="additional-field text-white inline-block min-width5"
                   id="tsQuotedCurrency"></span></div>
+            </div>
+            <br>
+            <div class="drop-down-white">
+              <span class="inline-block min-width5">&nbsp;</span>
+              <div class="drop-down-white"><input class="search main-field white" id="tsPosSize2" onkeyup="fillPosSizeDetails('quoted')" type="number" placeholder="Amount in Quoted Coin" />&nbsp;<span class="additional-field text-white inline-block min-width5"
+                  id="tsQuotedCurrency2"></span></div>
             </div>
           </div>
           <div>
@@ -75,8 +81,7 @@
         <a id="executeStrategyBtn" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="executeStrategy()" class="button white margin-s-b30"><i class="text-green fas fa-play"></i> Execute</a>
         <br>
         <span style="font-size:small">NOTE: If you close the application, all executions will be terminated and NOT executed any more.
-          You can resume their execution on app re-launch.<br>
-          NOTE: If you are executing a strategy and edit it the changes will NOT take place in the execution. You need to edit the execution itself!</span>
+          You can resume their execution on app re-launch.</span>
       </div>
 
       <div id="tsResultDiv" class="display-none">
@@ -96,11 +101,12 @@
                   <td>Strategy</td>
                   <td>Exchange</td>
                   <td>Instrument</td>
+                  <td class="text-center">Pos. Size %<a title="Info" onclick="posSizeInfo()" href="#/">&nbsp;<i class="fa fa-info-circle"></i></a></td>
                   <td class="text-center">Trades Nb.</td>
                   <td class="text-center">Open Trade</td>
                   <td class="text-right">Result</td>
                   <td></td>
-                  <td class="text-center">Last Tick</td>
+                  <td class="text-center">Last Tick<a title="Info" onclick="lastTickInfo()" href="#/">&nbsp;<i class="fa fa-info-circle"></i></a></td>
                   <td>Status</td>
                   <td>Actions</td>
                 </tr>
