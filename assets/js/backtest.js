@@ -87,7 +87,7 @@ async function editBtStrategy() {
     }
     editStrategy(strategyName);
   } catch (err) {
-      log('error', 'editBtStrategy', err.stack);
+    log('error', 'editBtStrategy', err.stack);
   }
 }
 
@@ -171,6 +171,7 @@ async function runBacktest() {
   }
 
   try {
+    bbColorIndexToUse = 0;
     backtestRunning = true;
     let strategy = await getStrategyByName(strategyName);
     if (strategy === null) {
@@ -194,7 +195,7 @@ async function runBacktest() {
 
     //get all timeframes
     let timeframes = getTimeframes(strategy);
-    if(timeframes===null) {
+    if (timeframes === null) {
       $('#runBacktestBtn').removeClass('disabled');
       $('#btRunning').hide();
       $('#btResult').hide();
@@ -391,6 +392,15 @@ function getIndicatorsFromRules(indicators, rules) {
         period: rule.period,
         period2: rule.period2,
         period3: rule.period3,
+        data: [],
+        data2: [],
+        timeframe: rule.timeframe
+      };
+    } else if (rule.indicator === 'bb') {
+      indTmp = {
+        type: rule.indicator,
+        period: rule.period,
+        period2: rule.period2,
         data: [],
         data2: [],
         timeframe: rule.timeframe
@@ -595,11 +605,26 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
                 ]);
               }
             }
+
             if (value !== null && value[0] !== null) {
               indicator.data.push([
                 ticks[timeframes[1]][smallTfIndex].d.getTime(),
                 value[0]
               ]);
+            }
+            if (indicator.type === 'bb') {
+              value = calculateBB(indicator.period, indicator.period2, closePrices[indicator.timeframe])
+              if (value !== null && value[0] !== null && value[0].length > 0) {
+
+                indicator.data.push([
+                  ticks[timeframes[1]][smallTfIndex].d.getTime(),
+                  value[0][1]
+                ]);
+                indicator.data2.push([
+                  ticks[timeframes[1]][smallTfIndex].d.getTime(),
+                  value[0][2]
+                ]);
+              }
             }
           }
           data.push([
@@ -635,6 +660,19 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
               ticks[timeframes[0]][bigTfIndex].d.getTime(),
               value[0]
             ]);
+          }
+          if (indicator.type === 'bb') {
+            value = calculateBB(indicator.period, indicator.period2, closePrices[indicator.timeframe])
+            if (value !== null && value[0] !== null && value[0].length > 0) {
+              indicator.data.push([
+                ticks[timeframes[0]][bigTfIndex].d.getTime(),
+                value[0][1]
+              ]);
+              indicator.data2.push([
+                ticks[timeframes[0]][bigTfIndex].d.getTime(),
+                value[0][2]
+              ]);
+            }
           }
         }
         data.push([
@@ -763,6 +801,28 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
             data: indicator.data2
           })
         }
+      } else if (indicator.type === 'bb') {
+        let color = getNextBBColor();
+        series.push({
+          name: 'Bollinger_Upper_Band_' + indicator.period + ',' + indicator.period2 + ' ' + indicator.timeframe.replace(' ', '_'),
+          type: 'spline',
+          yAxis: 0,
+          color: color,
+          dataGrouping: {
+            enabled: false
+          },
+          data: indicator.data
+        })
+        series.push({
+          name: 'Bollinger_Lower_Band_' + indicator.period + ',' + indicator.period2 + ' ' + indicator.timeframe.replace(' ', '_'),
+          type: 'spline',
+          yAxis: 0,
+          color: color,
+          dataGrouping: {
+            enabled: false
+          },
+          data: indicator.data2
+        })
       } else {
         series.push({
           name: indicator.type + '_' + indicator.period + ' ' + indicator.timeframe.replace(' ', '_'),
@@ -863,7 +923,17 @@ function btResultShowRows(from, to) {
   }
   $('#btStrategiesTable').append('</tbody>');
 }
+let bbColors = ['#8cffa1', '#95afdb', '#cea28a', '#ea6ec9', '#96231f', '#66acad'];
+let bbColorIndexToUse = 0;
 
+function getNextBBColor() {
+  if (bbColorIndexToUse == bbColors.length) {
+    bbColorIndexToUse = 0;
+  }
+  let result = bbColors[bbColorIndexToUse];
+  bbColorIndexToUse++;
+  return result;
+}
 let cancelBt = false;
 async function btCancel() {
   $('#btCancelBtn').addClass('disabled');

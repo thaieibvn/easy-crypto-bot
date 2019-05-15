@@ -44,10 +44,6 @@
             </div>
           </div>
           <br>
-          <div id="emailDiv">
-            <span class="inline-block min-width5">E-mail:&nbsp;</span>
-            <div class="drop-down-white"><input class="search main-field white" id="emailBox" type="text" placeholder="E-mail to receive Alerts" /></div>
-          </div>
           <div class="display-none" id="tsPosSizeDiv" >
             <div class="drop-down-white">
               <span class="inline-block min-width5">Trade size:&nbsp;</span>
@@ -74,6 +70,10 @@
               <input autocomplete="off" class="search main-field white" id="trFeeBox" type="number" placeholder="Fee" value="0.075" />
             </div>
           </div>
+          <div id="emailDiv">
+            <span class="inline-block min-width5">E-mail:&nbsp;</span>
+            <div class="drop-down-white"><input class="search main-field white" id="emailBox" type="text" placeholder="E-mail to receive Alerts" /></div>
+          </div>
         </div>
       </div>
 
@@ -89,9 +89,10 @@
         <div>
           <h2 class="text-center margin-s-b10">Executions&nbsp;<i class="fas fa-rocket"></i> </h2>
           <div class="text-center margin-b20">
-            <a style="width:15em" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="startAllExecutions()" class="button white alt"><i class="text-green fas fa-play"></i> Start All</a>
-            <a style="width:15em" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="stopAllExecutions()" class="button white alt"><i class="text-red fas fa-stop"></i> Stop All</a>
-            <a style="width:15em" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="clearErrors()" class="button white alt"><i class="text-blue fas fa-recycle"></i> Clear Errors</a>
+            <a style="width:18em" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="startAllExecutions()" class="button white alt"><i class="text-green fas fa-play"></i> Start All</a>
+            <a style="width:18em" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="stopAllExecutions()" class="button white alt"><i class="text-red fas fa-stop"></i> Stop All</a>
+            <a style="width:18em" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="clearErrors()" class="button white alt"><i class="text-blue fas fa-recycle"></i> Clear Errors</a>
+            <a style="width:18em" onkeydown="opKeyDownDoNothing(event)" href="#/" onclick="notifications()" class="button white alt" id="notificationsBtn"><i class="text-green fas fa-play"></i> Start Notifications</a>
           </div>
           <div class="table-wrapper ">
             <table id="tsStrategiesTable" class="white alt">
@@ -129,6 +130,7 @@
                   <td>Available Balance</td>
                   <td>In Order</td>
                   <td>USD Value</td>
+                  <td>% of Total</td>
                 </tr>
               </thead>
               <tbody id="binanceBalanceTable">

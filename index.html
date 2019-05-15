@@ -68,7 +68,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 								<li><a href="#/" onclick="dropDownItem('Crossing Moving Averages', '#buyRulesDiv', function(){buyRuleType='cma'})">Crossing Moving Averages</a></li>
 								<li><a href="#/" onclick="dropDownItem('Relative Strength Index RSI', '#buyRulesDiv', function(){buyRuleType='rsi'})">Relative Strength Index RSI</a></li>
 								<li><a href="#/" onclick="dropDownItem('MACD', '#buyRulesDiv', function(){buyRuleType='macd'})">MACD</a></li>
-								<li><a href="#/" onclick="dropDownItem('Bollinger Band', '#buyRulesDiv', function(){buyRuleType='Bollinger Band'})">Bollinger Band</a></li>
+								<li><a href="#/" onclick="dropDownItem('Bollinger Bands', '#buyRulesDiv', function(){buyRuleType='bb'})">Bollinger Bands</a></li>
 							</ul>
 						</div>
 					</div>
@@ -91,7 +91,7 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 								<li><a href="#/" onclick="dropDownItem('Crossing Moving Averages', '#sellRulesDiv', function(){sellRuleType='cma'})">Crossing Moving Averages</a></li>
 								<li><a href="#/" onclick="dropDownItem('Relative Strength Index RSI', '#sellRulesDiv', function(){sellRuleType='rsi'})">Relative Strength Index RSI</a></li>
 								<li><a href="#/" onclick="dropDownItem('MACD', '#sellRulesDiv', function(){sellRuleType='macd'})">MACD</a></li>
-								<li><a href="#/" onclick="dropDownItem('Bollinger Band', '#sellRulesDiv', function(){sellRuleType='Bollinger Band'})">Bollinger Band</a></li>
+								<li><a href="#/" onclick="dropDownItem('Bollinger Bands', '#sellRulesDiv', function(){sellRuleType='bb'})">Bollinger Bands</a></li>
 							</ul>
 						</div>
 					</div>
@@ -104,21 +104,23 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 				<hr />
 				<div class="text-center">
 					<h3 class="text-center">3. Set Stoploss and Target: Sell if the price moves against you or if your target is met:</h3>
-					<span class="min-width7 inline-block text-left">Stoploss:&nbsp;</span>
+					<span class="min-width7 inline-block text-left"><a title="Info" onclick="stoplossInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;Stoploss:&nbsp;</span>
 					<input class="white" id="stoploss" onkeydown="stoplossTypeChange('sl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
-					<span class="min-width7 inline-block text-left">Trailing SL:&nbsp;</span>
+					<span class="min-width7 inline-block text-left"><a title="Info" onclick="stoplossInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;Trailing SL:&nbsp;</span>
 					<input class="white" id="trailingSl" onkeydown="stoplossTypeChange('tsl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
-					<span class="min-width7 inline-block text-left">Target:&nbsp;</span>
+					<span class="min-width7 inline-block text-left"><a title="Info" onclick="targetInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;Target:&nbsp;</span>
 					<input class="white" id="target" style="width:10em;" type="number" value="" />&nbsp;%<br>
-					<span style="margin-left:1.4em;" class="min-width7 inline-block text-left">Time Close <a title="Info" onclick="timeCloseInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>:&nbsp;</span>
+					<span style="margin-left:1.4em;" class="min-width7 inline-block text-left"><a title="Info" onclick="timeCloseInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;Time Close:&nbsp;</span>
 					<input class="white" id="timeClose" style="width:10em;" type="number" value="" />&nbsp;hours<br>
 					<span style="font-size:small">If you don't want Stoloss or Target, leave them empty.</span>
 				</div>
 				<hr />
 
 				<div class="text-center margin-s-b30">
-					<a href="#/" onclick="saveStrategy()" class="button alt white">Save</a>
+					<div class="margin-s-b10" style="font-size:small">Except for the Target, the bot executes MARKET ORDERS.</div>
+					<a href="#/" id="saveStrategyBtn" onclick="saveStrategy()" class="button alt white">Save</a>
 					<a href="#/" onclick="closeNewStrategy()" class="button alt white">Cancel</a>
+					<div style="font-size:small" id="saveStrategyDisabled" class="display-none">* This strategy is currently running. Please stop the execution and then try to edit.</div>
 				</div>
 				<br>
 			</div>
@@ -190,9 +192,11 @@ EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 							<span class="bold" id="executionExchangeEdit"></span><br> <span class="inline-block min-width5">Instrument:&nbsp;</span>
 							<span class="bold" id="executionInstrumentEdit"></span>
 							<div id="executionPosSizeEditDiv" class="inline"><br> <span class="inline-block min-width5">Trade Size:&nbsp;</span>
-								<input style="width:200px;" onkeyup="fillPosSizeDetailsEdit('base')" autocomplete="off" class="search" id="executionPosSizeEdit" type="number" placeholder="Amount in Base Coin" />&nbsp;<span class="additional-field inline-block min-width5" id="tsQuotedCurrencyEdit"></span>
+								<input style="width:200px;" onkeyup="fillPosSizeDetailsEdit('base')" autocomplete="off" class="search" id="executionPosSizeEdit" type="number" placeholder="Amount in Base Coin" />&nbsp;<span class="additional-field inline-block min-width5"
+								  id="tsQuotedCurrencyEdit"></span>
 								<br> <span class="inline-block min-width5">&nbsp;</span>
-									<input style="width:200px;" onkeyup="fillPosSizeDetailsEdit('quoted')" autocomplete="off" class="search" id="executionPosSizeEdit2" type="number" placeholder="Amount in Quoted Coin" />&nbsp;<span class="additional-field inline-block min-width5" id="tsQuotedCurrencyEdit2"></span>
+								<input style="width:200px;" onkeyup="fillPosSizeDetailsEdit('quoted')" autocomplete="off" class="search" id="executionPosSizeEdit2" type="number" placeholder="Amount in Quoted Coin" />&nbsp;<span class="additional-field inline-block min-width5"
+								  id="tsQuotedCurrencyEdit2"></span>
 
 							</div>
 

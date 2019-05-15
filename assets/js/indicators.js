@@ -112,7 +112,39 @@ function checkTradeRules(rules, historicalDatas) {
           continue;
         }
       }
+    } else if (rule.indicator === "bb") {
+      let bb = calculateBB(rule.period, rule.period2, historicalData);
+      let bandValue = 0;
+      let bandValue2 = 0;
+      if (rule.type === 'upper band') {
+        bandValue = bb[0][1];
+        bandValue2 = bb[1][1]
+      } else {
+        bandValue = bb[0][2];
+        bandValue2 = bb[1][2]
+      }
+
+      if (rule.direction === 'above') {
+        if (historicalData[historicalData.length - 1] > bandValue * (1 + (rule.value / 100))) {
+          rulesMet++;
+          continue;
+        }
+      } else if (rule.direction === 'bellow') {
+        if (historicalData[historicalData.length - 1] < bandValue * (1 - (rule.value / 100))) {
+          rulesMet++;
+          continue;
+        }
+      } else if (rule.direction === 'crossing') {
+        if (rule.crossDirection === 'top to bottom' && historicalData[historicalData.length - 2] >= bandValue2 && historicalData[historicalData.length - 1] < bandValue) {
+          rulesMet++;
+          continue;
+        } else if (rule.crossDirection === 'bottom to top' && historicalData[historicalData.length - 2] <= bandValue2 && historicalData[historicalData.length - 1] > bandValue) {
+          rulesMet++;
+          continue;
+        }
+      }
     }
+
   }
   return rulesMet === rules.length;
 }
@@ -122,22 +154,22 @@ function calculateSMA(smaPeriod, historicalData) {
     return null;
   }
   let sum = 0;
-  for (let i = historicalData.length - smaPeriod; i < historicalData.length-1; i++) {
+  for (let i = historicalData.length - smaPeriod; i < historicalData.length - 1; i++) {
     sum += historicalData[i]
   }
   return [
     parseFloat(((sum + historicalData[historicalData.length - 1]) / smaPeriod).toFixed(8)),
-    parseFloat(((sum + historicalData[historicalData.length - smaPeriod-1]) / smaPeriod).toFixed(8))
+    parseFloat(((sum + historicalData[historicalData.length - smaPeriod - 1]) / smaPeriod).toFixed(8))
   ];
 }
 
 function calculateEMA(emaPeriod, historicalData) {
   let periodsToUse = 300;
-  if (emaPeriod<150) {
+  if (emaPeriod < 150) {
     periodsToUse = 250
-  } else if (emaPeriod<100) {
+  } else if (emaPeriod < 100) {
     periodsToUse = 200
-  } else if (emaPeriod<50) {
+  } else if (emaPeriod < 50) {
     periodsToUse = 100
   }
 
@@ -146,11 +178,14 @@ function calculateEMA(emaPeriod, historicalData) {
   }
   let multiplier = 2 / (emaPeriod + 1);
   let emaPrev = historicalData[historicalData.length - periodsToUse];
-  for (let i = historicalData.length - (periodsToUse-1); i < historicalData.length-1; i++) {
+  for (let i = historicalData.length - (periodsToUse - 1); i < historicalData.length - 1; i++) {
     emaPrev = (historicalData[i] - emaPrev) * multiplier + emaPrev;
   }
   let ema = (historicalData[historicalData.length - 1] - emaPrev) * multiplier + emaPrev;
-  return [parseFloat(ema.toFixed(8)), parseFloat(emaPrev.toFixed(8))];
+  return [
+    parseFloat(ema.toFixed(8)),
+    parseFloat(emaPrev.toFixed(8))
+  ];
 }
 
 function calculateRs(period, array) {
@@ -171,7 +206,7 @@ function calculateRsi(rsiPeriod, historicalData) {
   let avgGain = [];
   let avgLoss = [];
   let prevClose = historicalData[historicalData.length - 100];
-  for (let i = historicalData.length - 99; i < historicalData.length-1; i++) {
+  for (let i = historicalData.length - 99; i < historicalData.length - 1; i++) {
     let change = historicalData[i] - prevClose;
     if (change > 0) {
       avgGain.push(change);
@@ -202,7 +237,10 @@ function calculateRsi(rsiPeriod, historicalData) {
   let rsiPrev = 100 - (100 / (1 + (avgGainFinalPrev / avgLossFinalPrev)));
   //let d = new Date(array[index][0])
   //alert(d + ' RSI: ' + rsi+' RSI: ' + rsiPrev);
-  return [parseFloat(rsi.toFixed(8)), parseFloat(rsiPrev.toFixed(8))];
+  return [
+    parseFloat(rsi.toFixed(8)),
+    parseFloat(rsiPrev.toFixed(8))
+  ];
 }
 
 function calculateEMAFull(emaPeriod, historicalData, count) {
@@ -212,13 +250,13 @@ function calculateEMAFull(emaPeriod, historicalData, count) {
   let multiplier = 2 / (emaPeriod + 1);
   let emaPrev = historicalData[historicalData.length - count];
   let emas = [];
-  for (let i = historicalData.length - count; i < historicalData.length-1; i++) {
+  for (let i = historicalData.length - count; i < historicalData.length - 1; i++) {
     emaPrev = (historicalData[i] - emaPrev) * multiplier + emaPrev;
     emas.push(parseFloat(emaPrev.toFixed(8)));
   }
 
-    let ema = (historicalData[historicalData.length - 1] - emaPrev) * multiplier + emaPrev;
-    emas.push(parseFloat(ema.toFixed(8)));
+  let ema = (historicalData[historicalData.length - 1] - emaPrev) * multiplier + emaPrev;
+  emas.push(parseFloat(ema.toFixed(8)));
 
   return emas;
 }
@@ -255,6 +293,58 @@ function calculateMacd(period, period2, period3, historicalData) {
     parseFloat(macd[macd.length - 2].toFixed(8)),
     signal
   ];
+}
+
+function calculateBB(period, stdDev, historicalData) {
+  if (historicalData.length <= period + 1) {
+    return null;
+  }
+  let sma = calculateSMA(period, historicalData);
+
+  let dataPrev = [];
+  let data = [];
+  dataPrev.push(historicalData[historicalData.length - 1 - period]);
+  data.push(historicalData[historicalData.length - 1])
+  for (let i = historicalData.length - 2; i > historicalData.length - 1 - period; i--) {
+    dataPrev.push(historicalData[i]);
+    data.push(historicalData[i])
+  }
+  let prevStdDev1 = calculateStdDev(dataPrev);
+  let stdDev1 = calculateStdDev(data);
+
+  return [
+    [
+      sma[0],
+      parseFloat((sma[0] + (stdDev1 * stdDev)).toFixed(8)),
+      parseFloat((sma[0] - (stdDev1 * stdDev)).toFixed(8))
+    ],
+    [
+      sma[1],
+      parseFloat((sma[1] + (prevStdDev1 * stdDev)).toFixed(8)),
+      parseFloat((sma[1] - (prevStdDev1 * stdDev)).toFixed(8))
+    ]
+  ];
+}
+
+function calculateStdDev(data) {
+  let avg = calculateAvg(data);
+
+  let squareDiffs = data.map(function(value) {
+    let diff = value - avg;
+    return diff * diff;
+  });
+
+  let avgSquareDiff = calculateAvg(squareDiffs);
+
+  return Math.sqrt(avgSquareDiff);
+}
+
+function calculateAvg(data) {
+  let sum = data.reduce(function(sum, value) {
+    return sum + value;
+  }, 0);
+
+  return sum / data.length;
 }
 
 module.exports = {

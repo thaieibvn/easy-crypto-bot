@@ -417,6 +417,35 @@ function getLastOrderId(instrument) {
   });
 }
 
+async function retryConnection(err) {
+  paused = true;
+  lastUpdated = null;
+  startTries++;
+  if (startTries > maxRetries) {
+    self.postMessage([
+      execId, 'ERROR', 'Connection to Binance lost. Binance may be in maintenance, '+ execution.instrument+' trading may be halted or you may have lost connection to the Internet. : Details: '  + err
+    ]);
+  } else {
+    self.postMessage([execId, 'STALLED']);
+    await sleep(1000 * 60 * 1); // 1 minute
+    paused = true;
+    await mutex.release();
+    let endpoints = binance.websockets.subscriptions();
+    for (let endpoint in endpoints) {
+      binance.websockets.terminate(endpoint);
+    }
+    self.postMessage([
+      execId, 'LOG', 'Resetting Binance connection for strategy ' + execution.strategy.name + ' on instrumnet ' + execution.instrument + '. Retry ' + startTries
+    ]);
+    await sleep(1000);
+    await mutex.release();
+    await sleep(4000);
+    lastUpdated = null;
+    startBinanceWebsocket();
+  }
+
+}
+
 async function verifyWebsocketIsAlive(timeframe) {
   let minutes = 1;
 
@@ -470,7 +499,13 @@ async function verifyWebsocketIsAlive(timeframe) {
         await lastUpdateMutex.release();
       }
       if (date < new Date()) {
-
+        startTries++;
+        if (startTries > maxRetries) {
+          self.postMessage([
+            execId, 'ERROR', 'Connection to Binance lost. Binance may be in maintenance, '+ execution.instrument+' trading may be halted or you may have lost connection to the Internet.'
+          ]);
+          return;
+        }
         paused = true;
         await mutex.release();
         let endpoints = binance.websockets.subscriptions();
@@ -478,7 +513,7 @@ async function verifyWebsocketIsAlive(timeframe) {
           binance.websockets.terminate(endpoint);
         }
         self.postMessage([
-          execId, 'LOG', 'Resetting Binance connection for strategy ' + execution.strategy.name + ' on instrumnet ' + execution.instrument + '..'
+          execId, 'LOG', 'Resetting Binance websocket listener for strategy ' + execution.strategy.name + ' on instrumnet ' + execution.instrument + '..'
         ]);
         await sleep(1000);
         await mutex.release();
@@ -545,13 +580,7 @@ async function startBinanceWebsocket() {
       }
       let lastDate = binance.last(chart);
       if (chart[lastDate] === undefined) {
-        paused = true;
-        lastUpdated = null;
-        startTries++;
-        let restart = startTries < 6
-          ? 'restart'
-          : null;
-        self.postMessage([execId, 'ERROR', 'Connection to Binance lost. Check Binance website for maintenance and try executing your strategy later.', restart]);
+        retryConnection('Binance API does not return realtime prices.');
         return;
       }
 
@@ -581,9 +610,7 @@ async function startBinanceWebsocket() {
           let bigTfTicks = await getBinanceTicks(getShortTimeframe(bigTf));
 
           if (bigTfTicks === null || bigTfTicks === undefined || bigTfTicks.length === 0) {
-            paused = true;
-            lastUpdated = null;
-            self.postMessage([execId, 'ERROR', 'Connection to Binance lost. Check Binance website for maintenance and try executing your strategy later.']);
+            retryConnection('Binance API does not return realtime prices.');
             return;
           }
           closePrices[bigTf] = [];
@@ -688,6 +715,7 @@ async function startBinanceWebsocket() {
                     }
                   } //Real trading - market buy
                   tradeType = 'sell';
+                  startTries = 0;
                   return;
                 } //Check BigTF only contains buy rules  bigTfEndDate !== lastCheckedDataBigTf
               } //checkTradeRules - buyRules
@@ -718,6 +746,7 @@ async function startBinanceWebsocket() {
                   await marketSell(execution, curPrice);
                 }
                 tradeType = 'buy';
+                startTries = 0;
                 return;
               } //checkTradeRules - sellRules
             } // tradeType === 'sell'
@@ -770,17 +799,12 @@ async function startBinanceWebsocket() {
         }
 
       }
+      startTries = 0;
     } catch (err2) {
-      //self.postMessage([execId, 'STALLED']);
-      paused = true;
-      lastUpdated = null;
-      self.postMessage([
-        execId, 'ERROR', 'Connection to Binance lost: Details: ' + err2.stack
-      ]);
+      retryConnection(err2.stack);
     } finally {
       await mutex.release();
     }
-
   });
 }
 
@@ -807,12 +831,14 @@ let binanceInstrumentsInfo = null;
 let paused = false;
 let startTries = 0;
 let lastUpdated = null;
+const maxRetries = 10;
 
 self.addEventListener('message', async function(e) {
   try {
     if (typeof e.data === 'string' && e.data === ('PAUSE')) {
       paused = true;
       lastUpdated = null;
+      startTries = 0;
       let endpoints = binance.websockets.subscriptions();
       for (let endpoint in endpoints) {
         binance.websockets.terminate(endpoint);

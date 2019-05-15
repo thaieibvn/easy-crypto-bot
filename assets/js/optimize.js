@@ -1,5 +1,4 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
-const os = require('os');
 
 async function opFillBinanceInstruments() {
   await getBinanceInstruments();
@@ -219,7 +218,7 @@ async function runOptimize() {
       $('#runOptBtn').removeClass('disabled');
       return;
     }
-    strategyNameToUse =strategy.name + ' (' + instrument + ' Opt.)';
+    strategyNameToUse = strategy.name + ' (' + instrument + ' Opt.)';
     $('#opRunPercent').html('Starting Optimization..');
     $('#opRunRemaining').html('&nbsp;');
     $('#opRunPercent2').hide();
@@ -707,17 +706,34 @@ function getRuleVariations(rule) {
           if (period >= period2) {
             continue;
           }
-          ruleVariations.push(createRuleVariation(rule, period, null, null, null, period2, null));
+          ruleVariations.push(createRuleVariation(rule, period, null, rule.crossDirection, null, period2, null));
+        }
+      }
+    }
+  } else if (rule.indicator === 'bb') {
+    if (rule.direction !== 'crossing') {
+      for (let period of bbPeriods) {
+        for (let period2 of bbPeriods2) {
+          for (let value of bbValues) {
+            ruleVariations.push(createRuleVariation(rule, period, value, null, null, period2, null));
+          }
+        }
+      }
+    } else {
+      for (let period of bbPeriods) {
+        for (let period2 of bbPeriods2) {
+          ruleVariations.push(createRuleVariation(rule, period, null, rule.crossDirection, null, period2, null));
         }
       }
     }
   }
+
   return ruleVariations;
 }
 
 let fineTuneMaxCycles = 3;
 
-let maPeriods = [10, 31, 42];
+let maPeriods = [10, 29, 48];
 let maValues = [1, 3];
 
 let rsiPeriods = [6, 15, 24];
@@ -727,6 +743,10 @@ let macdPeriods = [6, 15, 24];
 let macdPeriods2 = [10, 19, 28];
 let macdPeriods3 = [6, 15];
 let macdValues = [1, 3];
+
+let bbPeriods = [10, 29, 48];
+let bbPeriods2 = [1, 3];
+let bbValues = [1, 3];
 
 //Fina tune values
 
@@ -767,6 +787,22 @@ let macdPeriodsFineTune3 = [-1, 0, 1];
 let macdPeriods2FineTune3 = [-1, 0, 1];
 let macdPeriods3FineTune3 = [-1, 0, 1];
 let macdValuesFineTune3 = [0];
+
+let bbPeriodsFineTune = [];
+let bbPeriods2FineTune = [];
+let bbValuesFineTune = [];
+
+let bbPeriodsFineTune1 = [-5, 0, 5];
+let bbPeriods2FineTune1 = [-0.5, 0, 0.5];
+let bbValuesFineTune1 = [-0.5, 0, 0.5];
+
+let bbPeriodsFineTune2 = [-3, 0, 3];
+let bbPeriods2FineTune2 = [-0.25, 0, 0.25];
+let bbValuesFineTune2 = [-0.25, 0, 0.25];
+
+let bbPeriodsFineTune3 = [-1, 0, 1];
+let bbPeriods2FineTune3 = [-0.1, 0, 0.1];
+let bbValuesFineTune3 = [-0.1, 0, 0.1];
 
 let stoplossesFineTune0 = [2, 4.5, 7];
 let stoplossesFineTune1 = [-0.5, 0, 0.5];
@@ -835,17 +871,21 @@ function getRuleVariationsFineTune(rule) {
         for (let period of macdPeriodsFineTune) {
           for (let period2 of macdPeriods2FineTune) {
             let periodToUse = rule.period + period;
-            let periodToUse2 = rule.period + period2;
+            let periodToUse2 = rule.period2 + period2;
             if (periodToUse >= periodToUse2 || periodToUse < 2) {
               continue;
             }
             for (let period3 of macdPeriods3FineTune) {
+              let periodToUse3 = rule.period3 + period3;
+              if (periodToUse3 < 2) {
+                continue;
+              }
               for (let value of macdValuesFineTune) {
                 let valueToUse = rule.value + value;
                 if (valueToUse === 0) {
                   valueToUse = 0.1
                 }
-                ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, null, null, periodToUse2, period3));
+                ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, null, null, periodToUse2, periodToUse3));
               }
             }
           }
@@ -854,12 +894,16 @@ function getRuleVariationsFineTune(rule) {
         for (let period of macdPeriodsFineTune) {
           for (let period2 of macdPeriods2FineTune) {
             let periodToUse = rule.period + period;
-            let periodToUse2 = rule.period + period2;
+            let periodToUse2 = rule.period2 + period2;
             if (periodToUse >= periodToUse2 || periodToUse < 2) {
               continue;
             }
             for (let period3 of macdPeriods3FineTune) {
-              ruleVariations.push(createRuleVariation(rule, periodToUse, null, rule.crossDirection, null, periodToUse2, period3));
+              let periodToUse3 = rule.period3 + period3;
+              if (periodToUse3 < 2) {
+                continue;
+              }
+              ruleVariations.push(createRuleVariation(rule, periodToUse, null, rule.crossDirection, null, periodToUse2, periodToUse3));
             }
           }
         }
@@ -868,15 +912,52 @@ function getRuleVariationsFineTune(rule) {
       for (let period of macdPeriodsFineTune) {
         for (let period2 of macdPeriods2FineTune) {
           let periodToUse = rule.period + period;
-          let periodToUse2 = rule.period + period2;
+          let periodToUse2 = rule.period2 + period2;
           if (periodToUse >= periodToUse2 || periodToUse < 2) {
             continue;
           }
-          ruleVariations.push(createRuleVariation(rule, periodToUse, null, null, null, periodToUse2, null));
+          ruleVariations.push(createRuleVariation(rule, periodToUse, null, rule.crossDirection, null, periodToUse2, null));
         }
       }
     }
 
+  } else if (rule.indicator === 'bb') {
+
+    if (rule.direction !== 'crossing') {
+      for (let period of bbPeriodsFineTune) {
+        let periodToUse = rule.period + period;
+        if (periodToUse < 2) {
+          continue;
+        }
+        for (let period2 of bbPeriods2FineTune) {
+          let periodToUse2 = rule.period2 + period2;
+          if (periodToUse2 <= 0) {
+            continue;
+          }
+          for (let value of bbValuesFineTune) {
+            let valueToUse = rule.value + value;
+            if (valueToUse === 0) {
+              valueToUse = 0.1
+            }
+            ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, null, null, periodToUse2, null));
+          }
+        }
+      }
+    } else {
+      for (let period of bbPeriodsFineTune) {
+        let periodToUse = rule.period + period;
+        if (periodToUse < 2) {
+          continue;
+        }
+        for (let period2 of bbPeriods2FineTune) {
+          let periodToUse2 = rule.period2 + period2;
+          if (periodToUse2 <= 0) {
+            continue;
+          }
+          ruleVariations.push(createRuleVariation(rule, periodToUse, null, rule.crossDirection, null, periodToUse2, null));
+        }
+      }
+    }
   }
 
   return ruleVariations;
@@ -904,6 +985,9 @@ function getRulesVariations(rules, fineTune) {
         macdPeriods2FineTune = macdPeriods2FineTune1;
         macdPeriods3FineTune = macdPeriods3FineTune1;
         macdValuesFineTune = macdValuesFineTune1;
+        bbPeriodsFineTune = bbPeriodsFineTune1;
+        bbPeriods2FineTune = bbPeriods2FineTune1;
+        bbValuesFineTune = bbValuesFineTune1;
         ruleVariations = getRuleVariationsFineTune(rule);
         break;
       case 2:
@@ -915,6 +999,9 @@ function getRulesVariations(rules, fineTune) {
         macdPeriods2FineTune = macdPeriods2FineTune2;
         macdPeriods3FineTune = macdPeriods3FineTune2;
         macdValuesFineTune = macdValuesFineTune2;
+        bbPeriodsFineTune = bbPeriodsFineTune2;
+        bbPeriods2FineTune = bbPeriods2FineTune2;
+        bbValuesFineTune = bbValuesFineTune2;
         ruleVariations = getRuleVariationsFineTune(rule);
         break;
       case 3:
@@ -926,6 +1013,9 @@ function getRulesVariations(rules, fineTune) {
         macdPeriods2FineTune = macdPeriods2FineTune3;
         macdPeriods3FineTune = macdPeriods3FineTune3;
         macdValuesFineTune = macdValuesFineTune3;
+        bbPeriodsFineTune = bbPeriodsFineTune3;
+        bbPeriods2FineTune = bbPeriods2FineTune3;
+        bbValuesFineTune = bbValuesFineTune3;
         ruleVariations = getRuleVariationsFineTune(rule);
         break;
       default:
@@ -1038,7 +1128,6 @@ function getStrategyVariations(strategy, fineTune, stoplossVariations) {
   try {
     let buyRulesVariations = getRulesVariations(strategy.buyRules, fineTune);
     let sellRulesVariations = getRulesVariations(strategy.sellRules, fineTune);
-
     let strategiesWithBuyRuleVariations = [];
     let strategiesWithBuySellRuleVariations = [];
     for (let ruleVariations of buyRulesVariations[0]) {
@@ -1103,7 +1192,7 @@ function getStrategyVariations(strategy, fineTune, stoplossVariations) {
     }
 
   } catch (err) {
-    alert(err.stack)
+    log('error', 'getStrategyVariations', err.stack);
   }
 }
 
@@ -1197,23 +1286,23 @@ async function fillOptimizationResult(marketReturn) {
       : marketReturn < 0
         ? 'text-red'
         : '';
-        //'Tested ' + strategyVariationsTested + ' variations.
-    if(strategyVariationsResults.length > 0) {
-    $('#opResultH').html('Showing top 100 of the optimized strategies. Market Return for the same period: <span class="' + marketReturnClass + '">' + marketReturn.toFixed(2) + '%</span>');
-    $('#opStrategiesTable').show();
-  } else {
-    $('#opResultH').html('The optimiaztion didn\'t generate any strategies with positive return.');
-    $('#opStrategiesTable').hide();
-  }
+    //'Tested ' + strategyVariationsTested + ' variations.
+    if (strategyVariationsResults.length > 0) {
+      $('#opResultH').html('Showing top 100 of the optimized strategies. Market Return for the same period: <span class="' + marketReturnClass + '">' + marketReturn.toFixed(2) + '%</span>');
+      $('#opStrategiesTable').show();
+    } else {
+      $('#opResultH').html('The optimiaztion didn\'t generate any strategies with positive return.');
+      $('#opStrategiesTable').hide();
+    }
 
     await terminateOpWorkers();
     strategyVariations = [];
-    let resTmp=[]
-    for(let i=0;i<Math.min(rowsShown, strategyVariationsResults.length);i++){
+    let resTmp = []
+    for (let i = 0; i < Math.min(rowsShown, strategyVariationsResults.length); i++) {
       resTmp.push(strategyVariationsResults[0]);
     }
     strategyVariationsResults = [];
-    strategyVariationsResults=resTmp;
+    strategyVariationsResults = resTmp;
     $('#opRunning').hide();
     $('#opResult').show();
   } catch (err) {

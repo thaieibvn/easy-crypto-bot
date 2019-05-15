@@ -181,11 +181,14 @@ async function checkMaxLossReached(id) {
   }
 
   if (result <= execution.maximumLoss) {
-    let errorMsg = 'Execution of ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + ' has reached the maximum loss of ' + execution.maximumLoss + ' ' + getQuotedCurrency(execution.instrument) + '. If you want to continue the execution, you have to edit the Max Loss field of the execution.';
+    let errorMsg = 'Max Loss of ' + execution.maximumLoss + ' ' + getQuotedCurrency(execution.instrument) + ' was reached for execution ' + execution.name + ' on ' + execution.exchange + ' for ' + execution.instrument + '. If you want to continue the execution, you have to edit the Max Loss field.';
     await stopStrategyExecution(id, errorMsg);
-    openModalInfoBig('<h3 class="text-center">Error</h3>' + errorMsg + '<br>The execution was stopped.');
+    openModalInfoBig('<h3 class="text-center">Max Loss Reached!</h3>' + errorMsg + '<br>The execution was stopped.');
     execution.error = errorMsg;
     await updateExecutionDb(execution);
+    if (execution.type === 'Trading') {
+      sendErrorMail(execution);
+    }
     return true;
   }
   return false;
@@ -199,7 +202,11 @@ function stalledInfo() {
 }
 
 function setStatusAndActions(id, status, errorMsg) {
-  if (status === 'Error') {
+
+  if (status === 'MaxLoss') {
+    $('#statusStr' + id).html('<span class="text-red">MaxLoss&nbsp;<a title="Show Error" href="#/" onclick="showErrorMsg(\'' + errorMsg + '\', ' + id + ')"><i class="fas fa-question-circle"></i></a></span>');
+    $('#actionsBtns' + id).html('<a title="Clear Error" href="#/" onclick="clearError(' + id + ')"><i class="fas fa-recycle"></i></a>&nbsp;&nbsp;<a title="Edit Execution" href="#/" onclick="editExecution(' + id + ')"><i class="far fa-edit"></i></a>&nbsp;&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-trash"></i></a>');
+  } else if (status === 'Error') {
     $('#statusStr' + id).html('<span class="text-red">Error&nbsp;<a title="Show Error" href="#/" onclick="showErrorMsg(\'' + errorMsg + '\', ' + id + ')"><i class="fas fa-question-circle"></i></a></span>');
     $('#actionsBtns' + id).html('<a title="Clear Error" href="#/" onclick="clearError(' + id + ')"><i class="fas fa-recycle"></i></a>&nbsp;&nbsp;<a title="Edit Execution" href="#/" onclick="editExecution(' + id + ')"><i class="far fa-edit"></i></a>&nbsp;&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-trash"></i></a>');
   } else if (status === 'Stopped') {
@@ -628,6 +635,90 @@ function sendEmail(execution, type, date, entry) {
   }, function(data, status) {});
 }
 
+var emailDb = null;
+function getEmailDb() {
+  if (emailDb === null) {
+    emailDb = new Datastore({
+      filename: getAppDataFolder() + '/db/email.db',
+      autoload: true
+    });
+  }
+  return emailDb;
+}
+
+function getEmailFromDb() {
+  return new Promise((resolve, reject) => {
+    getEmailDb().findOne({
+      id: 'trade-mail'
+    }, (error, result) => {
+      if (error) {
+        resolve(null);
+      } else {
+        if (result != null && result != undefined && result.email != null && result.email != undefined && result.email.length > 0 && result.email.indexOf('@') != -1) {
+          resolve(result.email);
+          return;
+        }
+        resolve(null);
+      }
+    })
+  });
+}
+
+function removeEmailFromDb() {
+  return new Promise((resolve, reject) => {
+    getEmailDb().remove({
+      id: 'trade-mail'
+    }, function(error, numDeleted) {
+      resolve(numDeleted);
+    })
+  });
+}
+
+function addEmailToDb(email) {
+  return new Promise((resolve, reject) => {
+    getEmailDb().insert({
+      id: 'trade-mail',
+      email: email
+    }, (error, srt) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(srt);
+      }
+    })
+  });
+}
+
+async function updateEmailDb(email) {
+  await removeEmailFromDb();
+  await addEmailToDb(email);
+}
+
+let sendNotifications = false;
+async function notifications() {
+  if (!sendNotifications) {
+    let email = await getEmailFromDb();
+    if (email == null) {
+      email = '';
+    }
+    openModalConfirm('<div class="text-justify">If you want to receive trading updates on your Real Trading strategies, please fill your email bellow:</div>' + '<input style="width:100%"class="search main-field white" id="emailBoxTmp" type="text" placeholder="E-mail to receive Notifications" value="' + email + '"/>', async function() {
+      email = $('#emailBoxTmp').val();
+      if (email.indexOf('@') === -1) {
+        openModalInfo('Please type a valid email!');
+        return;
+      }
+      await updateEmailDb(email);
+      await fillEmailField();
+      $('#notificationsBtn').html('<i class="text-red fas fa-stop"></i> Stop Notifications');
+      sendNotifications = true;
+    })
+  } else {
+    openModalInfo('Notifications are stopped!')
+    $('#notificationsBtn').html('<i class="text-green fas fa-play"></i> Start Notifications');
+    sendNotifications = false;
+  }
+}
+
 async function editTrStrategy() {
   try {
     let strategyName = $('#tsStrategyCombobox').text();
@@ -738,9 +829,7 @@ async function editExecution(id) {
 }
 
 function calculateUsdtValue(coin, total, prices) {
-  if (prices[coin + 'BTC'] !== undefined) {
-    return calculateUsdtValue('BTC', Number.parseFloat(prices[coin + 'BTC']) * total, prices)
-  } else if (coin === 'USDT') {
+  if (coin === 'USDT') {
     return total;
   } else if (coin === 'USDC') {
     return total;
@@ -754,11 +843,13 @@ function calculateUsdtValue(coin, total, prices) {
     return Number.parseFloat(prices['BTCUSDT']) * total;
   } else if (coin == 'BNB') {
     return Number.parseFloat(prices['BNBUSDT']) * total;
-  } else if (prices[coin + 'BNB'] !== undefined) {
-    return calculateUsdtValue('BNB', Number.parseFloat(prices[coin + 'BNB']) * total, prices)
   } else if (coin == 'ETH') {
     return Number.parseFloat(prices['ETHUSDT']) * total;
-  } else if (prices[coin + 'ETH'] !== undefined) {
+  } else if (prices[coin + 'BTC'] !== undefined) {
+    return calculateUsdtValue('BTC', Number.parseFloat(prices[coin + 'BTC']) * total, prices)
+  } else if (prices[coin + 'BNB'] !== undefined) {
+    return calculateUsdtValue('BNB', Number.parseFloat(prices[coin + 'BNB']) * total, prices)
+  }  else if (prices[coin + 'ETH'] !== undefined) {
     return calculateUsdtValue('ETH', Number.parseFloat(prices[coin + 'ETH']) * total, prices)
   } else {
     return 0;
@@ -803,13 +894,72 @@ async function fillBinanceBalances() {
       fillPosSizePercent(totalUsdt, prices);
       $('#binanceBalanceTable').html('');
       for (let row of totalBalances) {
-        $('#binanceBalanceTable').append('<tr><td>' + row.coin + '</td><td>' + row.total + '</td><td>' + row.available + '</td><td>' + row.onOrder + '</td><td>' + row.usdt.toFixed(2) + '</td></tr>')
+        let pecentOfAcc = (row.usdt / totalUsdt) * 100;
+        $('#binanceBalanceTable').append('<tr><td>' + row.coin + '</td><td>' + row.total + '</td><td>' + row.available + '</td><td>' + row.onOrder + '</td><td>$' + row.usdt.toFixed(2) + '</td><td>' + pecentOfAcc.toFixed(2) + '%</td></tr>')
       }
     }
   } catch (err) {
     log('error', 'fillBinanceBalances', err.stack)
   } finally {
     await balanceMutex.release();
+  }
+}
+
+async function sendErrorMail(execution) {
+  try {
+    let email = await getEmailFromDb();
+    if (!sendNotifications || email == null) {
+      return;
+    }
+    let text = 'The execution of strategy "' + execution.strategy.name + '" on instrument ' + execution.instrument + ' was stopped due to the following event:<br><br>' + execution.error;
+
+    $.post("https://easycryptobot.com/mail-error-sender.php", {
+      f: 'ecb',
+      m: email,
+      t: text
+    }, function(data, status) {});
+  } catch (err) {
+    log('error', 'sendErrorMail', err.stack);
+  }
+}
+
+async function sendTradeMail(execution) {
+  try {
+    let email = await getEmailFromDb();
+    if (!sendNotifications || email == null) {
+      return;
+    }
+    let trade = execution.trades[execution.trades.length - 1];
+    let text = '';
+    if (trade.exit != undefined && trade.exit != null) {
+      text = 'The execution of strategy "' + execution.strategy.name + '" on instrument ' + execution.instrument + ' has sold ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' at ' + trade.exit.toFixed(8) + ', resulting in ' + trade.result.toFixed(2) + '% ~ ' + trade.resultMoney.toFixed(8) + ' ' + getQuotedCurrency(execution.instrument);
+    } else {
+      text = 'The execution of strategy ' + execution.strategy.name + ' on instrument ' + execution.instrument + ' has bought ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' at ' + trade.entry.toFixed(8);
+    }
+    let executions = await getExecutionsFromDb();
+    let executionsText = '';
+    for (let executionTmp of executions) {
+      if (executionTmp.type === 'Trading') {
+        let result = 0;
+        let resultMoney = 0;
+        for (let trade of executionTmp.trades) {
+          if (trade.exit == undefined || trade.exit == null) {
+            continue;
+          }
+          result += trade.result;
+          resultMoney += trade.resultMoney;
+        }
+        executionsText += '<tr><td>' + executionTmp.strategy.name + '</td><td>' + executionTmp.exchange + '</td><td>' + executionTmp.instrument + '</td><td>' + executionTmp.trades.length + '</td><td>' + result.toFixed(2) + '%</td><td>' + resultMoney.toFixed(8) + ' ' + getQuotedCurrency(executionTmp.instrument) + '</td></tr>';
+      }
+    }
+    $.post("https://easycryptobot.com/mail-trade-sender.php", {
+      f: 'ecb',
+      m: email,
+      t: text,
+      e: executionsText
+    }, function(data, status) {});
+  } catch (err) {
+    log('error', 'sendTradeMail', err.stack);
   }
 }
 
@@ -995,7 +1145,6 @@ async function hasStrategyOpenTrades(name) {
 }
 
 async function executeStrategy() {
-
   try {
     await executionMutex.lock();
     let runningExecutions = $('#tsStrategiesTable tr').length - 1; //First tr is the header
@@ -1013,6 +1162,9 @@ async function executeStrategy() {
 
     if (email.indexOf('@') === -1) {
       email = null;
+    } else {
+      await updateEmailDb(email);
+      await fillEmailField();
     }
     if (strategyName === 'Choose Strategy') {
       openModalInfo('Please Choose a Strategy!');
@@ -1231,23 +1383,15 @@ async function runStrategy(id) {
               openModalInfoBig(errMsg);
               break;
             case 'ERROR':
-              if (additionalData === 'restart') {
-                for (let worker of executionWorkers) {
-                  if (worker.execId == id) {
-                    worker.wk.postMessage('PAUSE');
-                    await sleep(2000);
-                    worker.wk.postMessage('RESUME');
-                    break;
-                  }
-                }
-                return;
-              }
               let errorMsg = data.replace(/[^a-z0-9 !,.;:()-_=+]/gi, ' ') + '<br><br>The execution of the strategy was stopped!';
               await stopStrategyExecution(id, errorMsg);
               execution.error = errorMsg;
               await updateExecutionDb(execution);
               showErrorMsg(errorMsg, id);
               log('error', 'runStrategy webworker listener', errorMsg);
+              if (execution.type === 'Trading') {
+                sendErrorMail(execution);
+              }
               break;
             case 'LAST_UPDATED':
               $('#lastUpdatedExecution' + id).html(formatDateNoYear(new Date()));
@@ -1293,6 +1437,7 @@ async function runStrategy(id) {
               $('#openTrade' + id).html('<i class="fa fa-check"></i>');
               if (execution.type === 'Trading') {
                 fillBinanceBalances();
+                sendTradeMail(execution);
               }
               break;
             case 'SELL':
@@ -1311,6 +1456,7 @@ async function runStrategy(id) {
                 await checkMaxLossReached(id);
                 if (execution.type === 'Trading') {
                   fillBinanceBalances();
+                  sendTradeMail(execution);
                 }
               }
               break;
@@ -1355,7 +1501,9 @@ async function stopStrategyExecution(id, errorMsg, dontWait, terminate) {
     await sleep(1000);
   }
 
-  if (errorMsg !== null && errorMsg !== undefined) {
+  if (errorMsg !== null && errorMsg !== undefined && errorMsg.indexOf('Max Loss') == 0) {
+    setStatusAndActions(id, 'MaxLoss', errorMsg);
+  } else if (errorMsg !== null && errorMsg !== undefined) {
     setStatusAndActions(id, 'Error', errorMsg);
   } else {
     setStatusAndActions(id, 'Stopped');
@@ -1499,10 +1647,13 @@ async function manualCloseOpenTrade(id) {
         openModalInfoBig("Cannot close trade in Real Trading mode without connection to the exchange via your API Key and Secret!");
       });
       $('#closeOpenTradeBtn').removeClass('disabled');
+      manuallyClosingTrade = false;
       return;
     } else {
       let finalPrice = await binanceMarketSell(execution)
       if (finalPrice == null) {
+        $('#closeOpenTradeBtn').removeClass('disabled');
+        manuallyClosingTrade = false;
         return;
       }
 
@@ -1532,11 +1683,14 @@ async function manualCloseOpenTrade(id) {
 
 async function saveEditExecutionWindow(id) {
   try {
-    showLoading();
-    while (manuallyClosingTrade) {
-      await sleep(500);
-    }
     let execution = await getExecutionById(id);
+    if (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit == null || execution.trades[execution.trades.length - 1].exit == undefined)) {
+      showLoading();
+      while (manuallyClosingTrade) {
+        await sleep(500);
+      }
+      execution = await getExecutionById(id);
+    }
     if (execution.type === 'Alerts') {
       let email = $('#executionEmailEdit').val();
       if (email.indexOf('@') === -1) {
@@ -1555,7 +1709,7 @@ async function saveEditExecutionWindow(id) {
         }
         positionSize = posCheck[1];
         if (execution.positionSize !== positionSize && (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit == null || execution.trades[execution.trades.length - 1].exit == undefined))) {
-          openModalInfoBig('<h3 class="text-center">Error</h3>Editing of the position size is forbidden while there is an open trade on the execution.<br>You need to click on the "Close Open Trade" button before changing the position size!');
+          openModalInfoBig('<h3 class="text-center">Error</h3>Editing the position size is not allowed while there is an open trade.<br>Click on the "Close Open Trade" button before changing the position size!');
           return;
         }
         execution.positionSize = positionSize;
@@ -1567,7 +1721,7 @@ async function saveEditExecutionWindow(id) {
           return;
         }
         if (execution.positionSizeQuoted !== positionSizeQuoted && (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit == null || execution.trades[execution.trades.length - 1].exit == undefined))) {
-          openModalInfoBig('<h3 class="text-center">Error</h3>Editing of the position size is forbidden while there is an open trade on the execution.<br>You need to click on the "Close Open Trade" button before changing the position size!');
+          openModalInfoBig('<h3 class="text-center">Error</h3>Editing the position size is not allowed while there is an open trade.<br>Click on the "Close Open Trade" button before changing the position size!');
           return;
         }
         execution.positionSizeQuoted = positionSizeQuoted;
@@ -1635,3 +1789,12 @@ async function updateExecutionStrategy(name, orgName) {
     }
   }
 }
+
+async function fillEmailField() {
+  let email = await getEmailFromDb();
+  if (email != null) {
+    $('#emailBox').val(email);
+    $('#bugEmail').val(email);
+  }
+}
+fillEmailField();

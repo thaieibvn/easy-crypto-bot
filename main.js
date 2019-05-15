@@ -13,7 +13,7 @@ global.optimizatin = {
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow;
-app.disableHardwareAcceleration();
+//app.disableHardwareAcceleration();
 //app.commandLine.appendSwitch('enable-transparent-visuals');
 //app.commandLine.appendSwitch('disable-gpu');
 function createWindow() {

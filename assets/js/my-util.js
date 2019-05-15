@@ -1,6 +1,8 @@
 const Datastore = require('nedb');
 const shell = require('electron').shell;
 const {app, BrowserWindow, clipboard, remote} = require('electron');
+const os = require('os');
+
 const Highcharts = require('highcharts/highstock');
 //require('highcharts/indicators/indicators')(Highcharts);
 //require('highcharts/indicators/ema')(Highcharts);
@@ -140,7 +142,7 @@ function hideLoading() {
       $('#wrapper').css('pointer-events', 'auto');
       $('#sidebar').css('opacity', '1');
       $('#sidebar').css('pointer-events', 'auto');
-    }else {
+    } else {
       $('#footer').css('opacity', '0.5');
       $('#wrapper').css('opacity', '0.5');
     }
@@ -277,6 +279,9 @@ function showUpdateMsg(curVersion, latestVersion) {
 
 async function checkForUpdates(data, showUpdate, showNoUpdate) {
   let curVersion = remote.app.getVersion();
+  if (curVersion.indexOf('BETA') != -1) {
+    return;
+  }
   $.ajax({
     type: 'get',
     url: 'https://easycryptobot.com/version.html',
@@ -570,11 +575,14 @@ async function fillBugLogs() {
   } catch (err) {}
 }
 
-function reportBug(e) {
+async function reportBug(e) {
   e.preventDefault();
   let mail = $('#bugEmail').val();
-  if (mail == null || mail == undefined || mail.length == 0) {
+  if (mail == null || mail == undefined || mail.length == 0 || mail.indexOf('@') == -1) {
     mail = 'unknown';
+  } else {
+    await updateEmailDb(mail);
+    fillEmailField();
   }
 
   let desc = $('#bugDesc').val();
@@ -589,7 +597,10 @@ function reportBug(e) {
 
   openModalInfo("Your BUG report was sent!<br>Thank you for improving EasyCryptoBot!");
 
-  let logs = $('#bugLogs').val().replace(/(?:\r\n|\r|\n)/g, '<br>');
+  let logs = 'App Version: ' + remote.app.getVersion() + '<br>';
+  logs += 'OS: ' + os.platform() + ' ' + os.type() + ' ' + os.release() + '<br>';
+  logs += 'Logs: ' + $('#bugLogs').val().replace(/(?:\r\n|\r|\n)/g, '<br>');
+
   $('#bugLogs').html("No logs available!");
   $('#bugDesc').val('');
   $.post("https://easycryptobot.com/mail-bug.php", {
@@ -603,7 +614,7 @@ function reportBug(e) {
 
 function clearLogs(e) {
   e.preventDefault();
-  openModalConfirmYes('Are you sure you want to clear the logs?', function(){
+  openModalConfirmYes('Are you sure you want to clear the logs?', function() {
     try {
       $('#bugLogs').html("No logs available!");
       fs.writeFileSync(getLogFilename(), '', 'utf-8');

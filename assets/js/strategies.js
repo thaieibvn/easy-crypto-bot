@@ -93,7 +93,7 @@ function parseRules(rules) {
       if (indicator === 'sma' || indicator === 'ema') {
         ruleItem.period = period;
         ruleItem.direction = direction;
-        if (isNaN(period) || period < 1) {
+        if (isNaN(period) || period <= 1) {
           openModalInfo('Please fill all moving average fields with correct values!');
           return null;
         }
@@ -110,7 +110,7 @@ function parseRules(rules) {
       } else if (indicator === 'cma') {
         ruleItem.period = period;
         ruleItem.period2 = period2;
-        if (isNaN(period) || isNaN(period2) || period < 1 || period2 < 1) {
+        if (isNaN(period) || isNaN(period2) || period <= 1 || period2 <= 1) {
           openModalInfo('Please fill all moving average fields with correct values!');
           return null;
         }
@@ -121,7 +121,7 @@ function parseRules(rules) {
         ruleItem.period = period;
         ruleItem.direction = direction;
         ruleItem.value = value;
-        if (isNaN(period) || isNaN(value) || period < 1 || value < 0) {
+        if (isNaN(period) || isNaN(value) || period <= 1 || value <= 0) {
           openModalInfo('Please fill all RSI fields with correct values!');
           return null;
         }
@@ -129,7 +129,7 @@ function parseRules(rules) {
           ruleItem.crossDirection = crossDirection;
         }
       } else if (indicator === 'macd') {
-        if (isNaN(period) || isNaN(period2) || period < 1 || period2 < 1) {
+        if (isNaN(period) || isNaN(period2) || period <= 1 || period2 <= 1) {
           openModalInfo('Please fill all MACD fields with correct values!');
           return null;
         }
@@ -152,11 +152,30 @@ function parseRules(rules) {
         ruleItem.type = $(rule).find('.macd-line').text();
         if (ruleItem.type === 'signal line') {
           let period3 = Number.parseInt($(rule).find('.period3').val());
-          if (isNaN(period3) || period3 < 1) {
+          if (isNaN(period3) || period3 <= 1) {
             openModalInfo('Please fill all MACD fields with correct values!');
             return null;
           }
           ruleItem.period3 = period3;
+        }
+      } else if (indicator === 'bb') {
+        period2 = Number.parseFloat($(rule).find('.period2').val());
+        if (isNaN(period) || isNaN(period2) || period <= 1 || period2 <= 0) {
+          openModalInfo('Please fill all Bollinger Bands fields with correct values!');
+          return null;
+        }
+        ruleItem.period = period;
+        ruleItem.period2 = period2;
+        ruleItem.type = $(rule).find('.bb-line').text();
+        ruleItem.direction = direction;
+        if (direction === 'crossing') {
+          ruleItem.crossDirection = crossDirection;
+        } else {
+          ruleItem.value = value;
+          if (isNaN(value)) {
+            openModalInfo('Please fill all Bollinger Bands fields with correct values!');
+            return null;
+          }
         }
       }
       parsedRules.push(ruleItem);
@@ -212,21 +231,21 @@ async function saveStrategy() {
   }
 
   let stoploss = Number.parseFloat($('#stoploss').val());
-  if (!isNaN(stoploss) && stoploss < 0.5) {
-    openModalInfo('The stoploss cannot be less than 0.5');
+  if (!isNaN(stoploss) && stoploss < 0.25) {
+    openModalInfo('The stoploss cannot be less than 0.25');
     return;
   }
   let trailingSl = Number.parseFloat($('#trailingSl').val());
-  if (!isNaN(trailingSl) && trailingSl < 0.5) {
-    openModalInfo('The trailing stoploss cannot be less than 0.5');
+  if (!isNaN(trailingSl) && trailingSl < 0.25) {
+    openModalInfo('The trailing stoploss cannot be less than 0.25');
     return;
   }
   if (!isNaN(trailingSl)) {
     stoploss = null;
   }
   let target = Number.parseFloat($('#target').val());
-  if (!isNaN(target) && target < 0.5) {
-    openModalInfo('The target cannot be less than 0.5');
+  if (!isNaN(target) && target < 0.25) {
+    openModalInfo('The target cannot be less than 0.25');
     return;
   }
 
@@ -371,6 +390,15 @@ function addNewRsiRule(id, type) {
 function addNewMacdRule(id, type) {
   $('#' + type + 'Rules>ul').append('<li class="' + type + '-macd" id="' + id + '"><span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe MACD, using "fast" period <input class="period" type="number" value="12" /> and "slow" period <input class="period2" type="number" value="26"/>,&nbsp;is&nbsp;<div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li><li><a href="#/" onclick="dropDownItem(\'bellow\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">bellow</a></li><li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').hide();$(\'#' + id + 'C\').show()})">crossing</a></li></ul></div>&nbsp;<div id="' + id + 'Line" class="inline"><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'Line\')"><span class="name macd-line">signal line</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'signal line\', \'#' + id + 'Line\', function(){$(\'#' + id + 'SL\').show()})">signal line</a></li><li><a href="#/" onclick="dropDownItem(\'zero\', \'#' + id + 'Line\',function(){$(\'#' + id + 'SL\').hide()})">zero</a></li></ul></div></div><div id="' + id + 'SL" class="inline">&nbsp;with period <input class="period3" type="number" value="9"/> <div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="1" /> %</div></div><div id="' + id + 'C" class="inline" style="display:none;"> from <div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li><li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li></ul></div></div>&nbsp;<a title="Info" onclick="macdInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a></li>');
 }
+
+function addNewBBRule(id, type) {
+  $('#' + type + 'Rules>ul').append('<li class="' + type + '-bb" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe the price is ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'bellow\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">bellow</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show();$(\'#' + id + 'P\').hide()})">crossing</a></li>' + '</ul>' + '</div>' + '&nbsp;the&nbsp;<div id="' + id + 'Line" class="inline"><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'Line\')"><span class="name bb-line">upper band</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'upper band\', \'#' + id + 'Line\', function(){})">upper band</a></li><li><a href="#/" onclick="dropDownItem(\'lower band\', \'#' + id + 'Line\',function(){})">lower band</a></li></ul></div></div>&nbsp;of Bollinger Bands with period <input class="period" type="number" value="20" /> ' + '&nbsp;and Std. Dev. <input class="period2" type="number" value="2"/>&nbsp;' + '<div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="1" /> %</div>' + '<div id="' + id + 'C" class="inline" style="display:none;"> from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '</div>' + '&nbsp;<a title="Info" onclick="bbInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
+}
+
+function bbInfo() {
+  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">Bollinger Bands is a tool that plots two standard deviations (positively and negatively) away from a simple moving average (SMA) of the price.<br>The purpose of Bollinger Bands is to provide a relative definition of high and low prices of a market. Many traders believe the closer the prices move to the upper band, the more overbought the market, and the closer the prices move to the lower band, the more oversold the market.<br>The author of the indicator John Bollinger has a set of 22 rules to follow when using the bands as a trading system.</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/bb-info.png\" alt=\"\">");
+}
+
 function macdInfo() {
   openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">MACD, short for Moving Average Convergence/Divergence, is a trend-following momentum indicator.The MACD is the difference between a \"fast\" (short period) exponential moving average (EMA), and a \"slow\" (longer period) EMA. An EMA of the MACD that is called \"signal line\" is plotted on top of the MACD.<br><br>Signal Line Crossovers<br>Signal line crossovers are the most common MACD signals. A BUY signal is when MACD turns up and crosses above the signal line.<br><br>Center Line Crossovers<br>Center line crossovers are the next most common MACD signals. A bullish signal is generated when when the MACD Line moves above the zero line to turn positive.</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/macd-info.png\" alt=\"\">");
 }
@@ -393,6 +421,14 @@ function rsiInfo() {
 
 function timeCloseInfo() {
   openModalInfoBig("The Time Close field will close each position if your selling rules were not met or if the stoploss and the target were not reached within the provided timeframe. For example if you put '24' in this field all your positions will be closed 24 hours after they were opened automatically even the selling rules were not met. Should be whole hour - cannot have decimals and will be rounded.");
+}
+
+function targetInfo() {
+  openModalInfoBig("If you provide a target the bot will place a LIMIT SELL order on the exchange to ensure the desired percent.");
+}
+
+function stoplossInfo() {
+  openModalInfoBig("If the stoploss is reached the bot will execute a MARKET SELL order. Please note that if the bot is not running the stoploss order will not be placed! ");
 }
 
 function indicatorCommingSoon(name) {
@@ -434,6 +470,8 @@ function newRule(id, type, direction) {
     addNewRsiRule(id, direction);
   } else if (type === 'macd') {
     addNewMacdRule(id, direction);
+  } else if (type === 'bb') {
+    addNewBBRule(id, direction);
   } else {
     indicatorCommingSoon(type)
   }
@@ -495,7 +533,7 @@ function openStrategyVariationStrategy(strategy) {
   openStrategy(strategy)
 }
 
-function openStrategy(strategy) {
+function openStrategy(strategy, hideSaveBtn) {
   try {
     clearStrategyFields();
     $("#newStrategyWindowDiv").animate({
@@ -572,6 +610,19 @@ function openStrategy(strategy) {
         } else {
           $(id).find('.value').val(rule.value);
         }
+      } else if (rule.indicator === 'bb') {
+        $(id).find('.period').val(rule.period);
+        $(id).find('.period2').val(rule.period2);
+        $(id).find('.direction').text(rule.direction);
+        $(id).find('.bb-line').text(rule.type);
+
+        if (rule.direction === 'crossing') {
+          $(id + 'C').show();
+          $(id + 'P').hide();
+          $(id).find('.cross-direction').text(rule.crossDirection);
+        } else {
+          $(id).find('.value').val(rule.value);
+        }
       }
     });
     buyRuleType = buyRuleTypeTmp;
@@ -628,9 +679,31 @@ function openStrategy(strategy) {
         } else {
           $(id).find('.value').val(rule.value);
         }
+      } else if (rule.indicator === 'bb') {
+        $(id).find('.period').val(rule.period);
+        $(id).find('.period2').val(rule.period2);
+        $(id).find('.direction').text(rule.direction);
+        $(id).find('.bb-line').text(rule.type);
+
+        if (rule.direction === 'crossing') {
+          $(id + 'C').show();
+          $(id + 'P').hide();
+          $(id).find('.cross-direction').text(rule.crossDirection);
+        } else {
+          $(id).find('.value').val(rule.value);
+        }
       }
     });
     sellRuleType = sellRuleTypeTmp;
+
+    if (hideSaveBtn) {
+      $('#saveStrategyBtn').addClass('disabled');
+      $('#saveStrategyDisabled').show();
+      openModalInfo('The strategy "' + name + '" is currently running.<br>Please stop the execution and then try to edit.');
+    } else {
+      $('#saveStrategyBtn').removeClass('disabled')
+      $('#saveStrategyDisabled').hide();
+    }
 
   } catch (err) {
     log('error', 'openStrategy', err.stack);
@@ -639,10 +712,6 @@ function openStrategy(strategy) {
 
 async function editStrategy(name) {
   let isRunnig = await isStrategyRunning(name);
-  if (isRunnig) {
-    openModalInfo('The strategy "' + name + '" is currently running.<br>Please stop the execution and then try to edit it.');
-    return;
-  }
 
   let isUsedInExecutions = await isStrategyUsedInExecutions(name);
 
@@ -652,8 +721,8 @@ async function editStrategy(name) {
   $('#duplicateStrategyBtn').css('display', 'inline-block');
   const strategy = await getStrategyByName(name);
   lastTFUsed = 'Choose Timeframe';
-  openStrategy(strategy);
-  if (isUsedInExecutions) {
+  openStrategy(strategy, isRunnig);
+  if (isUsedInExecutions && !isRunnig) {
     openModalInfo('Please note that the strategy "' + name + '" is currently in the "Executions" list under the Traging tab. Your changes will apply to the execution as well.');
   }
 }
@@ -706,12 +775,24 @@ async function rmStrategy2(name) {
   }
 }
 
+function openBacktestStrategy(name) {
+  $('#btStrategyCombobox').html(name);
+  sectionClick('#backtest');
+  $(window).scrollTop(0);
+}
+
+function openOptimizeStrategy(name) {
+  $('#opStrategyCombobox').html(name);
+  sectionClick('#optimize');
+  $(window).scrollTop(0);
+}
+
 async function loadStrategies() {
   try {
     const strategies = await getStrategies();
-    $('#strategiesTable').html('');
+    $('#strategiesTable tbody').html('');
     strategies.forEach(function(d) {
-      $('#strategiesTable').append('<tr><td>' + d.name + '<td><td><a title="Edit Strategy" href="#newStrategyLabel" onclick="editStrategy(\'' + d.name + '\')" ><i class="far fa-edit"></i></a><td><td><a title="Remove Strategy" href="#/" onclick="rmStrategy(\'' + d.name + '\')"><i class="fas fa-trash"></i></a></td></tr>');
+      $('#strategiesTable tbody').append('<tr><td>' + d.name + '</td><td class="text-center"><a title="Edit Strategy" href="#newStrategyLabel" onclick="editStrategy(\'' + d.name + '\')" ><i class="far fa-edit"></i></a>' + '&nbsp;&nbsp;&nbsp;<a title="Backtest Strategy" href="#/" onclick="openBacktestStrategy(\'' + d.name + '\')" ><i class="fas fa-chart-line"></i></a>' + '&nbsp;&nbsp;&nbsp;<a title="Optimize Strategy" href="#/" onclick="openOptimizeStrategy(\'' + d.name + '\')" ><i class="fas fa-cogs"></i></a>' + '&nbsp;&nbsp;&nbsp;<a title="Remove Strategy" href="#/" onclick="rmStrategy(\'' + d.name + '\')"><i class="fas fa-trash"></i></a></td></tr>');
     });
   } catch (err) {
     log('error', 'loadStrategies', err.stack);
