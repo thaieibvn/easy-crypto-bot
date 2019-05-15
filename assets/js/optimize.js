@@ -1359,7 +1359,7 @@ function opOptInfo() {
 }
 
 function opCpuInfo() {
-  openModalInfoBig('<div class="text-center"><h2>CPU Usage</h2></div><strong>One Core</strong> - uses only one CPU core. Will run slower but will not consume much CPU power.<br><strong>Half Cores</strong> - uses half of your CPU cores. Runs faster but you should close some of the running apps.<br><strong>All Cores</strong> - uses all of your CPU cores - 1. The fastest but you should close all other apps.');
+  openModalInfoBig('<div class="text-center"><h2>CPU Usage</h2></div><strong>One Core</strong> - uses only one CPU core. Will run slowly but will not consume much CPU power.<br><strong>1/2 Cores</strong> - uses 1/2 of your total CPU cores. Runs faster but consumes more resources.<br><strong>All Cores</strong> - uses all of your CPU cores - 1. The fastest option but it is recommended to avoid using additional applications when using this feature.');
 }
 
 function fillOpTestPeriod() {
