@@ -645,11 +645,11 @@ function binanceCancelOrder(instrument, orderId) {
 }
 
 async function binanceMarketSell(execution) {
-  if (binanceRealTrading == null) {
+  if (binanceRealTrading == null || execution == null || execution.trades.length == 0) {
     return null;
   }
   await binanceCancelOrder(execution.instrument, execution.takeProfitOrderId);
-  let positionSize = execution.positionSize
+  let positionSize = execution.trades[execution.trades.length - 1].posSize;
   let priceAndQty = await binanceGetOrderTradePrice(execution.instrument, execution.takeProfitOrderId, 'sell');
   if (priceAndQty !== null) {
     if (priceAndQty[1] === execution.positionSize) {
