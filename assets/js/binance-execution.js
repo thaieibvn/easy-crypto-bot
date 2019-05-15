@@ -40,7 +40,7 @@ function getPrecisionFromTickSize(tickSize) {
 
 async function getBinanceInstrumentsInfo(instrument) {
   if (binanceInstrumentsInfo === null) {
-    binanceInstrumentsInfo = {};
+    let binanceInstrumentsInfoTmp = {};
     return new Promise((resolve, reject) => {
       binance.useServerTime(function() {
         binance.exchangeInfo(function(error, data) {
@@ -59,8 +59,9 @@ async function getBinanceInstrumentsInfo(instrument) {
             }
             item.orderTypes = obj.orderTypes;
             item.precision = getPrecisionFromTickSize(item.tickSize);
-            binanceInstrumentsInfo[obj.symbol] = item;
+            binanceInstrumentsInfoTmp[obj.symbol] = item;
           }
+          binanceInstrumentsInfo = binanceInstrumentsInfoTmp;
           resolve(binanceInstrumentsInfo[instrument.toUpperCase()]);
         });
       });

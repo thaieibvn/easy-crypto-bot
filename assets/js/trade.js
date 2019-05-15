@@ -1683,14 +1683,11 @@ async function manualCloseOpenTrade(id) {
 
 async function saveEditExecutionWindow(id) {
   try {
-    let execution = await getExecutionById(id);
-    if (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit == null || execution.trades[execution.trades.length - 1].exit == undefined)) {
-      showLoading();
-      while (manuallyClosingTrade) {
-        await sleep(500);
-      }
-      execution = await getExecutionById(id);
+    showLoading();
+    while (manuallyClosingTrade) {
+      await sleep(500);
     }
+    let execution = await getExecutionById(id);
     if (execution.type === 'Alerts') {
       let email = $('#executionEmailEdit').val();
       if (email.indexOf('@') === -1) {
