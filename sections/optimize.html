@@ -47,7 +47,6 @@
           <br>
 
           <span class="inline-block min-width5" id="opPeriodFrom">Period from:&nbsp;</span><input class="white" id="opFromDate" type="date" />&nbsp;&nbsp;to:&nbsp;&nbsp;<input class="white" id="opToDate" type="date" />
-
           <div id="opStopLossTargetDiv" class="margin-t10 ">
             <span class="inline-block min-width10" id="opStopLossTarget">Stoploss &amp; Target:&nbsp;</span>
             <input type="radio" id="opChangeStoplossNo" name="opChangeStoploss" value="no" checked><label class="min-width10" for="opChangeStoplossNo">Don't change</label>
@@ -63,17 +62,23 @@
           <div>
             <span class="inline-block min-width10" id="opOptType">&nbsp;</span>
             <div class="inline-block">
-              <input type="radio" id="opTypeRiskReward" name="opOpType" value="fine"> <label class="min-width10" for="opTypeRiskReward">Risk/Reward</label>
-              <input type="radio" id="opTypeSpikes" name="opOpType" value="fine"> <label for="opTypeSpikes">Spikes</label>
+              <input type="radio" id="opTypeRiskReward" name="opOpType" value="risk"> <label class="min-width10" for="opTypeRiskReward">Risk/Reward</label>
+              <input type="radio" id="opTypeSpikes" name="opOpType" value="spike"> <label for="opTypeSpikes">Spikes</label>
             </div>
           </div>
+
         </div>
       </div>
 
       <div class="text-center">
         <a id="runOptBtn" href="#/" onkeydown="opKeyDownDoNothing(event)" onclick="runOptimize(event)" class="button white margin-s-b30"><i class="text-green fas fa-play"></i> Optimize</a>
       </div>
-
+      <div class="text-center" id="opStopLossTargetDiv" class="margin-t10 ">
+        <span class="inline-block min-width10" id="opStopLossTarget">CPU Usage <a title="Info" onclick="opCpuInfo()" href="#/"><i class="fa fa-info-circle"></i></a> :&nbsp;</span>
+        <input type="radio" id="opOneCore" name="opCPUCores" value="one" ><label class="min-width10" for="opOneCore">One Core</label>
+        <input type="radio" id="opHalfCores" name="opCPUCores" value="half" checked><label class="min-width10" for="opHalfCores">Half Cores</label>
+        <input type="radio" id="opAllCores" name="opCPUCores" value="all"> <label for="opAllCores">All Cores</label>
+      </div>
       <div id="opResultDiv" class="display-none">
         <div id="opRunning">
           <h3 class="text-center" id="opRunPercent"></h3>

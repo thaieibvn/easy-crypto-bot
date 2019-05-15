@@ -311,13 +311,23 @@ async function runOptimize() {
     etaStr = '';
     etaLastNum = null;
     //Initialize webworkers
-    if (!webWorkersInitialized) {
-      let cpus = os.cpus().length;
+    let cpus = os.cpus().length;
+
+    let maxCPUs = cpus > 1
+      ? cpus - 1
+      : 1;
+    if ($('#opOneCore').is(':checked')) {
+      maxOpWorkers = 1;
+    } else if ($('#opHalfCores').is(':checked')) {
       maxOpWorkers = cpus > 1
         ? cpus / 2
         : 1;
+    } else {
+      maxOpWorkers = maxCPUs;
+    }
 
-      for (let i = 0; i < maxOpWorkers; i++) {
+    if (!webWorkersInitialized) {
+      for (let i = 0; i < maxCPUs; i++) {
         opExecutionWorkers[i] = new Worker("./assets/js/optimize-execution.js");
         opExecutionWorkers[i].addEventListener('error', async function(e) {
           log('error', 'opExecutionWorkers.EventListener error', e.message + '<br>' + e.filename + ' ' + e.lineno);
@@ -1347,8 +1357,9 @@ function openOpStrategy(index) {
 function opOptInfo() {
   openModalInfoBig('<h2 class="text-center">Optimize For:</h2><strong>Max Return</strong> - optimize the parameters to find the strategies that generate the highest return.<br><br>' + '<strong>Risk/Reward</strong> - optimize the parameters to find the strategies that generate the highest return for the lowest drawdown.<br><br>' + '<strong>Consistency</strong> - optimize the parameters to find the strategies that generate relatively consistent trades. Usually, those strategies generate less return as they are not designed to catch price spikes but they have more predictable results. Use this type for stable coins whithout too many spikes in the price.<br><br>' + '<strong>Spikes</strong> - optimize the parameters to find the strategies that are able to catch spikes in the price of the asset. Use this for coins that do not have a stable price and have many spikes in the price.');
 }
+
 function opCpuInfo() {
-  openModalInfoBig('<div class="text-center">CPU Use</div>1 Core - uses only 1 CPU core. Will run slower but will not consume much CPU power.<br>Half Cores - uses half of your CPU cores. Runs faster but you should close some of the running apps.<br>All Cores - uses all of your CPU cores. The fastest but you should close all other apps.');
+  openModalInfoBig('<div class="text-center"><h2>CPU Usage</h2></div><strong>One Core</strong> - uses only one CPU core. Will run slower but will not consume much CPU power.<br><strong>Half Cores</strong> - uses half of your CPU cores. Runs faster but you should close some of the running apps.<br><strong>All Cores</strong> - uses all of your CPU cores - 1. The fastest but you should close all other apps.');
 }
 
 function fillOpTestPeriod() {
