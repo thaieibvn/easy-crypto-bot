@@ -65,7 +65,7 @@ async function addOpResult(result) {
   try {
     await addOpResultMutex.lock();
     opCompleted++;
-    if (result !== null && result.totalReturn > 0) {
+    if (result !== null) {
       strategyVariationsResults.push(result);
     }
     return opCompleted;
@@ -78,6 +78,7 @@ let strategyVariations = [];
 let strategyVariationsTested = 0;
 let fineTune = 0;
 let strategyVariationsResults = [];
+let strategyVariationsIntermitBestResults = [];
 let opExecutionCanceled = false;
 let opExecutionWorkers = {};
 let opExecutedIndex = 0;
@@ -92,7 +93,7 @@ let startDate = null;
 let ticks = {};
 let feeRate = null;
 let optType = 'return';
-let stoplossVariations;
+let changeStoplossAndTarget;
 let etaLastDate = null;
 let etaStr = '';
 let etaLastNum = null;
@@ -205,7 +206,7 @@ async function runOptimize() {
     optType = 'spikes';
   }
 
-  stoplossVariations = $('#opChangeStoplossYes').is(':checked');
+  changeStoplossAndTarget = $('#opChangeStoplossYes').is(':checked');
 
   try {
     optimizationRunning = true;
@@ -244,6 +245,7 @@ async function runOptimize() {
     }
 
     let rulesNumber = strategy.buyRules.length + strategy.sellRules.length;
+
     if (rulesNumber > 5) {
       openModalInfo('The Optimization feature is not available for strategies that have more than 5 rules. If you want to use this feature, please, edit your strategy!');
       $('#runOptBtn').removeClass('disabled');
@@ -253,7 +255,7 @@ async function runOptimize() {
       return;
     }
 
-    if (stoplossVariations && rulesNumber > 4) {
+    if (changeStoplossAndTarget && rulesNumber > 4) {
       openModalInfo('The Stoploss & Target Change option is not available for strategies that have more than 4 rules. If you want to use this option, please, edit your strategy!');
       $('#runOptBtn').removeClass('disabled');
       $('#opRunning').hide();
@@ -296,14 +298,15 @@ async function runOptimize() {
     $('#opRunPercent').html('Optimization Execution: 0%');
     $('#opRunRemaining').html('&nbsp;');
     $('#opRunRocket').show();
-
     strategyVariations = [];
     fineTune = 0;
     strategyVariationsTested = 0;
-    strategyVariations = getStrategyVariations(strategy, fineTune, stoplossVariations);
+    setRulesVariationsPatterns(rulesNumber, changeStoplossAndTarget);
+    strategyVariations = getStrategyVariations(strategy, fineTune, changeStoplossAndTarget);
     strategyVariationsTested = strategyVariations.length;
 
     strategyVariationsResults = [];
+    strategyVariationsIntermitBestResults = [];
     opExecutedIndex = 0;
     opExecutionCanceled = false;
     opCompleted = 0;
@@ -386,34 +389,34 @@ async function runOptimize() {
               }
 
               let lap = 2;
-              if (percentCompleted > (100 / (fineTuneMaxCycles + 1))) {
-                if (etaLastDate == null) {
-                  etaLastDate = new Date();
-                  etaLastNum = percentCompleted;
-                } else if (etaLastNum + lap <= percentCompleted) {
-                  let dateNow = new Date();
-                  let dateDiff = (Math.abs((dateNow.getTime() - etaLastDate.getTime()) / 1000)) * (100 - percentCompleted) / lap;
+              //if (percentCompleted > (100 / (fineTuneMaxCycles + 1))) {
+              if (etaLastDate == null) {
+                etaLastDate = new Date();
+                etaLastNum = percentCompleted;
+              } else if (etaLastNum + lap <= percentCompleted) {
+                let dateNow = new Date();
+                let dateDiff = (Math.abs((dateNow.getTime() - etaLastDate.getTime()) / 1000)) * (100 - percentCompleted) / lap;
 
-                  let minutes = Math.floor(dateDiff / 60);
-                  let seconds = dateDiff % 60;
-                  if (minutes > 0) {
-                    if (seconds > 30) {
-                      minutes++;
-                    }
-                    if (minutes === 1) {
-                      etaStr = '~ ' + minutes.toFixed(0) + ' min';
-                    } else {
-                      etaStr = '~ ' + minutes.toFixed(0) + ' mins';
-                    }
-                  } else {
-                    etaStr = '< 1 min';
+                let minutes = Math.floor(dateDiff / 60);
+                let seconds = dateDiff % 60;
+                if (minutes > 0) {
+                  if (seconds > 30) {
+                    minutes++;
                   }
-
-                  etaLastDate = new Date();
-                  etaLastNum = percentCompleted;
-                  $('#opRunRemaining').html('time left ' + etaStr);
+                  if (minutes === 1) {
+                    etaStr = '~ ' + minutes.toFixed(0) + ' min';
+                  } else {
+                    etaStr = '~ ' + minutes.toFixed(0) + ' mins';
+                  }
+                } else {
+                  etaStr = '< 1 min';
                 }
+
+                etaLastDate = new Date();
+                etaLastNum = percentCompleted;
+                $('#opRunRemaining').html('time left ' + etaStr);
               }
+              //}
               $('#opRunPercent').html('Optimization Execution: ' + percentCompleted.toFixed(0) + '%');
 
               if (completed === strategyVariations.length) {
@@ -472,17 +475,143 @@ async function runOptimize() {
   }
 }
 
+function setRulesVariationsPatterns(rulesNumber, changeStoplossAndTarget) {
+  //if (rulesNumber <= 2 && !changeStoplossAndTarget) {
+  fineTuneMaxCycles = 6;
+
+  //MA
+  maPeriods = [10, 29, 48];
+  maPeriodsFineTune1 = [-5, 5];
+  maPeriodsFineTune2 = [-3, 3];
+  maPeriodsFineTune3 = [-2, 2];
+  maPeriodsFineTune4 = [-2, 2];
+  maPeriodsFineTune5 = [-1, 1];
+  maPeriodsFineTune6 = [-1, 1];
+  maValues = [1, 3];
+  maValuesFineTune1 = [-0.5, 0.5];
+  maValuesFineTune2 = [-0.5, 0.5];
+  maValuesFineTune3 = [-0.5, 0.5];
+  maValuesFineTune4 = [-0.25, 0.25];
+  maValuesFineTune5 = [-0.25, 0.25];
+  maValuesFineTune6 = [-0.25, 0.25];
+
+  //RSI
+  rsiPeriods = [7, 14];
+  rsiPeriodsFineTune1 = [-4, 4];
+  rsiPeriodsFineTune2 = [-3, 3];
+  rsiPeriodsFineTune3 = [-3, 3];
+  rsiPeriodsFineTune4 = [-3, 3];
+  rsiPeriodsFineTune5 = [-2, 2];
+  rsiPeriodsFineTune6 = [-1, 1];
+  rsiValues = [40, 60];
+  rsiValuesFineTune1 = [-10, 10];
+  rsiValuesFineTune2 = [-5, 5];
+  rsiValuesFineTune3 = [-4, 4];
+  rsiValuesFineTune4 = [-3, 3];
+  rsiValuesFineTune5 = [-2, 2];
+  rsiValuesFineTune6 = [-1, 1];
+
+  //MACD
+  macdPeriods = [6, 15, 24];
+  macdPeriodsFineTune1 = [-3, 3];
+  macdPeriodsFineTune2 = [-2, 2];
+  macdPeriodsFineTune3 = [-2, 2];
+  macdPeriodsFineTune4 = [-2, 2];
+  macdPeriodsFineTune5 = [-1, 1];
+  macdPeriodsFineTune6 = [-1, 1];
+  macdPeriods2 = [10, 19, 28];
+  macdPeriods2FineTune1 = [-3, 3];
+  macdPeriods2FineTune2 = [-2, 2];
+  macdPeriods2FineTune3 = [-2, 2];
+  macdPeriods2FineTune4 = [-2, 2];
+  macdPeriods2FineTune5 = [-1, 1];
+  macdPeriods2FineTune6 = [-1, 1];
+  macdPeriods3 = [6, 14];
+  macdPeriods3FineTune1 = [-2, 2];
+  macdPeriods3FineTune2 = [-1, 1];
+  macdPeriods3FineTune3 = [-1, 1];
+  macdPeriods3FineTune4 = [-1, 1];
+  macdPeriods3FineTune5 = [-1, 1];
+  macdPeriods3FineTune6 = [-1, 1];
+  macdValues = [1, 3];
+  macdValuesFineTune1 = [-0.5, 0.5];
+  macdValuesFineTune2 = [-0.5, 0.5];
+  macdValuesFineTune3 = [-0.5, 0.5];
+  macdValuesFineTune4 = [-0.25, 0.25];
+  macdValuesFineTune5 = [0];
+  macdValuesFineTune6 = [0];
+
+  //BB
+  bbPeriods = [10, 29, 48];
+  bbPeriodsFineTune1 = [-4, 4];
+  bbPeriodsFineTune2 = [-3, 3];
+  bbPeriodsFineTune3 = [-2, 2];
+  bbPeriodsFineTune4 = [-1, 1];
+  bbPeriodsFineTune5 = [-2, 2];
+  bbPeriodsFineTune6 = [-1, 1];
+  bbPeriods2 = [1, 3];
+  bbPeriods2FineTune1 = [-0.5, 0.5];
+  bbPeriods2FineTune2 = [-0.25, 0.25];
+  bbPeriods2FineTune3 = [-0.25, 0.25];
+  bbPeriods2FineTune4 = [-0.25, 0.25];
+  bbPeriods2FineTune5 = [-0.25, 0.25];
+  bbPeriods2FineTune6 = [-0.25, 0.25];
+  bbValues = [1, 3];
+  bbValuesFineTune1 = [-0.5, 0.5];
+  bbValuesFineTune2 = [-0.5, 0.5];
+  bbValuesFineTune3 = [-0.25, 0.25];
+  bbValuesFineTune4 = [-0.25, 0.25];
+  bbValuesFineTune5 = [-0.25, 0.25];
+  bbValuesFineTune6 = [-0.25, 0.25];
+}
+
+function rulesAreSame(rule1, rule2) {
+  return rule1.period == rule2.period && rule1.period2 == rule2.period2 && rule1.period3 == rule2.period3 && rule1.value == rule2.value && rule1.period == rule2.period;
+}
+
+function pushNewStrategyVariation(variations, strategy) {
+  let hasTheSameStrategy = false;
+  for (let strategyTmp of variations) {
+    let allBuyRulesAreSame = true;
+    for (let i = 0; i < strategyTmp.buyRules.length; i++) {
+      if (!rulesAreSame(strategyTmp.buyRules[i], strategy.buyRules[i])) {
+        allBuyRulesAreSame = false;
+        break;
+      }
+    }
+    if (allBuyRulesAreSame) {
+      let allSellRulesAreSame = true;
+      for (let i = 0; i < strategyTmp.sellRules.length; i++) {
+        if (!rulesAreSame(strategyTmp.sellRules[i], strategy.sellRules[i])) {
+          allSellRulesAreSame = false;
+          break;
+        }
+      }
+      if (allSellRulesAreSame) {
+        if (strategyTmp.stoploss == strategy.stoploss && strategyTmp.target == strategy.target && strategyTmp.trailingSl == strategy.trailingSl) {
+          hasTheSameStrategy = true;
+          break;
+        }
+      }
+    }
+  }
+  if (!hasTheSameStrategy) {
+    variations.push(strategy);
+  }
+  return !hasTheSameStrategy;
+}
+
 function getStrategyVariationsFromResult(biggestTradeMultiplier, strategiesToAdd) {
   let addedStrategies = 0;
   let result = [];
   for (let strategyRes of strategyVariationsResults) {
-    if (strategyRes.biggestGain * biggestTradeMultiplier > strategyRes.totalReturn) {
+    if (biggestTradeMultiplier != 0 && strategyRes.biggestGain * biggestTradeMultiplier > strategyRes.totalReturn) {
       continue;
     }
-
-    let strategyVariationsTmp = getStrategyVariations(strategyRes.strategy, fineTune, stoplossVariations);
+    strategyVariationsIntermitBestResults.push(strategyRes);
+    let strategyVariationsTmp = getStrategyVariations(strategyRes.strategy, fineTune, changeStoplossAndTarget);
     for (let strategyTmp of strategyVariationsTmp) {
-      result.push(strategyTmp);
+      pushNewStrategyVariation(result, strategyTmp);
     }
     addedStrategies++;
     if (addedStrategies >= strategiesToAdd) {
@@ -570,16 +699,13 @@ async function doFineTuneOfResult() {
 
     let strategyVariationsTmp = [];
     if (optType === 'consistency') {
-      strategyVariationsTmp = getStrategyVariationsFromResult(4, strategiesToAdd);
+      strategyVariationsTmp = getStrategyVariationsFromResult(3, strategiesToAdd);
       if (strategyVariationsTmp.length === 0) {
-        strategyVariationsTmp = getStrategyVariationsFromResult(3, strategiesToAdd);
+        strategyVariationsTmp = getStrategyVariationsFromResult(2, strategiesToAdd);
         if (strategyVariationsTmp.length === 0) {
-          strategyVariationsTmp = getStrategyVariationsFromResult(2, strategiesToAdd);
+          strategyVariationsTmp = getStrategyVariationsFromResult(1, strategiesToAdd);
           if (strategyVariationsTmp.length === 0) {
-            strategyVariationsTmp = getStrategyVariationsFromResult(1, strategiesToAdd);
-            if (strategyVariationsTmp.length === 0) {
-              strategyVariationsTmp = getStrategyVariationsFromResult(0, strategiesToAdd);
-            }
+            strategyVariationsTmp = getStrategyVariationsFromResult(0, strategiesToAdd);
           }
         }
       }
@@ -743,86 +869,119 @@ function getRuleVariations(rule) {
 
 let fineTuneMaxCycles = 3;
 
-let maPeriods = [10, 29, 48];
-let maValues = [1, 3];
+let maPeriods = [];
+let maValues = [];
 
-let rsiPeriods = [6, 15, 24];
-let rsiValues = [25, 56, 77];
+let rsiPeriods = [];
+let rsiValues = [];
 
-let macdPeriods = [6, 15, 24];
-let macdPeriods2 = [10, 19, 28];
-let macdPeriods3 = [6, 15];
-let macdValues = [1, 3];
+let macdPeriods = [];
+let macdPeriods2 = [];
+let macdPeriods3 = [];
+let macdValues = [];
 
-let bbPeriods = [10, 29, 48];
-let bbPeriods2 = [1, 3];
-let bbValues = [1, 3];
+let bbPeriods = [];
+let bbPeriods2 = [];
+let bbValues = [];
 
 //Fina tune values
 
 let maPeriodsFineTune = [];
 let maValuesFineTune = [];
-let maPeriodsFineTune1 = [-5, 0, 5];
-let maValuesFineTune1 = [-0.5, 0, 0.5];
-let maPeriodsFineTune2 = [-3, 0, 3];
-let maValuesFineTune2 = [-0.25, 0, 0.25];
-let maPeriodsFineTune3 = [-1, 0, 1];
-let maValuesFineTune3 = [-0.1, 0, 0.1];
+let maPeriodsFineTune1 = [];
+let maValuesFineTune1 = [];
+let maPeriodsFineTune2 = [];
+let maValuesFineTune2 = [];
+let maPeriodsFineTune3 = [];
+let maValuesFineTune3 = [];
+let maPeriodsFineTune4 = [];
+let maValuesFineTune4 = [];
+let maPeriodsFineTune5 = [];
+let maValuesFineTune5 = [];
+let maPeriodsFineTune6 = [];
+let maValuesFineTune6 = [];
 
 let rsiPeriodsFineTune = [];
 let rsiValuesFineTune = [];
-let rsiPeriodsFineTune1 = [-2, 0, 2];
-let rsiValuesFineTune1 = [-8, 0, 8];
-let rsiPeriodsFineTune2 = [-1, 0, 1];
-let rsiValuesFineTune2 = [-5, 0, 5];
-let rsiPeriodsFineTune3 = [-1, 0, 1];
-let rsiValuesFineTune3 = [-2, 0, 2];
+let rsiPeriodsFineTune1 = [];
+let rsiValuesFineTune1 = [];
+let rsiPeriodsFineTune2 = [];
+let rsiValuesFineTune2 = [];
+let rsiPeriodsFineTune3 = [];
+let rsiValuesFineTune3 = [];
+let rsiPeriodsFineTune4 = [];
+let rsiValuesFineTune4 = [];
+let rsiPeriodsFineTune5 = [];
+let rsiValuesFineTune5 = [];
+let rsiPeriodsFineTune6 = [];
+let rsiValuesFineTune6 = [];
 
 let macdPeriodsFineTune = [];
 let macdPeriods2FineTune = [];
 let macdPeriods3FineTune = [];
 let macdValuesFineTune = [];
-
-let macdPeriodsFineTune1 = [-2, 0, 2];
-let macdPeriods2FineTune1 = [-2, 0, 2];
-let macdPeriods3FineTune1 = [-2, 0, 2];
-let macdValuesFineTune1 = [-0.5, 0, 0.5];
-
-let macdPeriodsFineTune2 = [-1, 0, 1];
-let macdPeriods2FineTune2 = [-1, 0, 1];
-let macdPeriods3FineTune2 = [-1, 0, 1];
-let macdValuesFineTune2 = [-0.25, 0, 0.25];
-
-let macdPeriodsFineTune3 = [-1, 0, 1];
-let macdPeriods2FineTune3 = [-1, 0, 1];
-let macdPeriods3FineTune3 = [-1, 0, 1];
-let macdValuesFineTune3 = [0];
+let macdPeriodsFineTune1 = [];
+let macdPeriods2FineTune1 = [];
+let macdPeriods3FineTune1 = [];
+let macdValuesFineTune1 = [];
+let macdPeriodsFineTune2 = [];
+let macdPeriods2FineTune2 = [];
+let macdPeriods3FineTune2 = [];
+let macdValuesFineTune2 = [];
+let macdPeriodsFineTune3 = [];
+let macdPeriods2FineTune3 = [];
+let macdPeriods3FineTune3 = [];
+let macdValuesFineTune3 = [];
+let macdPeriodsFineTune4 = [];
+let macdPeriods2FineTune4 = [];
+let macdPeriods3FineTune4 = [];
+let macdValuesFineTune4 = [];
+let macdPeriodsFineTune5 = [];
+let macdPeriods2FineTune5 = [];
+let macdPeriods3FineTune5 = [];
+let macdValuesFineTune5 = [];
+let macdPeriodsFineTune6 = [];
+let macdPeriods2FineTune6 = [];
+let macdPeriods3FineTune6 = [];
+let macdValuesFineTune6 = [];
 
 let bbPeriodsFineTune = [];
 let bbPeriods2FineTune = [];
 let bbValuesFineTune = [];
-
-let bbPeriodsFineTune1 = [-5, 0, 5];
-let bbPeriods2FineTune1 = [-0.5, 0, 0.5];
-let bbValuesFineTune1 = [-0.5, 0, 0.5];
-
-let bbPeriodsFineTune2 = [-3, 0, 3];
-let bbPeriods2FineTune2 = [-0.25, 0, 0.25];
-let bbValuesFineTune2 = [-0.25, 0, 0.25];
-
-let bbPeriodsFineTune3 = [-1, 0, 1];
-let bbPeriods2FineTune3 = [-0.1, 0, 0.1];
-let bbValuesFineTune3 = [-0.1, 0, 0.1];
+let bbPeriodsFineTune1 = [];
+let bbPeriods2FineTune1 = [];
+let bbValuesFineTune1 = [];
+let bbPeriodsFineTune2 = [];
+let bbPeriods2FineTune2 = [];
+let bbValuesFineTune2 = [];
+let bbPeriodsFineTune3 = [];
+let bbPeriods2FineTune3 = [];
+let bbValuesFineTune3 = [];
+let bbPeriodsFineTune4 = [];
+let bbPeriods2FineTune4 = [];
+let bbValuesFineTune4 = [];
+let bbPeriodsFineTune5 = [];
+let bbPeriods2FineTune5 = [];
+let bbValuesFineTune5 = [];
+let bbPeriodsFineTune6 = [];
+let bbPeriods2FineTune6 = [];
+let bbValuesFineTune6 = [];
 
 let stoplossesFineTune0 = [2, 4.5, 7];
-let stoplossesFineTune1 = [-0.5, 0, 0.5];
-let stoplossesFineTune2 = [-0.25, 0, 0.25];
-let stoplossesFineTune3 = [-0.25, 0, 0.25];
+let stoplossesFineTune1 = [-0.5, 0.5];
+let stoplossesFineTune2 = [-0.25, 0.25];
+let stoplossesFineTune3 = [-0.25, 0.25];
+let stoplossesFineTune4 = [-0.25, 0.25];
+let stoplossesFineTune5 = [0];
+let stoplossesFineTune6 = [0];
 
-let targetsFineTune0 = [3, 8.5, 14];
-let targetsFineTune1 = [-1, 0, 1];
-let targetsFineTune2 = [-1, 0, 1];
-let targetsFineTune3 = [-0.5, 0, 0.5];
+let targetsFineTune0 = [3, 7, 12.5];
+let targetsFineTune1 = [-1, 1];
+let targetsFineTune2 = [-1, 1];
+let targetsFineTune3 = [-0.5, 0.5];
+let targetsFineTune4 = [-0.2, 0.2];
+let targetsFineTune5 = [0];
+let targetsFineTune6 = [0];
 
 function getRuleVariationsFineTune(rule) {
   let ruleVariations = [];
@@ -1028,6 +1187,48 @@ function getRulesVariations(rules, fineTune) {
         bbValuesFineTune = bbValuesFineTune3;
         ruleVariations = getRuleVariationsFineTune(rule);
         break;
+      case 4:
+        maPeriodsFineTune = maPeriodsFineTune4;
+        maValuesFineTune = maValuesFineTune4;
+        rsiPeriodsFineTune = rsiPeriodsFineTune4;
+        rsiValuesFineTune = rsiValuesFineTune4;
+        macdPeriodsFineTune = macdPeriodsFineTune4;
+        macdPeriods2FineTune = macdPeriods2FineTune4;
+        macdPeriods3FineTune = macdPeriods3FineTune4;
+        macdValuesFineTune = macdValuesFineTune4;
+        bbPeriodsFineTune = bbPeriodsFineTune4;
+        bbPeriods2FineTune = bbPeriods2FineTune4;
+        bbValuesFineTune = bbValuesFineTune4;
+        ruleVariations = getRuleVariationsFineTune(rule);
+        break;
+      case 5:
+        maPeriodsFineTune = maPeriodsFineTune5;
+        maValuesFineTune = maValuesFineTune5;
+        rsiPeriodsFineTune = rsiPeriodsFineTune5;
+        rsiValuesFineTune = rsiValuesFineTune5;
+        macdPeriodsFineTune = macdPeriodsFineTune5;
+        macdPeriods2FineTune = macdPeriods2FineTune5;
+        macdPeriods3FineTune = macdPeriods3FineTune5;
+        macdValuesFineTune = macdValuesFineTune5;
+        bbPeriodsFineTune = bbPeriodsFineTune5;
+        bbPeriods2FineTune = bbPeriods2FineTune5;
+        bbValuesFineTune = bbValuesFineTune5;
+        ruleVariations = getRuleVariationsFineTune(rule);
+        break;
+      case 6:
+        maPeriodsFineTune = maPeriodsFineTune6;
+        maValuesFineTune = maValuesFineTune6;
+        rsiPeriodsFineTune = rsiPeriodsFineTune6;
+        rsiValuesFineTune = rsiValuesFineTune6;
+        macdPeriodsFineTune = macdPeriodsFineTune6;
+        macdPeriods2FineTune = macdPeriods2FineTune6;
+        macdPeriods3FineTune = macdPeriods3FineTune6;
+        macdValuesFineTune = macdValuesFineTune6;
+        bbPeriodsFineTune = bbPeriodsFineTune6;
+        bbPeriods2FineTune = bbPeriods2FineTune6;
+        bbValuesFineTune = bbValuesFineTune6;
+        ruleVariations = getRuleVariationsFineTune(rule);
+        break;
       default:
         ruleVariations = getRuleVariations(rule);
         break;
@@ -1093,6 +1294,18 @@ function createStrategyVariationWithStoplossRules(finalStrategiesList, strategie
       stoplosses = stoplossesFineTune3;
       targets = targetsFineTune3;
       break;
+    case 4:
+      stoplosses = stoplossesFineTune4;
+      targets = targetsFineTune4;
+      break;
+    case 5:
+      stoplosses = stoplossesFineTune5;
+      targets = targetsFineTune5;
+      break;
+    case 6:
+      stoplosses = stoplossesFineTune6;
+      targets = targetsFineTune6;
+      break;
     default:
       break;
   };
@@ -1134,7 +1347,7 @@ function createStrategyVariationWithStoplossRules(finalStrategiesList, strategie
   return finalStrategiesList;
 }
 
-function getStrategyVariations(strategy, fineTune, stoplossVariations) {
+function getStrategyVariations(strategy, fineTune, changeStoplossAndTarget) {
   try {
     let buyRulesVariations = getRulesVariations(strategy.buyRules, fineTune);
     let sellRulesVariations = getRulesVariations(strategy.sellRules, fineTune);
@@ -1193,7 +1406,7 @@ function getStrategyVariations(strategy, fineTune, stoplossVariations) {
       strategiesWithBuySellRuleVariations = strategiesWithBuyRuleVariations;
     }
 
-    if (stoplossVariations) {
+    if (changeStoplossAndTarget) {
       let strategiesWithBuySellAndStoplossRuleVariations = [];
       createStrategyVariationWithStoplossRules(strategiesWithBuySellAndStoplossRuleVariations, strategiesWithBuySellRuleVariations, fineTune);
       return strategiesWithBuySellAndStoplossRuleVariations;
@@ -1267,11 +1480,34 @@ async function fillOptimizationResult(marketReturn) {
     optimizationRunning = false;
     $('#opCancelBtn').addClass('disabled');
 
+    for (let res of strategyVariationsIntermitBestResults) {
+      strategyVariationsResults.push(res);
+    }
+    strategyVariationsIntermitBestResults = [];
+
     strategyVariationsResults.sort(function(a, b) {
       return compareStrategyResults(a, b)
     });
-
+    let strategiesTmpList = [];
+    let resultTmp = [];
     let rowsShown = 100;
+
+    for (let res of strategyVariationsResults) {
+      if (pushNewStrategyVariation(strategiesTmpList, res.strategy)) {
+        resultTmp.push(res);
+      }
+      if (resultTmp.length == rowsShown) {
+        break;
+      }
+    }
+    strategyVariationsResults = resultTmp;
+    resultTmp = [];
+    strategiesTmpList = [];
+
+    optType = 'return';
+    strategyVariationsResults.sort(function(a, b) {
+      return compareStrategyResults(a, b)
+    });
     opResultShowRows(0, rowsShown);
     //pagination
     $('#opStrategiesTableNav').html('');
@@ -1297,6 +1533,7 @@ async function fillOptimizationResult(marketReturn) {
         ? 'text-red'
         : '';
     //'Tested ' + strategyVariationsTested + ' variations.
+
     if (strategyVariationsResults.length > 0) {
       $('#opResultH').html('Showing top 100 of the optimized strategies. Market Return for the same period: <span class="' + marketReturnClass + '">' + marketReturn.toFixed(2) + '%</span>');
       $('#opStrategiesTable').show();
@@ -1306,13 +1543,13 @@ async function fillOptimizationResult(marketReturn) {
     }
 
     await terminateOpWorkers();
-    strategyVariations = [];
+    /*strategyVariations = [];
     let resTmp = []
     for (let i = 0; i < Math.min(rowsShown, strategyVariationsResults.length); i++) {
       resTmp.push(strategyVariationsResults[0]);
     }
     strategyVariationsResults = [];
-    strategyVariationsResults = resTmp;
+    strategyVariationsResults = resTmp;*/
     $('#opRunning').hide();
     $('#opResult').show();
   } catch (err) {
@@ -1346,6 +1583,7 @@ async function opCancel() {
   await terminateOpWorkers();
   strategyVariations = [];
   strategyVariationsResults = [];
+  strategyVariationsIntermitBestResults = [];
   $('#opResultDiv').hide();
   $('#opExecInfo').show();
 }

@@ -1901,11 +1901,15 @@ a.expanded>span.caret {
   display: none;
   position: fixed;
   top: 4em;
-  left: 3.75em;
+  left: 1em;
   z-index: 9999;
   font-size: 0.65em;
   font-weight: bold;
   letter-spacing: 0.25em;
+}
+
+#updateAvailable a:hover {
+  color: #fff;
 }
 
 .blink {
@@ -1923,7 +1927,7 @@ a.expanded>span.caret {
   width: device-width;
 }
 
-@media screen and (max-width: 1280px) {
+@media screen and (max-width: 12800px) {
   body, input, select, textarea {
     font-size: 12pt;
   }

@@ -22,7 +22,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 975,
-    minWidth: 830,
+    minWidth: 860,
     minHeight: 300,
     title: "EasyCryptoBot v" + app.getVersion(),
     icon: "./assets/icons/icon.png",
