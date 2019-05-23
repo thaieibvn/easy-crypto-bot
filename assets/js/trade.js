@@ -1343,12 +1343,14 @@ async function runStrategy(id) {
     }
 
     let hasFreeWorker = false;
+
     for (let worker of executionWorkers) {
       if (worker.status === 'free') {
         worker.status = 'running';
         worker.execId = id;
         hasFreeWorker = true;
-        worker.wk.postMessage([execution, apiKey, apiSecret]);
+        let instrumentInfo = await getBinanceInstrumentsInfo(execution.instrument);
+        worker.wk.postMessage([execution, apiKey, apiSecret, instrumentInfo]);
         break;
       }
     }
@@ -1475,7 +1477,8 @@ async function runStrategy(id) {
       }, false);
 
       executionWorkers.push({status: 'running', execId: id, wk: wk});
-      wk.postMessage([execution, apiKey, apiSecret]);
+      let instrumentInfo = await getBinanceInstrumentsInfo(execution.instrument);
+      wk.postMessage([execution, apiKey, apiSecret, instrumentInfo]);
       return true;
     }
   } catch (err) {

@@ -748,6 +748,8 @@ function clearStrategyFields() {
   $('#trailingSl').val('');
   $('#target').val('');
   $('#timeClose').val('');
+  $('#saveStrategyBtn').removeClass('disabled')
+  $('#saveStrategyDisabled').hide();
 }
 
 async function rmStrategy(name) {

@@ -24,7 +24,7 @@
   },
   "license": "GPL-3.0-only",
   "devDependencies": {
-    "electron": "^2.0.0"
+    "electron": "^4.0.0"
   },
   "dependencies": {
     "electron-dl": "^1.12.0",

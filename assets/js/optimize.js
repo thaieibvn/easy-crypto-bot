@@ -995,7 +995,7 @@ function getRuleVariationsFineTune(rule) {
         }
         for (let value of maValuesFineTune) {
           let valueToUse = rule.value + value;
-          if (valueToUse === 0) {
+          if (valueToUse <= 0) {
             valueToUse = 0.1
           }
           ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse));
@@ -1051,7 +1051,7 @@ function getRuleVariationsFineTune(rule) {
               }
               for (let value of macdValuesFineTune) {
                 let valueToUse = rule.value + value;
-                if (valueToUse === 0) {
+                if (valueToUse <= 0) {
                   valueToUse = 0.1
                 }
                 ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, null, null, periodToUse2, periodToUse3));
@@ -1105,7 +1105,7 @@ function getRuleVariationsFineTune(rule) {
           }
           for (let value of bbValuesFineTune) {
             let valueToUse = rule.value + value;
-            if (valueToUse === 0) {
+            if (valueToUse <= 0) {
               valueToUse = 0.1
             }
             ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, null, null, periodToUse2, null));

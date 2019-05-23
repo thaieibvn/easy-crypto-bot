@@ -38,39 +38,6 @@ function getPrecisionFromTickSize(tickSize) {
   return 8;
 }
 
-async function getBinanceInstrumentsInfo(instrument) {
-  if (binanceInstrumentsInfo === null) {
-    let binanceInstrumentsInfoTmp = {};
-    return new Promise((resolve, reject) => {
-      binance.useServerTime(function() {
-        binance.exchangeInfo(function(error, data) {
-          for (let obj of data.symbols) {
-            let item = {};
-            for (let filter of obj.filters) {
-              if (filter.filterType == "MIN_NOTIONAL") {
-                item.minNotional = filter.minNotional;
-              } else if (filter.filterType == "LOT_SIZE") {
-                item.stepSize = filter.stepSize;
-                item.minQty = filter.minQty;
-                item.maxQty = filter.maxQty;
-              } else if (filter.filterType == "PRICE_FILTER") {
-                item.tickSize = filter.tickSize;
-              }
-            }
-            item.orderTypes = obj.orderTypes;
-            item.precision = getPrecisionFromTickSize(item.tickSize);
-            binanceInstrumentsInfoTmp[obj.symbol] = item;
-          }
-          binanceInstrumentsInfo = binanceInstrumentsInfoTmp;
-          resolve(binanceInstrumentsInfo[instrument.toUpperCase()]);
-        });
-      });
-    });
-  } else {
-    return binanceInstrumentsInfo[instrument.toUpperCase()];
-  }
-}
-
 function getBalance(instrument) {
   return new Promise((resolve, reject) => {
     binance.useServerTime(function() {
@@ -179,9 +146,8 @@ function getOrderTradePrice(execution, orderId, type) {
           if (commision !== 0 && type === 'buy') {
             let balance = await getBalance(execution.instrument);
             if (balance < execution.positionSize) {
-              let info = await getBinanceInstrumentsInfo(execution.instrument);
               //Change position size as we don't have the initial ammount to sell because of the commision
-              execution.positionSize = binance.roundStep(qty - commision, info.stepSize);
+              execution.positionSize = binance.roundStep(qty - commision, instrumentInfo.stepSize);
               if (execution.positionSizeQuoted == null || execution.positionSizeQuoted == undefined || execution.positionSizeQuoted <= 0) {
                 self.postMessage([execId, 'CH_POS_SIZE', execution.positionSize]);
               }
@@ -206,8 +172,7 @@ function getOrderTradePrice(execution, orderId, type) {
 async function updatePositionSize(curPrice) {
   if (execution.positionSizeQuoted != null && execution.positionSizeQuoted != undefined && execution.positionSizeQuoted > 0) {
     let tradeSize = execution.positionSizeQuoted / curPrice;
-    let info = await getBinanceInstrumentsInfo(execution.instrument);
-    execution.positionSize = binance.roundStep(tradeSize, info.stepSize);
+    execution.positionSize = binance.roundStep(tradeSize, instrumentInfo.stepSize);
   }
 }
 
@@ -217,10 +182,22 @@ async function marketBuy(execution, curPrice) {
     binance.useServerTime(function() {
       binance.marketBuy(execution.instrument, execution.positionSize, async (error, response) => {
         if (error !== null) {
+          let binanceError = JSON.parse(error.body).msg;
+          if (tooManyOrders < MAX_ORDER_RETRIES && binanceError.indexOf('Too many new orders') != -1) {
+            await sleep(1000);
+            tooManyOrders++;
+            self.postMessage([
+              execId, 'LOG', 'Strategy ' + execution.strategy.name + ' on instrumnet ' + execution.instrument + ' was not able to BUY. The bot will try again in 1 sec. Error from Binance: ' + binanceError
+            ]);
+            resolve(marketBuy(execution, curPrice));
+            return;
+          }
+
+          tooManyOrders = 0;
           paused = true;
           lastUpdated = null;
           self.postMessage([
-            execId, 'ERROR', 'Error buying ' + execution.positionSize + ' ' + execution.instrument + '. Error message from Binance: ' + JSON.parse(error.body).msg
+            execId, 'ERROR', 'Error buying ' + execution.positionSize + ' ' + execution.instrument + '. Error message from Binance: ' + binanceError
           ]);
           resolve(false);
         } else {
@@ -233,6 +210,7 @@ async function marketBuy(execution, curPrice) {
           };
           execution.trades.push(trade);
           self.postMessage([execId, 'BUY', trade, feeRate]);
+          tooManyOrders = 0;
           resolve(true);
         }
       });
@@ -249,8 +227,7 @@ async function marketSell(execution, curPrice) {
   }
   positionSize -= takeProfitExecutedQty;
 
-  let info = await getBinanceInstrumentsInfo(execution.instrument);
-  if (curPrice * positionSize < info.minNotional) {
+  if (curPrice * positionSize < instrumentInfo.minNotional) {
 
     let priceAndQty = await getOrderTradePrice(execution, execution.takeProfitOrderId, 'sell');
     if (priceAndQty === null || priceAndQty[1] == null) {
@@ -276,10 +253,22 @@ async function marketSell(execution, curPrice) {
     binance.useServerTime(function() {
       binance.marketSell(execution.instrument, positionSize, async (error, response) => {
         if (error !== null) {
+          let binanceError = JSON.parse(error.body).msg;
+          if (tooManyOrders < MAX_ORDER_RETRIES && binanceError.indexOf('Too many new orders') != -1) {
+            await sleep(1000);
+            tooManyOrders++;
+            self.postMessage([
+              execId, 'LOG', 'Strategy ' + execution.strategy.name + ' on instrumnet ' + execution.instrument + ' was not able to SELL. The bot will try again in 1 sec. Error from Binance: ' + binanceError
+            ]);
+            resolve(marketSell(execution, curPrice));
+            return;
+          }
+
+          tooManyOrders = 0;
           paused = true;
           lastUpdated = null;
           self.postMessage([
-            execId, 'ERROR', 'Error selling ' + positionSize + ' ' + execution.instrument + '. Error message from Binance: ' + JSON.parse(error.body).msg
+            execId, 'ERROR', 'Error selling ' + positionSize + ' ' + execution.instrument + '. Error message from Binance: ' + binanceError
           ]);
           resolve(false);
         } else {
@@ -299,6 +288,7 @@ async function marketSell(execution, curPrice) {
           self.postMessage([
             execId, 'SELL', execution.trades[tradeIndex]
           ]);
+          tooManyOrders = 0;
           resolve(true);
         }
       })
@@ -308,22 +298,36 @@ async function marketSell(execution, curPrice) {
 
 function placeTakeProfitLimit(execution, target) {
   return new Promise(async (resolve, reject) => {
-    let info = await getBinanceInstrumentsInfo(execution.instrument);
-    let price = Number.parseFloat(target.toFixed(info.precision));
+    let price = Number.parseFloat(target.toFixed(instrumentInfo.precision));
     let positionSize = execution.positionSize + execution.minNotionalAmountLeft;
     binance.useServerTime(function() {
       binance.sell(execution.instrument, positionSize, price, {
         type: "LIMIT"
-      }, (error, response) => {
+      }, async (error, response) => {
         if (error) {
+          let binanceError = JSON.parse(error.body).msg;
+          if (tooManyOrders < MAX_ORDER_RETRIES && binanceError.indexOf('Too many new orders') != -1) {
+            await sleep(1000);
+            tooManyOrders++;
+            self.postMessage([
+              execId, 'LOG', 'Strategy ' + execution.strategy.name + ' on instrumnet ' + execution.instrument + ' was not able to place SELL LIMIT ORDER. The bot will try again in 1 sec. Error from Binance: ' + binanceError
+            ]);
+            resolve(placeTakeProfitLimit(execution, target));
+            return;
+          }
+
+          tooManyOrders = 0;
           paused = true;
           lastUpdated = null;
           self.postMessage([
-            execId, 'ERROR', 'Error placing TAKE_PROFIT_LIMIT order for instrument ' + execution.instrument + '. Please take in mind that the strategy has bought and hasn\'t sell. You should manually sell on Binance the ammount or place the limit take profit order. Error message from Binance: ' + JSON.parse(error.body).msg
+            execId, 'ERROR', 'Error placing TAKE_PROFIT_LIMIT order for instrument ' + execution.instrument + '. Please take in mind that the strategy has bought and hasn\'t sell. You should manually sell on Binance the ammount or place the limit take profit order. Error message from Binance: ' + binanceError
           ]);
           resolve(null);
           return;
         }
+        tooManyOrders = 0;
+        execution.takeProfitOrderId = response.orderId;
+        self.postMessage([execId, 'TAKE_PROFIT_ORDER_ID', response.orderId]);
         resolve(response.orderId);
       });
     });
@@ -422,9 +426,9 @@ async function retryConnection(err) {
   paused = true;
   lastUpdated = null;
   startTries++;
-  if (startTries > maxRetries) {
+  if (startTries > MAX_CONENCTION_RETRIES) {
     self.postMessage([
-      execId, 'ERROR', 'Connection to Binance lost. Binance may be in maintenance, '+ execution.instrument+' trading may be halted or you may have lost connection to the Internet. : Details: '  + err
+      execId, 'ERROR', 'Connection to Binance lost. Binance may be in maintenance, ' + execution.instrument + ' trading may be halted or you may have lost connection to the Internet. : Details: ' + err
     ]);
   } else {
     self.postMessage([execId, 'STALLED']);
@@ -501,9 +505,9 @@ async function verifyWebsocketIsAlive(timeframe) {
       }
       if (date < new Date()) {
         startTries++;
-        if (startTries > maxRetries) {
+        if (startTries > MAX_CONENCTION_RETRIES) {
           self.postMessage([
-            execId, 'ERROR', 'Connection to Binance lost. Binance may be in maintenance, '+ execution.instrument+' trading may be halted or you may have lost connection to the Internet.'
+            execId, 'ERROR', 'Connection to Binance lost. Binance may be in maintenance, ' + execution.instrument + ' trading may be halted or you may have lost connection to the Internet.'
           ]);
           return;
         }
@@ -562,7 +566,7 @@ async function startBinanceWebsocket() {
   verifyWebsocketIsAlive(smallTf);
   await sleep(1000);
   lastUpdated = new Date();
-
+  tooManyOrders = 0;
   self.postMessage([execId, 'STARTED']);
   if (execution.type === 'Trading' && tradeType === 'sell') {
     if (execution.positionSizeQuoted != null && execution.positionSizeQuoted != undefined && execution.positionSizeQuoted > 0 && execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit === undefined || execution.trades[execution.trades.length - 1].exit === null)) {
@@ -704,11 +708,7 @@ async function startBinanceWebsocket() {
                     }
                     if (execution.strategy.target !== null && !isNaN(execution.strategy.target)) {
                       target = execution.trades[execution.trades.length - 1].entry * (1 + (execution.strategy.target / 100));
-                      execution.takeProfitOrderId = await placeTakeProfitLimit(execution, target);
-                      if (execution.takeProfitOrderId === null) {
-                        return;
-                      }
-                      self.postMessage([execId, 'TAKE_PROFIT_ORDER_ID', execution.takeProfitOrderId]);
+                      await placeTakeProfitLimit(execution, target);
                     }
                     if (execution.strategy.timeClose !== null && !isNaN(execution.strategy.timeClose)) {
                       timeClose = new Date(execution.trades[execution.trades.length - 1].openDate.getTime());
@@ -828,11 +828,13 @@ let startupsCount = 0;
 let lastCheckedData = -1;
 let lastCheckedDataBigTf = -1;
 let firstCande = true; // skip the first candle
-let binanceInstrumentsInfo = null;
+let instrumentInfo = null;
 let paused = false;
 let startTries = 0;
 let lastUpdated = null;
-const maxRetries = 10;
+const MAX_CONENCTION_RETRIES = 10;
+const MAX_ORDER_RETRIES = 10;
+let tooManyOrders = 0;
 
 self.addEventListener('message', async function(e) {
   try {
@@ -840,6 +842,7 @@ self.addEventListener('message', async function(e) {
       paused = true;
       lastUpdated = null;
       startTries = 0;
+      tooManyOrders = 0;
       let endpoints = binance.websockets.subscriptions();
       for (let endpoint in endpoints) {
         binance.websockets.terminate(endpoint);
@@ -876,9 +879,10 @@ self.addEventListener('message', async function(e) {
       lastCheckedData = -1;
       lastCheckedDataBigTf = -1;
       firstCande = true;
-      binanceInstrumentsInfo = null;
+      instrumentInfo = null;
       paused = false;
       startTries = 0;
+      tooManyOrders = 0;
       lastUpdated = null;
       return;
     } else if (typeof e.data === 'string' && e.data === ('RESUME')) {
@@ -931,6 +935,7 @@ self.addEventListener('message', async function(e) {
     execution = e.data[0];
     apiKey = e.data[1];
     apiSecret = e.data[2];
+    instrumentInfo = e.data[3];
     execId = execution.id;
     if (execution.feeRate === null || execution.feeRate === undefined) {
       feeRate = execution.feeRate;
