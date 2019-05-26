@@ -23,8 +23,14 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
   let timeframes = getTimeframes(strategy);
 
   let closePrices = {};
+  let highPrices = {};
+  let lowPrices = {};
+  let openPrices = {};
   for (let ft of timeframes) {
     closePrices[ft] = [];
+    highPrices[ft] = [];
+    lowPrices[ft] = [];
+    openPrices[ft] = [];
   }
 
   //Fill the additional data prior start date
@@ -34,6 +40,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
       break;
     }
     closePrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].c);
+      highPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].h);
+        lowPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].l);
+          openPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].o);
     bigTfIndex++;
   }
 
@@ -44,6 +53,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
         break;
       }
       closePrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].c);
+      highPrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].h);
+      lowPrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].l);
+      openPrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].o);
       smallTfIndex++;
     }
   }
@@ -80,7 +92,7 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
         let lowPrice = ticks[timeframes[1]][smallTfIndex].l;
         let date = ticks[timeframes[1]][smallTfIndex].d;
         if (tradeType === 'buy') {
-          if (checkTradeRules(strategy.buyRules, closePrices)) {
+          if (checkTradeRules(strategy.buyRules, closePrices, highPrices, lowPrices)) {
             //let openWithSpread = addBuySpread(openPrice);
             let trade = {
               'openDate': date,
@@ -138,6 +150,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
               stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
             }
             closePrices[timeframes[1]].push(closePrice);
+            highPrices[timeframes[1]].push(highPrice);
+            lowPrices[timeframes[1]].push(lowPrice);
+            openPrices[timeframes[1]].push(openPrice);
             smallTfIndex++;
             continue;
           }
@@ -173,6 +188,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
               stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
             }
             closePrices[timeframes[1]].push(closePrice);
+            highPrices[timeframes[1]].push(highPrice);
+            lowPrices[timeframes[1]].push(lowPrice);
+            openPrices[timeframes[1]].push(openPrice);
             smallTfIndex++;
             continue;
           }
@@ -182,6 +200,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
             trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
             tradeType = 'buy';
             closePrices[timeframes[1]].push(closePrice);
+            highPrices[timeframes[1]].push(highPrice);
+            lowPrices[timeframes[1]].push(lowPrice);
+            openPrices[timeframes[1]].push(openPrice);
             smallTfIndex++;
             continue;
           }
@@ -192,10 +213,13 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
               stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
             }
             closePrices[timeframes[1]].push(closePrice);
+            highPrices[timeframes[1]].push(highPrice);
+            lowPrices[timeframes[1]].push(lowPrice);
+            openPrices[timeframes[1]].push(openPrice);
             smallTfIndex++;
             continue;
           }
-          if (checkTradeRules(strategy.sellRules, closePrices)) {
+          if (checkTradeRules(strategy.sellRules, closePrices, highPrices, lowPrices)) {
             //let openWithSpread = addSellSpread(openPrice);
             trades[trades.length - 1]['closeDate'] = date;
             trades[trades.length - 1]['exit'] = openPrice;
@@ -212,6 +236,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
           stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
         }
         closePrices[timeframes[1]].push(closePrice);
+        highPrices[timeframes[1]].push(highPrice);
+        lowPrices[timeframes[1]].push(lowPrice);
+        openPrices[timeframes[1]].push(openPrice);
         smallTfIndex++;
       }
     } else {
@@ -222,7 +249,7 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
       let lowPrice = ticks[timeframes[0]][bigTfIndex].l;
       let date = ticks[timeframes[0]][bigTfIndex].d;
       if (tradeType === 'buy') {
-        if (checkTradeRules(strategy.buyRules, closePrices)) {
+        if (checkTradeRules(strategy.buyRules, closePrices, highPrices, lowPrices)) {
           //let openWithSpread = addBuySpread(openPrice);
           let trade = {
             'openDate': date,
@@ -277,6 +304,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
             stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
           }
           closePrices[timeframes[0]].push(closePrice);
+          highPrices[timeframes[0]].push(highPrice);
+          lowPrices[timeframes[0]].push(lowPrice);
+          openPrices[timeframes[0]].push(openPrice);
           bigTfIndex++;
           continue;
         }
@@ -312,6 +342,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
             stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
           }
           closePrices[timeframes[0]].push(closePrice);
+          highPrices[timeframes[0]].push(highPrice);
+          lowPrices[timeframes[0]].push(lowPrice);
+          openPrices[timeframes[0]].push(openPrice);
           bigTfIndex++;
           continue;
         }
@@ -321,6 +354,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
           trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
           tradeType = 'buy';
           closePrices[timeframes[0]].push(closePrice);
+          highPrices[timeframes[0]].push(highPrice);
+          lowPrices[timeframes[0]].push(lowPrice);
+          openPrices[timeframes[0]].push(openPrice);
           bigTfIndex++;
           continue;
         }
@@ -331,10 +367,13 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
             stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
           }
           closePrices[timeframes[0]].push(closePrice);
+          highPrices[timeframes[0]].push(highPrice);
+          lowPrices[timeframes[0]].push(lowPrice);
+          openPrices[timeframes[0]].push(openPrice);
           bigTfIndex++;
           continue;
         }
-        if (checkTradeRules(strategy.sellRules, closePrices)) {
+        if (checkTradeRules(strategy.sellRules, closePrices, highPrices, lowPrices)) {
           //let openWithSpread = addSellSpread(openPrice);
           trades[trades.length - 1]['closeDate'] = date;
           trades[trades.length - 1]['exit'] = openPrice;
@@ -353,6 +392,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
 
     }
     closePrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].c);
+    highPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].h);
+    lowPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].l);
+    openPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].o);
     bigTfIndex++;
 
   }

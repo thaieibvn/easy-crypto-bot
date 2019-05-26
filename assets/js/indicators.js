@@ -1,47 +1,49 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
-function checkTradeRules(rules, historicalDatas) {
+function checkTradeRules(rules, closePricesAll, highPricesAll, lowPricesAll) {
   if (rules === null || rules === undefined || rules.length === 0) {
     return false;
   }
   let rulesMet = 0;
   for (let rule of rules) {
-    let historicalData = historicalDatas[rule.timeframe];
-    if (historicalData.length < 2) {
+    let closePrices = closePricesAll[rule.timeframe];
+    let highPrices = highPricesAll[rule.timeframe];
+    let lowPrices = lowPricesAll[rule.timeframe];
+    if (closePrices.length < 2) {
       return false;
     }
     if (rule.indicator === 'sma' || rule.indicator === 'ema') {
       let ma = rule.indicator === 'sma'
-        ? calculateSMA(rule.period, historicalData)
-        : calculateEMA(rule.period, historicalData);
+        ? calculateSMA(rule.period, closePrices)
+        : calculateEMA(rule.period, closePrices);
       if (ma === null) {
         break;
       }
       if (rule.direction === 'above') {
-        if (historicalData[historicalData.length - 1] > ma[0] * (1 + (rule.value / 100))) {
+        if (closePrices[closePrices.length - 1] > ma[0] * (1 + (rule.value / 100))) {
           rulesMet++;
           continue;
         }
-      } else if (rule.direction === 'bellow') {
-        if (historicalData[historicalData.length - 1] < ma[0] * (1 - (rule.value / 100))) {
+      } else if (rule.direction === 'below' || rule.direction === 'bellow') {
+        if (closePrices[closePrices.length - 1] < ma[0] * (1 - (rule.value / 100))) {
           rulesMet++;
           continue;
         }
       } else if (rule.direction === 'crossing') {
-        if (rule.crossDirection === 'top to bottom' && historicalData[historicalData.length - 2] >= ma[1] && historicalData[historicalData.length - 1] < ma[0]) {
+        if (rule.crossDirection === 'top to bottom' && closePrices[closePrices.length - 2] >= ma[1] && closePrices[closePrices.length - 1] < ma[0]) {
           rulesMet++;
           continue;
-        } else if (rule.crossDirection === 'bottom to top' && historicalData[historicalData.length - 2] <= ma[1] && historicalData[historicalData.length - 1] > ma[0]) {
+        } else if (rule.crossDirection === 'bottom to top' && closePrices[closePrices.length - 2] <= ma[1] && closePrices[closePrices.length - 1] > ma[0]) {
           rulesMet++;
           continue;
         }
       }
     } else if (rule.indicator === "cma") {
       let ma1 = rule.type === "SMA"
-        ? calculateSMA(rule.period, historicalData)
-        : calculateEMA(rule.period, historicalData);
+        ? calculateSMA(rule.period, closePrices)
+        : calculateEMA(rule.period, closePrices);
       let ma2 = rule.type2 === "SMA"
-        ? calculateSMA(rule.period2, historicalData)
-        : calculateEMA(rule.period2, historicalData);
+        ? calculateSMA(rule.period2, closePrices)
+        : calculateEMA(rule.period2, closePrices);
       if (ma1 === null || ma2 === null) {
         break;
       }
@@ -53,7 +55,7 @@ function checkTradeRules(rules, historicalDatas) {
         continue;
       }
     } else if (rule.indicator === "rsi") {
-      let rsi = calculateRsi(rule.period, historicalData);
+      let rsi = calculateRsi(rule.period, closePrices);
       if (rsi === null) {
         break;
       }
@@ -62,7 +64,7 @@ function checkTradeRules(rules, historicalDatas) {
           rulesMet++;
           continue;
         }
-      } else if (rule.direction === 'bellow') {
+      } else if (rule.direction === 'below' || rule.direction === 'bellow') {
         if (rsi[0] < rule.value) {
           rulesMet++;
           continue;
@@ -77,7 +79,7 @@ function checkTradeRules(rules, historicalDatas) {
         }
       }
     } else if (rule.indicator === "macd") {
-      let macd = calculateMacd(rule.period, rule.period2, rule.period3, historicalData);
+      let macd = calculateMacd(rule.period, rule.period2, rule.period3, closePrices);
       if (macd === null) {
         break;
       }
@@ -98,7 +100,7 @@ function checkTradeRules(rules, historicalDatas) {
           rulesMet++;
           continue;
         }
-      } else if (rule.direction === 'bellow') {
+      } else if (rule.direction === 'below' || rule.direction === 'bellow') {
         if (macd[0] < lineValue * (1 - (ruleValue / 100))) {
           rulesMet++;
           continue;
@@ -113,7 +115,7 @@ function checkTradeRules(rules, historicalDatas) {
         }
       }
     } else if (rule.indicator === "bb") {
-      let bb = calculateBB(rule.period, rule.period2, historicalData);
+      let bb = calculateBB(rule.period, rule.period2, closePrices);
       let bandValue = 0;
       let bandValue2 = 0;
       if (rule.type === 'upper band') {
@@ -125,23 +127,47 @@ function checkTradeRules(rules, historicalDatas) {
       }
 
       if (rule.direction === 'above') {
-        if (historicalData[historicalData.length - 1] > bandValue * (1 + (rule.value / 100))) {
+        if (closePrices[closePrices.length - 1] > bandValue * (1 + (rule.value / 100))) {
           rulesMet++;
           continue;
         }
-      } else if (rule.direction === 'bellow') {
-        if (historicalData[historicalData.length - 1] < bandValue * (1 - (rule.value / 100))) {
+      } else if (rule.direction === 'below' || rule.direction === 'bellow') {
+        if (closePrices[closePrices.length - 1] < bandValue * (1 - (rule.value / 100))) {
           rulesMet++;
           continue;
         }
       } else if (rule.direction === 'crossing') {
-        if (rule.crossDirection === 'top to bottom' && historicalData[historicalData.length - 2] >= bandValue2 && historicalData[historicalData.length - 1] < bandValue) {
+        if (rule.crossDirection === 'top to bottom' && closePrices[closePrices.length - 2] >= bandValue2 && closePrices[closePrices.length - 1] < bandValue) {
           rulesMet++;
           continue;
-        } else if (rule.crossDirection === 'bottom to top' && historicalData[historicalData.length - 2] <= bandValue2 && historicalData[historicalData.length - 1] > bandValue) {
+        } else if (rule.crossDirection === 'bottom to top' && closePrices[closePrices.length - 2] <= bandValue2 && closePrices[closePrices.length - 1] > bandValue) {
           rulesMet++;
           continue;
         }
+      }
+    } else if (rule.indicator === "sto" || rule.indicator === "stoRsi") {
+      let sto = rule.indicator === "sto"
+        ? calculateSto(rule.period, rule.period2, rule.period3, closePrices, highPrices, lowPrices)
+        : calculateStoRsi(rule.period, rule.period2, rule.period3, rule.period4, closePrices);
+      if (sto === null) {
+        break;
+      }
+      let kLine = sto[0];
+      let dLine = sto[1];
+
+      if (rule.direction === 'crossing') {
+        if ((rule.type === 'above' && kLine[0] > rule.value) || (rule.type === 'below' && kLine[0] < rule.value)) {
+          if (rule.crossDirection === 'top to bottom' && kLine[1] >= dLine[1] && kLine[0] < dLine[0]) {
+            rulesMet++;
+            continue;
+          } else if (rule.crossDirection === 'bottom to top' && kLine[1] <= dLine[1] && kLine[0] > dLine[0]) {
+            rulesMet++;
+            continue;
+          }
+        }
+      } else if ((rule.direction === 'above' && kLine[0] > rule.value) || (rule.direction === 'below' && kLine[0] < rule.value)) {
+        rulesMet++;
+        continue;
       }
     }
 
@@ -149,21 +175,21 @@ function checkTradeRules(rules, historicalDatas) {
   return rulesMet === rules.length;
 }
 
-function calculateSMA(smaPeriod, historicalData) {
-  if (historicalData.length <= smaPeriod) {
+function calculateSMA(smaPeriod, closePrices) {
+  if (closePrices.length <= smaPeriod) {
     return null;
   }
   let sum = 0;
-  for (let i = historicalData.length - smaPeriod; i < historicalData.length - 1; i++) {
-    sum += historicalData[i]
+  for (let i = closePrices.length - smaPeriod; i < closePrices.length - 1; i++) {
+    sum += closePrices[i]
   }
   return [
-    parseFloat(((sum + historicalData[historicalData.length - 1]) / smaPeriod).toFixed(8)),
-    parseFloat(((sum + historicalData[historicalData.length - smaPeriod - 1]) / smaPeriod).toFixed(8))
+    parseFloat(((sum + closePrices[closePrices.length - 1]) / smaPeriod).toFixed(8)),
+    parseFloat(((sum + closePrices[closePrices.length - smaPeriod - 1]) / smaPeriod).toFixed(8))
   ];
 }
 
-function calculateEMA(emaPeriod, historicalData) {
+function calculateEMA(emaPeriod, closePrices) {
   let periodsToUse = 300;
   if (emaPeriod < 150) {
     periodsToUse = 250
@@ -173,15 +199,15 @@ function calculateEMA(emaPeriod, historicalData) {
     periodsToUse = 100
   }
 
-  if (historicalData.length <= emaPeriod || historicalData.length < periodsToUse) {
+  if (closePrices.length <= emaPeriod || closePrices.length < periodsToUse) {
     return null;
   }
   let multiplier = 2 / (emaPeriod + 1);
-  let emaPrev = historicalData[historicalData.length - periodsToUse];
-  for (let i = historicalData.length - (periodsToUse - 1); i < historicalData.length - 1; i++) {
-    emaPrev = (historicalData[i] - emaPrev) * multiplier + emaPrev;
+  let emaPrev = closePrices[closePrices.length - periodsToUse];
+  for (let i = closePrices.length - (periodsToUse - 1); i < closePrices.length - 1; i++) {
+    emaPrev = (closePrices[i] - emaPrev) * multiplier + emaPrev;
   }
-  let ema = (historicalData[historicalData.length - 1] - emaPrev) * multiplier + emaPrev;
+  let ema = (closePrices[closePrices.length - 1] - emaPrev) * multiplier + emaPrev;
   return [
     parseFloat(ema.toFixed(8)),
     parseFloat(emaPrev.toFixed(8))
@@ -198,16 +224,16 @@ function calculateRs(period, array) {
   return ema;
 }
 
-function calculateRsi(rsiPeriod, historicalData) {
-  if (historicalData.length <= rsiPeriod || historicalData.length < 100) {
+function calculateRsi(rsiPeriod, closePrices) {
+  if (closePrices.length <= rsiPeriod || closePrices.length < 100) {
     return null;
   }
 
   let avgGain = [];
   let avgLoss = [];
-  let prevClose = historicalData[historicalData.length - 100];
-  for (let i = historicalData.length - 99; i < historicalData.length - 1; i++) {
-    let change = historicalData[i] - prevClose;
+  let prevClose = closePrices[closePrices.length - 100];
+  for (let i = closePrices.length - 99; i < closePrices.length - 1; i++) {
+    let change = closePrices[i] - prevClose;
     if (change > 0) {
       avgGain.push(change);
       avgLoss.push(0);
@@ -215,13 +241,13 @@ function calculateRsi(rsiPeriod, historicalData) {
       avgGain.push(0);
       avgLoss.push(Math.abs(change));
     }
-    prevClose = historicalData[i];
+    prevClose = closePrices[i];
   }
 
   let avgGainFinalPrev = calculateRs(rsiPeriod, avgGain);
   let avgLossFinalPrev = calculateRs(rsiPeriod, avgLoss);
 
-  let change = historicalData[historicalData.length - 1] - prevClose;
+  let change = closePrices[closePrices.length - 1] - prevClose;
   if (change > 0) {
     avgGain.push(change);
     avgLoss.push(0);
@@ -235,38 +261,36 @@ function calculateRsi(rsiPeriod, historicalData) {
 
   let rsi = 100 - (100 / (1 + (avgGainFinal / avgLossFinal)));
   let rsiPrev = 100 - (100 / (1 + (avgGainFinalPrev / avgLossFinalPrev)));
-  //let d = new Date(array[index][0])
-  //alert(d + ' RSI: ' + rsi+' RSI: ' + rsiPrev);
   return [
     parseFloat(rsi.toFixed(8)),
     parseFloat(rsiPrev.toFixed(8))
   ];
 }
 
-function calculateEMAFull(emaPeriod, historicalData, count) {
-  if (historicalData.length <= emaPeriod || historicalData.length < count) {
+function calculateEMAFull(emaPeriod, closePrices, count) {
+  if (closePrices.length <= emaPeriod || closePrices.length < count) {
     return null;
   }
   let multiplier = 2 / (emaPeriod + 1);
-  let emaPrev = historicalData[historicalData.length - count];
+  let emaPrev = closePrices[closePrices.length - count];
   let emas = [];
-  for (let i = historicalData.length - count; i < historicalData.length - 1; i++) {
-    emaPrev = (historicalData[i] - emaPrev) * multiplier + emaPrev;
+  for (let i = closePrices.length - count; i < closePrices.length - 1; i++) {
+    emaPrev = (closePrices[i] - emaPrev) * multiplier + emaPrev;
     emas.push(parseFloat(emaPrev.toFixed(8)));
   }
 
-  let ema = (historicalData[historicalData.length - 1] - emaPrev) * multiplier + emaPrev;
+  let ema = (closePrices[closePrices.length - 1] - emaPrev) * multiplier + emaPrev;
   emas.push(parseFloat(ema.toFixed(8)));
 
   return emas;
 }
 
-function calculateMacd(period, period2, period3, historicalData) {
+function calculateMacd(period, period2, period3, closePrices) {
   let emasCount = period3 === undefined
     ? 100
     : period3 + 70;
-  let fastEma = calculateEMAFull(period, historicalData, emasCount);
-  let slowEma = calculateEMAFull(period2, historicalData, emasCount);
+  let fastEma = calculateEMAFull(period, closePrices, emasCount);
+  let slowEma = calculateEMAFull(period2, closePrices, emasCount);
   if (fastEma === null || slowEma === null || fastEma.length < 1 || slowEma.length < 1) {
     return null;
   }
@@ -295,19 +319,19 @@ function calculateMacd(period, period2, period3, historicalData) {
   ];
 }
 
-function calculateBB(period, stdDev, historicalData) {
-  if (historicalData.length <= period + 1) {
+function calculateBB(period, stdDev, closePrices) {
+  if (closePrices.length <= period + 1) {
     return null;
   }
-  let sma = calculateSMA(period, historicalData);
+  let sma = calculateSMA(period, closePrices);
 
   let dataPrev = [];
   let data = [];
-  dataPrev.push(historicalData[historicalData.length - 1 - period]);
-  data.push(historicalData[historicalData.length - 1])
-  for (let i = historicalData.length - 2; i > historicalData.length - 1 - period; i--) {
-    dataPrev.push(historicalData[i]);
-    data.push(historicalData[i])
+  dataPrev.push(closePrices[closePrices.length - 1 - period]);
+  data.push(closePrices[closePrices.length - 1])
+  for (let i = closePrices.length - 2; i > closePrices.length - 1 - period; i--) {
+    dataPrev.push(closePrices[i]);
+    data.push(closePrices[i])
   }
   let prevStdDev1 = calculateStdDev(dataPrev);
   let stdDev1 = calculateStdDev(data);
@@ -345,6 +369,140 @@ function calculateAvg(data) {
   }, 0);
 
   return sum / data.length;
+}
+
+function calculateStoKLine(startIndex, endIndex, closePrices, highPrices, lowPrices) {
+  let max = highPrices[startIndex];
+  let min = lowPrices[startIndex];
+  let count = 1;
+  for (let i = startIndex + 1; i <= endIndex; i++) {
+    count++;
+    if (max < highPrices[i]) {
+      max = highPrices[i];
+    }
+    if (min > lowPrices[i]) {
+      min = lowPrices[i];
+    }
+  }
+  return parseFloat(((closePrices[endIndex] - min) / (max - min)).toFixed(8)) * 100;
+}
+
+function calculateStoSmoothK(offset, kPeriod, smoothPeriod, closePrices, highPrices, lowPrices) {
+  let kLineData = [];
+  for (let i = closePrices.length - smoothPeriod - offset; i < closePrices.length - offset; i++) {
+    kLineData.push(calculateStoKLine(i - kPeriod + 1, i, closePrices, highPrices, lowPrices));
+  }
+
+  let sum = 0;
+  for (let i = 0; i < kLineData.length; i++) {
+    sum += kLineData[i]
+  }
+  return parseFloat((sum / smoothPeriod).toFixed(8));
+}
+
+function calculateSto(kPeriod, dPeriod, smoothPeriod, closePrices, highPrices, lowPrices) {
+  if (closePrices.length <= kPeriod + smoothPeriod) {
+    return null;
+  }
+  kLineSmoothedData = [];
+  for (let i = 0; i < dPeriod + 1; i++) {
+    kLineSmoothedData.push(calculateStoSmoothK(i, kPeriod, smoothPeriod, closePrices, highPrices, lowPrices));
+  }
+
+  let dLine = kLineSmoothedData[0];
+  let dLinePrev = kLineSmoothedData[kLineSmoothedData.length - 1];
+  for (let i = 1; i < dPeriod; i++) {
+    dLine += kLineSmoothedData[i];
+    dLinePrev += kLineSmoothedData[i];
+  }
+
+  dLine = Number.parseFloat((dLine / dPeriod).toFixed(8));
+  dLinePrev = Number.parseFloat((dLinePrev / dPeriod).toFixed(8));
+  return [
+    [
+      kLineSmoothedData[0], kLineSmoothedData[1]
+    ],
+    [
+      dLine, dLinePrev
+    ]
+  ];
+}
+calculateSto(14, 3, 3, [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  15
+], [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20
+], [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20
+])
+function calculateStoRsi(kPeriod, dPeriod, smoothPeriod, rsiPeriod, closePrices) {
+  let rsi = [];
+  let newclosePrices = [];
+  for (let i = closePrices.length - kPeriod - rsiPeriod - 100; i < closePrices.length - kPeriod - rsiPeriod; i++) {
+    newclosePrices.push(closePrices[i]);
+  }
+  for (let i = closePrices.length - kPeriod - rsiPeriod; i < closePrices.length; i++) {
+    newclosePrices.push(closePrices[i]);
+    rsi.push(calculateRsi(rsiPeriod, newclosePrices)[0]);
+  }
+
+  return calculateSto(kPeriod, dPeriod, smoothPeriod, rsi, rsi, rsi);
 }
 
 module.exports = {

@@ -701,12 +701,17 @@ async function notifications() {
     if (email == null) {
       email = '';
     }
-    openModalConfirm('<div class="text-justify">If you want to receive trading updates on your Real Trading strategies, please fill your email bellow:</div>' + '<input style="width:100%"class="search main-field white" id="emailBoxTmp" type="text" placeholder="E-mail to receive Notifications" value="' + email + '"/>', async function() {
-      email = $('#emailBoxTmp').val();
+
+    openModalConfirm('<div class="text-justify">If you want to receive trading updates on your Real Trading strategies, please fill your email below.<br>You will receive an e-mail report every 10 minutes in case of new trades.</div>' + '<input style="width:100%"class="search main-field white" id="emailBoxTmp" type="text" placeholder="E-mail to receive Notifications" value="' + email +
+    '"/>', async function() {
+      let email = $('#emailBoxTmp').val();
       if (email.indexOf('@') === -1) {
-        openModalInfo('Please type a valid email!');
+        openModalInfo('Please type a valid email!', function() {
+          notifications()
+        });
         return;
       }
+
       await updateEmailDb(email);
       await fillEmailField();
       $('#notificationsBtn').html('<i class="text-red fas fa-stop"></i> Stop Notifications');
@@ -849,7 +854,7 @@ function calculateUsdtValue(coin, total, prices) {
     return calculateUsdtValue('BTC', Number.parseFloat(prices[coin + 'BTC']) * total, prices)
   } else if (prices[coin + 'BNB'] !== undefined) {
     return calculateUsdtValue('BNB', Number.parseFloat(prices[coin + 'BNB']) * total, prices)
-  }  else if (prices[coin + 'ETH'] !== undefined) {
+  } else if (prices[coin + 'ETH'] !== undefined) {
     return calculateUsdtValue('ETH', Number.parseFloat(prices[coin + 'ETH']) * total, prices)
   } else {
     return 0;
@@ -923,6 +928,53 @@ async function sendErrorMail(execution) {
   }
 }
 
+let notificationsToSend = '';
+const notificationsMutex = new Mutex();
+async function sendNotificationTask() {
+  while (true) {
+    try {
+      await sleep(1000 * 60 * 10); //10 mins
+      let email = await getEmailFromDb();
+      if (!sendNotifications || email == null || notificationsToSend === '') {
+        continue;
+      }
+
+      let executions = await getExecutionsFromDb();
+      let executionsText = '';
+
+      for (let executionTmp of executions) {
+        if (executionTmp.type === 'Trading') {
+          let result = 0;
+          let resultMoney = 0;
+          for (let trade of executionTmp.trades) {
+            if (trade.exit == undefined || trade.exit == null) {
+              continue;
+            }
+            result += trade.result;
+            resultMoney += trade.resultMoney;
+          }
+          executionsText += '<tr><td>' + executionTmp.strategy.name + '</td><td>' + executionTmp.exchange + '</td><td>' + executionTmp.instrument + '</td><td>' + executionTmp.trades.length + '</td><td>' + result.toFixed(2) + '%</td><td>' + resultMoney.toFixed(8) + ' ' + getQuotedCurrency(executionTmp.instrument) + '</td></tr>';
+        }
+      }
+      try {
+        await notificationsMutex.lock();
+        $.post("https://easycryptobot.com/mail-trade-sender.php", {
+          f: 'ecb',
+          m: email,
+          t: notificationsToSend,
+          e: executionsText
+        }, function(data, status) {});
+        notificationsToSend = '';
+      } finally {
+        await notificationsMutex.release();
+      }
+    } catch (err) {
+      log('error', 'sendNotificationTask', err.stack);
+    }
+  }
+}
+sendNotificationTask();
+
 async function sendTradeMail(execution) {
   try {
     let email = await getEmailFromDb();
@@ -932,32 +984,16 @@ async function sendTradeMail(execution) {
     let trade = execution.trades[execution.trades.length - 1];
     let text = '';
     if (trade.exit != undefined && trade.exit != null) {
-      text = 'The execution of strategy "' + execution.strategy.name + '" on instrument ' + execution.instrument + ' has sold ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' at ' + trade.exit.toFixed(8) + ', resulting in ' + trade.result.toFixed(2) + '% ~ ' + trade.resultMoney.toFixed(8) + ' ' + getQuotedCurrency(execution.instrument);
+      text = '<li>SELL: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were sold at ' + trade.exit.toFixed(8) + ' by "' + execution.strategy.name + '" on ' + execution.instrument + '. Result: ' + trade.result.toFixed(2) + '% (' + trade.resultMoney.toFixed(8) + ' ' + getQuotedCurrency(execution.instrument) + ').</li>';
     } else {
-      text = 'The execution of strategy ' + execution.strategy.name + ' on instrument ' + execution.instrument + ' has bought ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' at ' + trade.entry.toFixed(8);
+      text = '<li>BUY: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were bought at ' + trade.entry.toFixed(8) + ' by "' + execution.strategy.name + '" on ' + execution.instrument + '.</li>';
     }
-    let executions = await getExecutionsFromDb();
-    let executionsText = '';
-    for (let executionTmp of executions) {
-      if (executionTmp.type === 'Trading') {
-        let result = 0;
-        let resultMoney = 0;
-        for (let trade of executionTmp.trades) {
-          if (trade.exit == undefined || trade.exit == null) {
-            continue;
-          }
-          result += trade.result;
-          resultMoney += trade.resultMoney;
-        }
-        executionsText += '<tr><td>' + executionTmp.strategy.name + '</td><td>' + executionTmp.exchange + '</td><td>' + executionTmp.instrument + '</td><td>' + executionTmp.trades.length + '</td><td>' + result.toFixed(2) + '%</td><td>' + resultMoney.toFixed(8) + ' ' + getQuotedCurrency(executionTmp.instrument) + '</td></tr>';
-      }
+    try {
+      await notificationsMutex.lock();
+      notificationsToSend += text;
+    } finally {
+      await notificationsMutex.release();
     }
-    $.post("https://easycryptobot.com/mail-trade-sender.php", {
-      f: 'ecb',
-      m: email,
-      t: text,
-      e: executionsText
-    }, function(data, status) {});
   } catch (err) {
     log('error', 'sendTradeMail', err.stack);
   }

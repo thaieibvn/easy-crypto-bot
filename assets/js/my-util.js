@@ -269,11 +269,11 @@ function showUpdateMsg(curVersion, latestVersion) {
   let curSplited = curVersion.split('.');
   let latestSplited = latestVersion.split('.');
   if (curSplited[0] === latestSplited[0]) {
-    openModalConfirm('<h3>An update is available!</h3><br>Check on the button bellow to see what is new since your current version ' + curVersion + '<br> <a href="https://easycryptobot.com/update" target="_blank" class="button alt white">Update Info</a><br><br><h3>Update now?</h3>', function() {
+    openModalConfirm('<h3>An update is available!</h3><br>Check on the button below to see what is new since your current version ' + curVersion + '<br> <a href="https://easycryptobot.com/update" target="_blank" class="button alt white">Update Info</a><br><br><h3>Update now?</h3>', function() {
       downloadUpdates()
     });
   } else {
-    openModalInfo('<h3>An update is available!</h3><br>Check on the button bellow to see what is new since your current version ' + curVersion + '<br> <a href="https://easycryptobot.com/update" target="_blank" class="button alt white">Update Info</a><br><br>No automatic update is available for your version. In order to update, you need to download again the app from <span class="one-click-select">https://easycryptobot.com/</span>. After the download you can extract the app at a new location and start it from there.')
+    openModalInfo('<h3>An update is available!</h3><br>Check on the button below to see what is new since your current version ' + curVersion + '<br> <a href="https://easycryptobot.com/update" target="_blank" class="button alt white">Update Info</a><br><br>No automatic update is available for your version. In order to update, you need to download again the app from <span class="one-click-select">https://easycryptobot.com/</span>. After the download you can extract the app at a new location and start it from there.')
   }
 }
 
@@ -358,7 +358,7 @@ async function checkEulaAccepted() {
   try {
     let eula = await getEula();
     if (eula === null || eula === undefined || !eula.accepted) {
-      openModalAcceptBig('By clicking on "Accept" bellow you are accepting the full Terms and Conditions of the EasyCryptoBot application, available at <span class="one-click-select" style="font-weight:bold"> https://easycryptobot.com/terms.html</span>.<br>' + 'Cryptocurrency trading involves risk, and is not suitable for all investors. ' + 'You are responsible for all the risks and financial resources that you are using for trading and you should carefully consider your investment objectives. ' + 'You are agreeing that you are using the EasyCryptoBot application at your own risk. ' + 'EasyCryptoBot and it\'s developers are not liable for any loss or damage resulting from the use of the application. ' + 'If you do not fully understand these risks and conditions or you are not agreeing with them you must NOT USE the Easy Crypto Bot.', function() {
+      openModalAcceptBig('By clicking on "Accept" below you are accepting the full Terms and Conditions of the EasyCryptoBot application, available at <span class="one-click-select" style="font-weight:bold"> https://easycryptobot.com/terms.html</span>.<br>' + 'Cryptocurrency trading involves risk, and is not suitable for all investors. ' + 'You are responsible for all the risks and financial resources that you are using for trading and you should carefully consider your investment objectives. ' + 'You are agreeing that you are using the EasyCryptoBot application at your own risk. ' + 'EasyCryptoBot and it\'s developers are not liable for any loss or damage resulting from the use of the application. ' + 'If you do not fully understand these risks and conditions or you are not agreeing with them you must NOT USE the Easy Crypto Bot.', function() {
         try {
           storeEula({'accepted': true});
         } catch (err) {

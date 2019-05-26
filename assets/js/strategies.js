@@ -182,7 +182,40 @@ function parseRules(rules) {
             return null;
           }
         }
+      } else if (indicator === 'sto' || indicator === 'stoRsi') {
+        let period3 = Number.parseInt($(rule).find('.period3').val());
+        let indicatorName = indicator === 'stoRsi'
+          ? 'Stochastic RSI'
+          : 'Stochastic';
+        if (isNaN(period) || isNaN(period2) || isNaN(period3) || period <= 1 || period2 <= 0 || period3 <= 0) {
+          openModalInfo('Please fill all ' + indicatorName + ' fields with correct values!');
+          return null;
+        }
+        ruleItem.period = period;
+        ruleItem.period2 = period2;
+        ruleItem.period3 = period3;
+        ruleItem.direction = direction;
+        if (isNaN(value) || value < 0 || value > 100) {
+          openModalInfo('Please fill all ' + indicatorName + ' fields with correct values!');
+          return null;
+        }
+        ruleItem.value = value;
+        if (direction === 'crossing') {
+          ruleItem.crossDirection = crossDirection;
+          ruleItem.type = $(rule).find('.direction2').text();
+        }
+
+        if (indicator === 'stoRsi') {
+          let period4 = Number.parseInt($(rule).find('.period4').val());
+          if (isNaN(period4) || period4 <= 1) {
+            openModalInfo('Please fill all ' + indicatorName + ' fields with correct values!');
+            return null;
+          }
+          ruleItem.period4 = period4;
+        }
+
       }
+
       parsedRules.push(ruleItem);
     }
     return parsedRules;
@@ -377,11 +410,11 @@ async function overwriteStrategy(strategy, name) {
 }
 
 function addNewSmaRule(id, type) {
-  $('#' + type + 'Rules>ul').append('<li class="' + type + '-sma" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe the price is ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'bellow\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">bellow</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show();$(\'#' + id + 'P\').hide()})">crossing</a></li>' + '</ul>' + '</div>' + '&nbsp;SMA with period <input class="period" type="number" value="20" /> ' + '<div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="10" /> %</div>' + '<div id="' + id + 'C" class="inline" style="display:none;"> from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '</div>' + '&nbsp;<a title="Info" onclick="smaInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
+  $('#' + type + 'Rules>ul').append('<li class="' + type + '-sma" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe the price is ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'below\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">below</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show();$(\'#' + id + 'P\').hide()})">crossing</a></li>' + '</ul>' + '</div>' + '&nbsp;SMA with period <input class="period" type="number" value="20" /> ' + '<div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="10" /> %</div>' + '<div id="' + id + 'C" class="inline" style="display:none;"> from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '</div>' + '&nbsp;<a title="Info" onclick="smaInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
 }
 
 function addNewEmaRule(id, type) {
-  $('#' + type + 'Rules>ul').append('<li class="' + type + '-ema" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe the price is ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'bellow\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">bellow</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show();$(\'#' + id + 'P\').hide()})">crossing</a></li>' + '</ul>' + '</div>' + '&nbsp;EMA with period <input class="period" type="number" value="20" /> ' + '<div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="10" /> %</div>' + '<div id="' + id + 'C" class="inline" style="display:none;"> from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '</div>' + '&nbsp;<a title="Info" onclick="emaInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
+  $('#' + type + 'Rules>ul').append('<li class="' + type + '-ema" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe the price is ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'below\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">below</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show();$(\'#' + id + 'P\').hide()})">crossing</a></li>' + '</ul>' + '</div>' + '&nbsp;EMA with period <input class="period" type="number" value="20" /> ' + '<div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="10" /> %</div>' + '<div id="' + id + 'C" class="inline" style="display:none;"> from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '</div>' + '&nbsp;<a title="Info" onclick="emaInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
 }
 
 function addNewCmaRule(id, type) {
@@ -389,22 +422,40 @@ function addNewCmaRule(id, type) {
 }
 
 function addNewRsiRule(id, type) {
-  $('#' + type + 'Rules>ul').append('<li class="' + type + '-rsi" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe RSI with period <input class="period" type="number" value="14" /> is&nbsp;' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'bellow\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').hide()})">bellow</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show()})">crossing</a></li>' + '</ul>' + '</div>' + '<div class="inline">&nbsp;<input class="value" type="number" /></div>' + '<div id="' + id + 'C" class="inline" style="display:none;"> from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '</div>' + '&nbsp;<a title="Info" onclick="rsiInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
+  $('#' + type + 'Rules>ul').append('<li class="' + type + '-rsi" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe RSI with period <input class="period" type="number" value="14" /> is&nbsp;' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'below\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').hide()})">below</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show()})">crossing</a></li>' + '</ul>' + '</div>' + '<div class="inline">&nbsp;<input class="value" type="number" value="50"/></div>' + '<div id="' + id + 'C" class="inline" style="display:none;"> from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '</div>' + '&nbsp;<a title="Info" onclick="rsiInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
 }
 
 function addNewMacdRule(id, type) {
-  $('#' + type + 'Rules>ul').append('<li class="' + type + '-macd" id="' + id + '"><span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe MACD, using "fast" period <input class="period" type="number" value="12" /> and "slow" period <input class="period2" type="number" value="26"/>,&nbsp;is&nbsp;<div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li><li><a href="#/" onclick="dropDownItem(\'bellow\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">bellow</a></li><li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').hide();$(\'#' + id + 'C\').show()})">crossing</a></li></ul></div>&nbsp;<div id="' + id + 'Line" class="inline"><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'Line\')"><span class="name macd-line">signal line</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'signal line\', \'#' + id + 'Line\', function(){$(\'#' + id + 'SL\').show()})">signal line</a></li><li><a href="#/" onclick="dropDownItem(\'zero\', \'#' + id + 'Line\',function(){$(\'#' + id + 'SL\').hide()})">zero</a></li></ul></div></div><div id="' + id + 'SL" class="inline">&nbsp;with period <input class="period3" type="number" value="9"/> <div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="1" /> %</div></div><div id="' + id + 'C" class="inline" style="display:none;"> from <div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li><li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li></ul></div></div>&nbsp;<a title="Info" onclick="macdInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a></li>');
+  $('#' + type + 'Rules>ul').append('<li class="' + type + '-macd" id="' + id + '"><span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe MACD, using "fast" period <input class="period" type="number" value="12" /> and "slow" period <input class="period2" type="number" value="26"/>,&nbsp;is&nbsp;<div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li><li><a href="#/" onclick="dropDownItem(\'below\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">below</a></li><li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').hide();$(\'#' + id + 'C\').show()})">crossing</a></li></ul></div>&nbsp;<div id="' + id + 'Line" class="inline"><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'Line\')"><span class="name macd-line">signal line</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'signal line\', \'#' + id + 'Line\', function(){$(\'#' + id + 'SL\').show()})">signal line</a></li><li><a href="#/" onclick="dropDownItem(\'zero\', \'#' + id + 'Line\',function(){$(\'#' + id + 'SL\').hide()})">zero</a></li></ul></div></div><div id="' + id + 'SL" class="inline">&nbsp;with period <input class="period3" type="number" value="9"/> <div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="1" /> %</div></div><div id="' + id + 'C" class="inline" style="display:none;"> from <div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li><li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li></ul></div></div>&nbsp;<a title="Info" onclick="macdInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a></li>');
 }
 
 function addNewBBRule(id, type) {
-  $('#' + type + 'Rules>ul').append('<li class="' + type + '-bb" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe the price is ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'bellow\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">bellow</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show();$(\'#' + id + 'P\').hide()})">crossing</a></li>' + '</ul>' + '</div>' + '&nbsp;the&nbsp;<div id="' + id + 'Line" class="inline"><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'Line\')"><span class="name bb-line">upper band</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'upper band\', \'#' + id + 'Line\', function(){})">upper band</a></li><li><a href="#/" onclick="dropDownItem(\'lower band\', \'#' + id + 'Line\',function(){})">lower band</a></li></ul></div></div>&nbsp;of Bollinger Bands with period <input class="period" type="number" value="20" /> ' + '&nbsp;and Std. Dev. <input class="period2" type="number" value="2"/>&nbsp;' + '<div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="1" /> %</div>' + '<div id="' + id + 'C" class="inline" style="display:none;"> from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '</div>' + '&nbsp;<a title="Info" onclick="bbInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
+  $('#' + type + 'Rules>ul').append('<li class="' + type + '-bb" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe the price is ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">above</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'below\', \'#' + id + '\', function(){ $(\'#' + id + 'P\').show();$(\'#' + id + 'C\').hide()})">below</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show();$(\'#' + id + 'P\').hide()})">crossing</a></li>' + '</ul>' + '</div>' + '&nbsp;the&nbsp;<div id="' + id + 'Line" class="inline"><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'Line\')"><span class="name bb-line">upper band</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="dropDownItem(\'upper band\', \'#' + id + 'Line\', function(){})">upper band</a></li><li><a href="#/" onclick="dropDownItem(\'lower band\', \'#' + id + 'Line\',function(){})">lower band</a></li></ul></div></div>&nbsp;of Bollinger Bands with period <input class="period" type="number" value="20" /> ' + '&nbsp;and Std. Dev. <input class="period2" type="number" value="2"/>&nbsp;' + '<div id="' + id + 'P" class="inline"> by <input class="value" type="number" value="1" /> %</div>' + '<div id="' + id + 'C" class="inline" style="display:none;"> from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '</div>' + '&nbsp;<a title="Info" onclick="bbInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
+}
+
+function addNewStoRule(id, type) {
+  $('#' + type + 'Rules>ul').append('<li class="' + type + '-sto" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe Stochastic %K line is ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">crossing</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'below\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').hide()})">below</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show();})">crossing</a></li>' + '</ul>' + '</div>' + '<div id="' + id + 'C" class="inline"> %D line from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '&nbsp;<div id="' + id + 'D2" class="inline"> <div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'D2\')"><span class="name direction2">below</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + 'D2\')">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'below\', \'#' + id + 'D2\')">below</a></li> </ul></div></div>' + '</div> <input class="value" type="number" value="50" />. Setup: %K period is <input class="period" type="number" value="14" />, %D period is <input class="period2" type="number" value="3" />, Smoothing is <input class="period3" type="number" value="3" />' + '&nbsp;<a title="Info" onclick="stoInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
+
+}
+
+function addNewStoRsiRule(id, type) {
+  $('#' + type + 'Rules>ul').append('<li class="' + type + '-stoRsi" id="' + id + '">' + '<span class="bold">Rule: </span>On ' + '<div id="' + id + 'TF" class="inline" style=""><div class="drop-down"><a href="#/" onclick="dropDown(\'#' + id + 'TF\')"><span class="name timeframe">' + lastTFUsed + '</span> <span class="caret"></span></a><ul><li><a href="#/" onclick="tfDropDownItem(\'1 minute\', \'#' + id + 'TF\')">1 minute</a></li><li><a href="#/" onclick="tfDropDownItem(\'5 minutes\', \'#' + id + 'TF\')">5 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'15 minutes\',\'#' + id + 'TF\')">15 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'30 minutes\', \'#' + id + 'TF\')">30 minutes</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 hour\', \'#' + id + 'TF\')">1 hour</a></li><li><a href="#/" onclick="tfDropDownItem(\'2 hours\', \'#' + id + 'TF\')">2 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'4 hours\', \'#' + id + 'TF\')">4 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'12 hours\', \'#' + id + 'TF\')">12 hours</a></li><li><a href="#/" onclick="tfDropDownItem(\'1 day\', \'#' + id + 'TF\')">1 day</a></li></ul></div></div>' + ' timeframe Stochastic RSI %K line is ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + '\')"><span class="name direction">crossing</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').hide()})">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'below\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').hide()})">below</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'crossing\', \'#' + id + '\', function(){ $(\'#' + id + 'C\').show();})">crossing</a></li>' + '</ul>' + '</div>' + '<div id="' + id + 'C" class="inline"> %D line from ' + '<div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'C\')"><span class="name cross-direction">bottom to top</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'bottom to top\', \'#' + id + 'C\')">bottom to top</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'top to bottom\', \'#' + id + 'C\')">top to bottom</a></li>' + '</ul>' + '</div>' + '&nbsp;<div id="' + id + 'D2" class="inline"> <div class="drop-down">' + '<a href="#/" onclick="dropDown(\'#' + id + 'D2\')"><span class="name direction2">below</span> <span ' + 'class="caret"></span></a>' + '<ul>' + '<li><a href="#/" onclick="dropDownItem(\'above\', \'#' + id + 'D2\')">above</a></li>' + '<li><a href="#/" onclick="dropDownItem(\'below\', \'#' + id + 'D2\')">below</a></li> </ul></div></div>' + '</div> <input class="value" type="number" value="50" />. Setup: RSI period is <input class="period4" type="number" value="14" />, %K period is <input class="period" type="number" value="14" />, %D period is <input class="period2" type="number" value="3" />, Smoothing is <input class="period3" type="number" value="3" />' + '&nbsp;<a title="Info" onclick="stoRsiInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>' + '&nbsp;<a title="Remove Rule" onclick="removeRule(\'#' + id + '\')" href="#/"><i class="text-red fas fa-times"></i></a>' + '</li>');
 }
 
 function ordersInfo() {
   openModalInfoBig('<h3 class="text-center">EasyCryptoBot Trading</h3><br><strong>BUY </strong> - when all of the buying rules are met the bot will execute MARKET BUY Order on the open of the candle, following the one in which the rules were met. This means that the bot will wait for a confirmation that the rules are met before buying.<br><br><strong>SELL </strong> - when all of the selling rules are met the bot will execute MARKET SELL Order on the open of the candle, following the one in which the rules were met. This means that the bot will wait for a confirmation that the rules are met before selling.<br><br><strong>STOPLOSS </strong> - if the current price reaches the stoploss a MARKET SELL order is executed.<br><br><strong>TARGET </strong> - if you privide a target percent when the bot buys a LIMIT SELL Order will be placed on the exchange. That way the target profit pecent will be guaranted for the full amount of your trading size.<br><br><strong>Time Close </strong> - when the provided time has passed if the position is still open the bot will execute a MARKET SELL order.');
 }
+
+function stoInfo() {
+  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">Stochastic oscillator is a momentum indicator comparing a particular closing price of a security to a range of its prices over a certain period of time.<br><br>Stochastic values are plotted in a range bound between 0 and 100. Overbought conditions exist when the oscillator is above 80, and the asset is considered oversold when values are below 20.<br><br>Stochastic oscillator charting generally consists of two lines: one reflecting the actual value of the oscillator for each session, and one reflecting its three-day simple moving average. Because price is thought to follow momentum, intersection of these two lines is considered to be a signal that a reversal may be in the works, as it indicates a large shift in momentum from day to day.</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/sto-info.png\" alt=\"\">");
+}
+
+function stoRsiInfo() {
+  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">Stochastic RSI indicator is essentially an indicator of an indicator.<br><br>It is used in technical analysis to provide a stochastic calculation to the RSI indicator. This means that it is a measure of RSI relative to its own high/low range over a user defined period of time.<br><br>This indicator is primarily used for identifying overbought and oversold conditions. Overbought conditions exist when the oscillator is above 80, and the asset is considered oversold when values are below 20.</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/sto-rsi-info.png\" alt=\"\">");
+}
+
 function bbInfo() {
-  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">Bollinger Bands is a tool that plots two standard deviations (positively and negatively) away from a simple moving average (SMA) of the price.<br>The purpose of Bollinger Bands is to provide a relative definition of high and low prices of a market. Many traders believe the closer the prices move to the upper band, the more overbought the market, and the closer the prices move to the lower band, the more oversold the market.<br>The author of the indicator John Bollinger has a set of 22 rules to follow when using the bands as a trading system.</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/bb-info.png\" alt=\"\">");
+  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">Bollinger Bands is a tool that plots two standard deviations (positively and negatively) away from a simple moving average (SMA) of the price.<br><br>The purpose of Bollinger Bands is to provide a relative definition of high and low prices of a market. Many traders believe the closer the prices move to the upper band, the more overbought the market, and the closer the prices move to the lower band, the more oversold the market.<br><br>The author of the indicator John Bollinger has a set of 22 rules to follow when using the bands as a trading system.</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/bb-info.png\" alt=\"\">");
 }
 
 function macdInfo() {
@@ -420,11 +471,11 @@ function emaInfo() {
 }
 
 function cmaInfo() {
-  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">A Crossover occurs when a short-term average crosses through a long-term average." + "<br><br>This signal is used by traders to identify that momentum is shifting in one direction and that a strong move is likely approaching." + "<br><br>A buy signal is generated when the short-term average crosses above the long-term average, while a sell signal is triggered by a short-term average crossing bellow a long-term average." + "</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/cma-info.png\" alt=\"\">");
+  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">A Crossover occurs when a short-term average crosses through a long-term average." + "<br><br>This signal is used by traders to identify that momentum is shifting in one direction and that a strong move is likely approaching." + "<br><br>A buy signal is generated when the short-term average crosses above the long-term average, while a sell signal is triggered by a short-term average crossing below a long-term average." + "</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/cma-info.png\" alt=\"\">");
 }
 
 function rsiInfo() {
-  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">Relative Strength Index - RSI is a momentum indicator which provides a relative evaluation of the strength of the recent price performance." + " RSI values range from 0 to 100. " + "<br><br>A RSI reading of 70 or above is commonly interpreted as indicating an overbought or overvalued condition that may signal a trend change or corrective price reversal to the downside." + "<br><br>A RSI reading of 30 or bellow is commonly interpreted as indicating an oversold or undervalued condition that may signal a trend change or corrective price reversal to the upside." + "</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/rsi-info.png\" alt=\"\">");
+  openModalInfoBig("<div style=\"display:inline-block;width:40%;margin:0 5%\">Relative Strength Index - RSI is a momentum indicator which provides a relative evaluation of the strength of the recent price performance." + " RSI values range from 0 to 100. " + "<br><br>A RSI reading of 70 or above is commonly interpreted as indicating an overbought or overvalued condition that may signal a trend change or corrective price reversal to the downside." + "<br><br>A RSI reading of 30 or below is commonly interpreted as indicating an oversold or undervalued condition that may signal a trend change or corrective price reversal to the upside." + "</div><img style=\"display:inline-block;width:40%;margin:0 5%;vertical-align:top;\" src=\"./assets/images/rsi-info.png\" alt=\"\">");
 }
 
 function timeCloseInfo() {
@@ -480,6 +531,10 @@ function newRule(id, type, direction) {
     addNewMacdRule(id, direction);
   } else if (type === 'bb') {
     addNewBBRule(id, direction);
+  } else if (type === 'sto') {
+    addNewStoRule(id, direction);
+  } else if (type === 'stoRsi') {
+    addNewStoRsiRule(id, direction);
   } else {
     indicatorCommingSoon(type)
   }
@@ -541,6 +596,87 @@ function openStrategyVariationStrategy(strategy) {
   openStrategy(strategy)
 }
 
+function fillRule(rule, id) {
+  let tf = (rule.timeframe === null || rule.timeframe === undefined)
+    ? 'Choose Timeframe'
+    : rule.timeframe;
+  $(id).find('.timeframe').text(tf);
+  if (rule.indicator === 'sma' || rule.indicator === 'ema') {
+    $(id).find('.period').val(rule.period);
+    $(id).find('.direction').text(rule.direction ==='bellow' ? 'below' : rule.direction);
+    if (rule.direction === 'crossing') {
+      $(id + 'C').show();
+      $(id + 'P').hide();
+      $(id).find('.cross-direction').text(rule.crossDirection);
+    } else {
+      $(id).find('.value').val(rule.value);
+    }
+  } else if (rule.indicator === 'cma') {
+    $(id).find('.period').val(rule.period);
+    $(id).find('.period2').val(rule.period2);
+    $(id).find('.ma-type').text(rule.type);
+    $(id).find('.ma-type2').text(rule.type2);
+    $(id).find('.cross-direction').text(rule.crossDirection);
+  } else if (rule.indicator === 'rsi') {
+    $(id).find('.period').val(rule.period);
+    $(id).find('.direction').text(rule.direction ==='bellow' ? 'below' : rule.direction);
+    $(id).find('.value').val(rule.value);
+    if (rule.direction === 'crossing') {
+      $(id + 'C').show();
+      $(id + 'P').hide();
+      $(id).find('.cross-direction').text(rule.crossDirection);
+    }
+  } else if (rule.indicator === 'macd') {
+    $(id).find('.period').val(rule.period);
+    $(id).find('.period2').val(rule.period2);
+    $(id).find('.direction').text(rule.direction ==='bellow' ? 'below' : rule.direction);
+    $(id).find('.macd-line').text(rule.type);
+
+    if (rule.type === 'signal line') {
+      $(id).find('.period3').val(rule.period3);
+    } else {
+      $(id + 'SL').hide();
+    }
+
+    if (rule.direction === 'crossing') {
+      $(id + 'C').show();
+      $(id + 'P').hide();
+      $(id).find('.cross-direction').text(rule.crossDirection);
+    } else {
+      $(id).find('.value').val(rule.value);
+    }
+  } else if (rule.indicator === 'bb') {
+    $(id).find('.period').val(rule.period);
+    $(id).find('.period2').val(rule.period2);
+    $(id).find('.direction').text(rule.direction ==='bellow' ? 'below' : rule.direction);
+    $(id).find('.bb-line').text(rule.type);
+
+    if (rule.direction === 'crossing') {
+      $(id + 'C').show();
+      $(id + 'P').hide();
+      $(id).find('.cross-direction').text(rule.crossDirection);
+    } else {
+      $(id).find('.value').val(rule.value);
+    }
+  } else if (rule.indicator === 'sto' || rule.indicator === 'stoRsi') {
+    $(id).find('.period').val(rule.period);
+    $(id).find('.period2').val(rule.period2);
+    $(id).find('.period3').val(rule.period3);
+    $(id).find('.direction').text(rule.direction ==='bellow' ? 'below' : rule.direction);
+    $(id).find('.value').val(rule.value);
+    if (rule.direction === 'crossing') {
+      $(id + 'C').show();
+      $(id).find('.cross-direction').text(rule.crossDirection);
+      $(id).find('.direction2').text(rule.type);
+    } else {
+      $(id + 'C').hide();
+    }
+    if (rule.indicator === 'stoRsi') {
+      $(id).find('.period4').val(rule.period4);
+    }
+  }
+}
+
 function openStrategy(strategy, hideSaveBtn) {
   try {
     clearStrategyFields();
@@ -570,68 +706,7 @@ function openStrategy(strategy, hideSaveBtn) {
     strategy.buyRules.forEach(rule => {
       buyRuleType = rule.indicator;
       let id = '#' + newBuyRule();
-      let tf = (rule.timeframe === null || rule.timeframe === undefined)
-        ? 'Choose Timeframe'
-        : rule.timeframe;
-      $(id).find('.timeframe').text(tf);
-      if (rule.indicator === 'sma' || rule.indicator === 'ema') {
-        $(id).find('.period').val(rule.period);
-        $(id).find('.direction').text(rule.direction);
-        if (rule.direction === 'crossing') {
-          $(id + 'C').show();
-          $(id + 'P').hide();
-          $(id).find('.cross-direction').text(rule.crossDirection);
-        } else {
-          $(id).find('.value').val(rule.value);
-        }
-      } else if (rule.indicator === 'cma') {
-        $(id).find('.period').val(rule.period);
-        $(id).find('.period2').val(rule.period2);
-        $(id).find('.ma-type').text(rule.type);
-        $(id).find('.ma-type2').text(rule.type2);
-        $(id).find('.cross-direction').text(rule.crossDirection);
-      } else if (rule.indicator === 'rsi') {
-        $(id).find('.period').val(rule.period);
-        $(id).find('.direction').text(rule.direction);
-        $(id).find('.value').val(rule.value);
-        if (rule.direction === 'crossing') {
-          $(id + 'C').show();
-          $(id + 'P').hide();
-          $(id).find('.cross-direction').text(rule.crossDirection);
-        }
-      } else if (rule.indicator === 'macd') {
-        $(id).find('.period').val(rule.period);
-        $(id).find('.period2').val(rule.period2);
-        $(id).find('.direction').text(rule.direction);
-        $(id).find('.macd-line').text(rule.type);
-
-        if (rule.type === 'signal line') {
-          $(id).find('.period3').val(rule.period3);
-        } else {
-          $(id + 'SL').hide();
-        }
-
-        if (rule.direction === 'crossing') {
-          $(id + 'C').show();
-          $(id + 'P').hide();
-          $(id).find('.cross-direction').text(rule.crossDirection);
-        } else {
-          $(id).find('.value').val(rule.value);
-        }
-      } else if (rule.indicator === 'bb') {
-        $(id).find('.period').val(rule.period);
-        $(id).find('.period2').val(rule.period2);
-        $(id).find('.direction').text(rule.direction);
-        $(id).find('.bb-line').text(rule.type);
-
-        if (rule.direction === 'crossing') {
-          $(id + 'C').show();
-          $(id + 'P').hide();
-          $(id).find('.cross-direction').text(rule.crossDirection);
-        } else {
-          $(id).find('.value').val(rule.value);
-        }
-      }
+      fillRule(rule, id);
     });
     buyRuleType = buyRuleTypeTmp;
 
@@ -639,68 +714,7 @@ function openStrategy(strategy, hideSaveBtn) {
     strategy.sellRules.forEach(rule => {
       sellRuleType = rule.indicator;
       let id = '#' + newSellRule();
-      let tf = (rule.timeframe === null || rule.timeframe === undefined)
-        ? 'Choose Timeframe'
-        : rule.timeframe;
-      $(id).find('.timeframe').text(tf);
-      if (rule.indicator === 'sma' || rule.indicator === 'ema') {
-        $(id).find('.period').val(rule.period);
-        $(id).find('.direction').text(rule.direction);
-        if (rule.direction === 'crossing') {
-          $(id + 'C').show();
-          $(id + 'P').hide();
-          $(id).find('.cross-direction').text(rule.crossDirection);
-        } else {
-          $(id).find('.value').val(rule.value);
-        }
-      } else if (rule.indicator === 'cma') {
-        $(id).find('.period').val(rule.period);
-        $(id).find('.period2').val(rule.period2);
-        $(id).find('.ma-type').text(rule.type);
-        $(id).find('.ma-type2').text(rule.type2);
-        $(id).find('.cross-direction').text(rule.crossDirection);
-      } else if (rule.indicator === 'rsi') {
-        $(id).find('.period').val(rule.period);
-        $(id).find('.direction').text(rule.direction);
-        $(id).find('.value').val(rule.value);
-        if (rule.direction === 'crossing') {
-          $(id + 'C').show();
-          $(id + 'P').hide();
-          $(id).find('.cross-direction').text(rule.crossDirection);
-        }
-      } else if (rule.indicator === 'macd') {
-        $(id).find('.period').val(rule.period);
-        $(id).find('.period2').val(rule.period2);
-        $(id).find('.direction').text(rule.direction);
-        $(id).find('.macd-line').text(rule.type);
-
-        if (rule.type === 'signal line') {
-          $(id).find('.period3').val(rule.period3);
-        } else {
-          $(id + 'SL').hide();
-        }
-
-        if (rule.direction === 'crossing') {
-          $(id + 'C').show();
-          $(id + 'P').hide();
-          $(id).find('.cross-direction').text(rule.crossDirection);
-        } else {
-          $(id).find('.value').val(rule.value);
-        }
-      } else if (rule.indicator === 'bb') {
-        $(id).find('.period').val(rule.period);
-        $(id).find('.period2').val(rule.period2);
-        $(id).find('.direction').text(rule.direction);
-        $(id).find('.bb-line').text(rule.type);
-
-        if (rule.direction === 'crossing') {
-          $(id + 'C').show();
-          $(id + 'P').hide();
-          $(id).find('.cross-direction').text(rule.crossDirection);
-        } else {
-          $(id).find('.value').val(rule.value);
-        }
-      }
+      fillRule(rule, id);
     });
     sellRuleType = sellRuleTypeTmp;
 
@@ -844,13 +858,13 @@ async function fillDefaultStrategies() {
           'target': 6
         });
         strategies.push({
-          'name': 'Example: EMA Bellow/Above',
+          'name': 'Example: EMA below/Above',
           'buyRules': [
             {
               'indicator': 'ema',
               "timeframe": "5 minutes",
               'period': 5,
-              'direction': 'bellow',
+              'direction': 'below',
               'value': 0.5
             }
           ],
@@ -874,7 +888,7 @@ async function fillDefaultStrategies() {
               'indicator': 'rsi',
               "timeframe": "5 minutes",
               'period': 20,
-              'direction': 'bellow',
+              'direction': 'below',
               'value': 40
             }, {
               'indicator': 'cma',
@@ -914,7 +928,7 @@ async function fillDefaultStrategies() {
               "indicator": "sma",
               "timeframe": "15 minutes",
               "period": 30,
-              "direction": "bellow",
+              "direction": "below",
               "value": 3
             }, {
               "indicator": "rsi",

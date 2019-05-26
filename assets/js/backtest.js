@@ -332,8 +332,12 @@ async function runBacktest() {
 
 function containsIndicator(indicators, indicator) {
   for (let intTmp of indicators) {
-    if (indicator.type === 'macd') {
+    if (indicator.type === 'macd' || indicator.type === 'sto') {
       if (intTmp.type === indicator.type && intTmp.period === indicator.period && intTmp.period2 === indicator.period2 && intTmp.period3 === indicator.period3 && intTmp.timeframe === indicator.timeframe) {
+        return true;
+      }
+    } else if (indicator.type === 'stoRsi') {
+      if (intTmp.type === indicator.type && intTmp.period === indicator.period && intTmp.period2 === indicator.period2 && intTmp.period3 === indicator.period3 && intTmp.period4 === indicator.period4 && intTmp.timeframe === indicator.timeframe) {
         return true;
       }
     } else if (intTmp.type === indicator.type && intTmp.period === indicator.period && intTmp.timeframe === indicator.timeframe) {
@@ -405,7 +409,27 @@ function getIndicatorsFromRules(indicators, rules) {
         data2: [],
         timeframe: rule.timeframe
       };
-
+    } else if (rule.indicator === 'sto') {
+      indTmp = {
+        type: rule.indicator,
+        period: rule.period,
+        period2: rule.period2,
+        period3: rule.period3,
+        data: [],
+        data2: [],
+        timeframe: rule.timeframe
+      };
+    } else if (rule.indicator === 'stoRsi') {
+      indTmp = {
+        type: rule.indicator,
+        period: rule.period,
+        period2: rule.period2,
+        period3: rule.period3,
+        period4: rule.period4,
+        data: [],
+        data2: [],
+        timeframe: rule.timeframe
+      };
     }
     if (indTmp !== null && !containsIndicator(indicators, indTmp)) {
       indicators.push(indTmp)
@@ -556,8 +580,14 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
     });
 
     let closePrices = {};
+    let highPrices = {};
+    let lowPrices = {};
+    let openPrices = {};
     for (let ft of timeframes) {
       closePrices[ft] = [];
+      highPrices[ft] = [];
+      lowPrices[ft] = [];
+      openPrices[ft] = [];
     }
 
     let bigTfIndex = 0;
@@ -566,6 +596,10 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
         break;
       }
       closePrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].c);
+      highPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].h);
+      lowPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].l);
+      openPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].o);
+
       bigTfIndex++;
     }
 
@@ -577,16 +611,25 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
           break;
         }
         closePrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].c);
+        highPrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].h);
+        lowPrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].l);
+        openPrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].o);
         smallTfIndex++;
       }
     }
 
     while (ticks[timeframes[0]].length > bigTfIndex) {
       closePrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].c);
+      highPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].h);
+      lowPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].l);
+      openPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].o);
       if (timeframes.length > 1) {
         let dateTo = getEndPeriod(ticks[timeframes[0]][bigTfIndex].d, timeframes[0]);
         while (ticks[timeframes[1]].length > smallTfIndex && ticks[timeframes[1]][smallTfIndex].d < dateTo) {
           closePrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].c);
+          highPrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].h);
+          lowPrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].l);
+          openPrices[timeframes[1]].push(ticks[timeframes[1]][smallTfIndex].o);
 
           for (let indicator of indicators) {
             let value = null;
@@ -612,6 +655,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
                 value[0]
               ]);
             }
+
             if (indicator.type === 'bb') {
               value = calculateBB(indicator.period, indicator.period2, closePrices[indicator.timeframe])
               if (value !== null && value[0] !== null && value[0].length > 0) {
@@ -626,6 +670,23 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
                 ]);
               }
             }
+            if (indicator.type === 'sto' || indicator.type === 'stoRsi') {
+              value = indicator.type === "sto"
+                ? calculateSto(indicator.period, indicator.period2, indicator.period3, closePrices[indicator.timeframe], highPrices[indicator.timeframe], lowPrices[indicator.timeframe])
+                : calculateStoRsi(indicator.period, indicator.period2, indicator.period3, indicator.period4, closePrices[indicator.timeframe], highPrices[indicator.timeframe], lowPrices[indicator.timeframe]);
+              if (value !== null && value[0] !== null && value[0].length > 0) {
+
+                indicator.data.push([
+                  ticks[timeframes[1]][smallTfIndex].d.getTime(),
+                  value[0][0]
+                ]);
+                indicator.data2.push([
+                  ticks[timeframes[1]][smallTfIndex].d.getTime(),
+                  value[1][0]
+                ]);
+              }
+            }
+
           }
           data.push([
             ticks[timeframes[1]][smallTfIndex].d.getTime(),
@@ -674,6 +735,24 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
               ]);
             }
           }
+
+          if (indicator.type === 'sto' || indicator.type === 'stoRsi') {
+            value = indicator.type === "sto"
+              ? calculateSto(indicator.period, indicator.period2, indicator.period3, closePrices[indicator.timeframe],highPrices[indicator.timeframe], lowPrices[indicator.timeframe])
+              : calculateStoRsi(indicator.period, indicator.period2, indicator.period3, indicator.period4, closePrices[indicator.timeframe],highPrices[indicator.timeframe], lowPrices[indicator.timeframe]);
+            if (value !== null && value[0] !== null && value[0].length > 0) {
+
+              indicator.data.push([
+                ticks[timeframes[0]][bigTfIndex].d.getTime(),
+                value[0][0]
+              ]);
+              indicator.data2.push([
+                ticks[timeframes[0]][bigTfIndex].d.getTime(),
+                value[1][0]
+              ]);
+            }
+          }
+
         }
         data.push([
           ticks[timeframes[0]][bigTfIndex].d.getTime(),
@@ -754,6 +833,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
     let freeYaxis = 1;
     let rsiYasxix = null;
     let macdYasxix = null;
+    let stoYasxix = null;
     let containsSecondAxisIndicators = false;
     for (let indicator of indicators) {
       if (indicator.type === 'rsi') {
@@ -823,6 +903,32 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
           },
           data: indicator.data2
         })
+      } else if (indicator.type === 'sto' || indicator.type === 'stoRsi') {
+        containsSecondAxisIndicators = true;
+
+        if (stoYasxix === null) {
+          stoYasxix = freeYaxis;
+          freeYaxis++;
+        }
+        series.push({
+          name: indicator.type + '_' + indicator.period + ',' + indicator.period2 + ',' + indicator.period3 + ' %K ' + indicator.timeframe.replace(' ', '_'),
+          type: 'spline',
+          yAxis: stoYasxix,
+          dataGrouping: {
+            enabled: false
+          },
+          data: indicator.data
+        });
+        series.push({
+          name: indicator.type + '_' + indicator.period + ',' + indicator.period2 + ',' + indicator.period3 + ' %D ' + indicator.timeframe.replace(' ', '_'),
+          type: 'spline',
+          yAxis: stoYasxix,
+          dataGrouping: {
+            enabled: false
+          },
+          data: indicator.data2
+        });
+
       } else {
         series.push({
           name: indicator.type + '_' + indicator.period + ' ' + indicator.timeframe.replace(' ', '_'),
@@ -923,7 +1029,14 @@ function btResultShowRows(from, to) {
   }
   $('#btStrategiesTable').append('</tbody>');
 }
-let bbColors = ['#8cffa1', '#95afdb', '#cea28a', '#ea6ec9', '#96231f', '#66acad'];
+let bbColors = [
+  '#8cffa1',
+  '#95afdb',
+  '#cea28a',
+  '#ea6ec9',
+  '#96231f',
+  '#66acad'
+];
 let bbColorIndexToUse = 0;
 
 function getNextBBColor() {
