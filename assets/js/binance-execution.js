@@ -548,8 +548,12 @@ async function startBinanceWebsocket() {
   let smallTf = execution.timeframes[execution.timeframes.length - 1];
   let bigTfEndDate = null;
   let closePrices = {};
+  let highPrices = {};
+  let lowPrices = {};
   for (let ft of execution.timeframes) {
     closePrices[ft] = [];
+    highPrices[ft] = [];
+    lowPrices[ft] = [];
   }
 
   let buyRulesHaveOnlyBigTf = true;
@@ -597,16 +601,24 @@ async function startBinanceWebsocket() {
         await lastUpdateMutex.release();
       }
       closePrices[smallTf] = [];
+      highPrices[smallTf] = [];
+      lowPrices[smallTf] = [];
       Object.keys(chart).forEach(function(key) {
         try {
           let close = Number.parseFloat(chart[key].close);
+          let high = Number.parseFloat(chart[key].high);
+          let low = Number.parseFloat(chart[key].low);
           if (!isNaN(close)) {
             closePrices[smallTf].push(close);
+            highPrices[smallTf].push(high);
+            lowPrices[smallTf].push(low);
           }
         } catch (err) {}
       });
       //Remove the last value as the current candle is not closed
       let curPrice = closePrices[smallTf].pop();
+      highPrices[smallTf].pop();
+      lowPrices[smallTf].pop();
 
       //Get big timeframe if needed
       if (smallTf !== bigTf) {
@@ -619,13 +631,19 @@ async function startBinanceWebsocket() {
             return;
           }
           closePrices[bigTf] = [];
+          highPrices[bigTf] = [];
+          lowPrices[bigTf] = [];
           for (let tick of bigTfTicks) {
             bigTfEndDate = new Date(tick[6]);
             closePrices[bigTf].push(Number.parseFloat(tick[4]));
+            highPrices[bigTf].push(Number.parseFloat(tick[2]));
+            lowPrices[bigTf].push(Number.parseFloat(tick[3]));
           }
 
           //Remove the last value as the current candle is not closed
           closePrices[bigTf].pop();
+          highPrices[bigTf].pop();
+          lowPrices[bigTf].pop();
         }
       }
 
@@ -637,13 +655,13 @@ async function startBinanceWebsocket() {
             if (alertType === 'buy') {
               if (!buyRulesHaveOnlyBigTf || bigTfEndDate !== lastCheckedDataBigTf) {
                 lastCheckedDataBigTf = bigTfEndDate;
-                if (checkTradeRules(execution.strategy.buyRules, closePrices)) {
+                if (checkTradeRules(execution.strategy.buyRules, closePrices, highPrices, lowPrices)) {
                   alertType = 'sell';
                   self.postMessage([execId, 'BUY', curPrice, new Date()]);
                 }
               }
             } else {
-              if (checkTradeRules(execution.strategy.sellRules, closePrices)) {
+              if (checkTradeRules(execution.strategy.sellRules, closePrices, highPrices, lowPrices)) {
                 alertType = 'buy';
                 self.postMessage([execId, 'SELL', curPrice, new Date()]);
               }
@@ -653,7 +671,7 @@ async function startBinanceWebsocket() {
             if (tradeType === 'buy') {
               if (!buyRulesHaveOnlyBigTf || bigTfEndDate !== lastCheckedDataBigTf) {
                 lastCheckedDataBigTf = bigTfEndDate;
-                if (checkTradeRules(execution.strategy.buyRules, closePrices)) {
+                if (checkTradeRules(execution.strategy.buyRules, closePrices, highPrices, lowPrices)) {
                   //Should buy at market
                   if (execution.type === 'Simulation') {
                     //Get current ASK price and use it as a trade entry.
@@ -722,7 +740,7 @@ async function startBinanceWebsocket() {
               } //checkTradeRules - buyRules
             } else {
               // tradeType === 'sell'
-              if (checkTradeRules(execution.strategy.sellRules, closePrices)) {
+              if (checkTradeRules(execution.strategy.sellRules, closePrices, highPrices, lowPrices)) {
                 if (execution.type === 'Simulation') {
                   //Get current BID price and use it as a trade exit.
                   for (let i = 0; i < 10; i++) {

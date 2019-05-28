@@ -427,70 +427,7 @@ function calculateSto(kPeriod, dPeriod, smoothPeriod, closePrices, highPrices, l
     ]
   ];
 }
-calculateSto(14, 3, 3, [
-  1,
-  2,
-  3,
-  4,
-  5,
-  6,
-  7,
-  8,
-  9,
-  10,
-  11,
-  12,
-  13,
-  14,
-  15,
-  16,
-  17,
-  18,
-  19,
-  15
-], [
-  1,
-  2,
-  3,
-  4,
-  5,
-  6,
-  7,
-  8,
-  9,
-  10,
-  11,
-  12,
-  13,
-  14,
-  15,
-  16,
-  17,
-  18,
-  19,
-  20
-], [
-  1,
-  2,
-  3,
-  4,
-  5,
-  6,
-  7,
-  8,
-  9,
-  10,
-  11,
-  12,
-  13,
-  14,
-  15,
-  16,
-  17,
-  18,
-  19,
-  20
-])
+
 function calculateStoRsi(kPeriod, dPeriod, smoothPeriod, rsiPeriod, closePrices) {
   let rsi = [];
   let newclosePrices = [];

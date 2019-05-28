@@ -563,10 +563,51 @@ function setRulesVariationsPatterns(rulesNumber, changeStoplossAndTarget) {
   bbValuesFineTune4 = [-0.25, 0.25];
   bbValuesFineTune5 = [-0.25, 0.25];
   bbValuesFineTune6 = [-0.25, 0.25];
+
+  //STOCHASTIC
+  stoPeriods = [7, 14];
+  stoPeriodsFineTune1 = [-4, 4];
+  stoPeriodsFineTune2 = [-3, 3];
+  stoPeriodsFineTune3 = [-3, 3];
+  stoPeriodsFineTune4 = [-3, 3];
+  stoPeriodsFineTune5 = [-2, 2];
+  stoPeriodsFineTune6 = [-1, 1];
+
+  stoPeriods2 = [3, 8];
+  stoPeriods2FineTune1 = [-1, 1];
+  stoPeriods2FineTune2 = [-1, 1];
+  stoPeriods2FineTune3 = [-1, 1];
+  stoPeriods2FineTune4 = [-1, 1];
+  stoPeriods2FineTune5 = [-1, 1];
+  stoPeriods2FineTune6 = [-1, 1];
+
+  stoPeriods3 = [3, 8];
+  stoPeriods3FineTune1 = [-1, 1];
+  stoPeriods3FineTune2 = [-1, 1];
+  stoPeriods3FineTune3 = [-1, 1];
+  stoPeriods3FineTune4 = [-1, 1];
+  stoPeriods3FineTune5 = [-1, 1];
+  stoPeriods3FineTune6 = [-1, 1];
+
+  stoPeriods4 = [7, 14];
+  stoPeriods4FineTune1 = [-4, 4];
+  stoPeriods4FineTune2 = [-3, 3];
+  stoPeriods4FineTune3 = [-3, 3];
+  stoPeriods4FineTune4 = [-3, 3];
+  stoPeriods4FineTune5 = [-2, 2];
+  stoPeriods4FineTune6 = [-1, 1];
+
+  stoValues = [30, 70];
+  stoValuesFineTune1 = [-10, 10];
+  stoValuesFineTune2 = [-5, 5];
+  stoValuesFineTune3 = [-4, 4];
+  stoValuesFineTune4 = [-3, 3];
+  stoValuesFineTune5 = [-2, 2];
+  stoValuesFineTune6 = [-1, 1];
 }
 
 function rulesAreSame(rule1, rule2) {
-  return rule1.period == rule2.period && rule1.period2 == rule2.period2 && rule1.period3 == rule2.period3 && rule1.value == rule2.value && rule1.period == rule2.period;
+  return rule1.period == rule2.period && rule1.period2 == rule2.period2 && rule1.period3 == rule2.period3 && rule1.value == rule2.value && rule1.period4 == rule2.period4;
 }
 
 function pushNewStrategyVariation(variations, strategy) {
@@ -754,7 +795,7 @@ async function doFineTuneOfResult() {
   }
 }
 
-function createRuleVariation(rule, period, value, crossDirection, type2, period2, period3) {
+function createRuleVariation(rule, period, value, crossDirection, type2, period2, period3, period4) {
   let newRule = {};
   newRule.indicator = rule.indicator;
   newRule.timeframe = rule.timeframe;
@@ -777,6 +818,10 @@ function createRuleVariation(rule, period, value, crossDirection, type2, period2
   if (period3 != undefined && period3 != null) {
     newRule.period3 = period3;
   }
+  if (period4 != undefined && period4 != null) {
+    newRule.period4 = period4;
+  }
+
   return newRule;
 }
 
@@ -862,6 +907,28 @@ function getRuleVariations(rule) {
         }
       }
     }
+  } else if (rule.indicator === 'sto') {
+    for (let period of stoPeriods) {
+      for (let period2 of stoPeriods2) {
+        for (let period3 of stoPeriods3) {
+          for (let value of stoValues) {
+            ruleVariations.push(createRuleVariation(rule, period, value, rule.crossDirection, null, period2, period3));
+          }
+        }
+      }
+    }
+  } else if (rule.indicator === 'stoRsi') {
+    for (let period of stoPeriods) {
+      for (let period2 of stoPeriods2) {
+        for (let period3 of stoPeriods3) {
+          for (let period4 of stoPeriods4) {
+            for (let value of stoValues) {
+              ruleVariations.push(createRuleVariation(rule, period, value, rule.crossDirection, null, period2, period3, period4));
+            }
+          }
+        }
+      }
+    }
   }
 
   return ruleVariations;
@@ -883,6 +950,12 @@ let macdValues = [];
 let bbPeriods = [];
 let bbPeriods2 = [];
 let bbValues = [];
+
+let stoPeriods = [];
+let stoPeriods2 = [];
+let stoPeriods3 = [];
+let stoPeriods4 = [];
+let stoValues = [];
 
 //Fina tune values
 
@@ -967,6 +1040,12 @@ let bbPeriodsFineTune6 = [];
 let bbPeriods2FineTune6 = [];
 let bbValuesFineTune6 = [];
 
+let stoPeriodsFineTune = [];
+let stoPeriods2FineTune = [];
+let stoPeriods3FineTune = [];
+let stoPeriods4FineTune = [];
+let stoValuesFineTune = [];
+
 let stoplossesFineTune0 = [2, 4.5, 7];
 let stoplossesFineTune1 = [-0.5, 0.5];
 let stoplossesFineTune2 = [-0.25, 0.25];
@@ -1031,7 +1110,13 @@ function getRuleVariationsFineTune(rule) {
         continue;
       }
       for (let value of rsiValuesFineTune) {
-        ruleVariations.push(createRuleVariation(rule, periodToUse, rule.value + value));
+        let valueToUse = rule.value + value;
+        if (valueToUse <= 0) {
+          valueToUse = 1;
+        } else if (valueToUse >= 100) {
+          valueToUse = 99;
+        }
+        ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse));
       }
     }
   } else if (rule.indicator === 'macd') {
@@ -1091,7 +1176,6 @@ function getRuleVariationsFineTune(rule) {
     }
 
   } else if (rule.indicator === 'bb') {
-
     if (rule.direction !== 'crossing') {
       for (let period of bbPeriodsFineTune) {
         let periodToUse = rule.period + period;
@@ -1127,6 +1211,68 @@ function getRuleVariationsFineTune(rule) {
         }
       }
     }
+  } else if (rule.indicator === 'sto') {
+    for (let period of stoPeriodsFineTune) {
+      let periodToUse = rule.period + period;
+      if (periodToUse < 2) {
+        continue;
+      }
+      for (let period2 of stoPeriods2FineTune) {
+        let periodToUse2 = rule.period2 + period2;
+        if (periodToUse2 <= 0) {
+          continue;
+        }
+        for (let period3 of stoPeriods3FineTune) {
+          let periodToUse3 = rule.period3 + period3;
+          if (periodToUse3 <= 0) {
+            continue;
+          }
+          for (let value of stoValuesFineTune) {
+            let valueToUse = rule.value + value;
+            if (valueToUse <= 0) {
+              valueToUse = 1;
+            } else if (valueToUse >= 100) {
+              valueToUse = 99;
+            }
+            ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, rule.crossDirection, null, periodToUse2, periodToUse3));
+          }
+        }
+      }
+    }
+  } else if (rule.indicator === 'stoRsi') {
+    for (let period of stoPeriodsFineTune) {
+      let periodToUse = rule.period + period;
+      if (periodToUse < 2) {
+        continue;
+      }
+      for (let period2 of stoPeriods2FineTune) {
+        let periodToUse2 = rule.period2 + period2;
+        if (periodToUse2 <= 0) {
+          continue;
+        }
+        for (let period3 of stoPeriods3FineTune) {
+          let periodToUse3 = rule.period3 + period3;
+          if (periodToUse3 <= 0) {
+            continue;
+          }
+          for (let period4 of stoPeriods4FineTune) {
+            let periodToUse4 = rule.period4 + period4;
+            if (periodToUse4 < 2) {
+              continue;
+            }
+            for (let value of stoValuesFineTune) {
+              let valueToUse = rule.value + value;
+              if (valueToUse <= 0) {
+                valueToUse = 1;
+              } else if (valueToUse >= 100) {
+                valueToUse = 99;
+              }
+              ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, rule.crossDirection, null, periodToUse2, periodToUse3, periodToUse4));
+            }
+          }
+        }
+      }
+    }
   }
 
   return ruleVariations;
@@ -1157,6 +1303,11 @@ function getRulesVariations(rules, fineTune) {
         bbPeriodsFineTune = bbPeriodsFineTune1;
         bbPeriods2FineTune = bbPeriods2FineTune1;
         bbValuesFineTune = bbValuesFineTune1;
+        stoPeriodsFineTune = stoPeriodsFineTune1;
+        stoPeriods2FineTune = stoPeriods2FineTune1;
+        stoPeriods3FineTune = stoPeriods3FineTune1;
+        stoPeriods4FineTune = stoPeriods4FineTune1;
+        stoValuesFineTune = stoValuesFineTune1;
         ruleVariations = getRuleVariationsFineTune(rule);
         break;
       case 2:
@@ -1171,6 +1322,11 @@ function getRulesVariations(rules, fineTune) {
         bbPeriodsFineTune = bbPeriodsFineTune2;
         bbPeriods2FineTune = bbPeriods2FineTune2;
         bbValuesFineTune = bbValuesFineTune2;
+        stoPeriodsFineTune = stoPeriodsFineTune2;
+        stoPeriods2FineTune = stoPeriods2FineTune2;
+        stoPeriods3FineTune = stoPeriods3FineTune2;
+        stoPeriods4FineTune = stoPeriods4FineTune2;
+        stoValuesFineTune = stoValuesFineTune2;
         ruleVariations = getRuleVariationsFineTune(rule);
         break;
       case 3:
@@ -1185,6 +1341,11 @@ function getRulesVariations(rules, fineTune) {
         bbPeriodsFineTune = bbPeriodsFineTune3;
         bbPeriods2FineTune = bbPeriods2FineTune3;
         bbValuesFineTune = bbValuesFineTune3;
+        stoPeriodsFineTune = stoPeriodsFineTune3;
+        stoPeriods2FineTune = stoPeriods2FineTune3;
+        stoPeriods3FineTune = stoPeriods3FineTune3;
+        stoPeriods4FineTune = stoPeriods4FineTune3;
+        stoValuesFineTune = stoValuesFineTune3;
         ruleVariations = getRuleVariationsFineTune(rule);
         break;
       case 4:
@@ -1199,6 +1360,11 @@ function getRulesVariations(rules, fineTune) {
         bbPeriodsFineTune = bbPeriodsFineTune4;
         bbPeriods2FineTune = bbPeriods2FineTune4;
         bbValuesFineTune = bbValuesFineTune4;
+        stoPeriodsFineTune = stoPeriodsFineTune4;
+        stoPeriods2FineTune = stoPeriods2FineTune4;
+        stoPeriods3FineTune = stoPeriods3FineTune4;
+        stoPeriods4FineTune = stoPeriods4FineTune4;
+        stoValuesFineTune = stoValuesFineTune4;
         ruleVariations = getRuleVariationsFineTune(rule);
         break;
       case 5:
@@ -1213,6 +1379,11 @@ function getRulesVariations(rules, fineTune) {
         bbPeriodsFineTune = bbPeriodsFineTune5;
         bbPeriods2FineTune = bbPeriods2FineTune5;
         bbValuesFineTune = bbValuesFineTune5;
+        stoPeriodsFineTune = stoPeriodsFineTune5;
+        stoPeriods2FineTune = stoPeriods2FineTune5;
+        stoPeriods3FineTune = stoPeriods3FineTune5;
+        stoPeriods4FineTune = stoPeriods4FineTune5;
+        stoValuesFineTune = stoValuesFineTune5;
         ruleVariations = getRuleVariationsFineTune(rule);
         break;
       case 6:
@@ -1227,6 +1398,11 @@ function getRulesVariations(rules, fineTune) {
         bbPeriodsFineTune = bbPeriodsFineTune6;
         bbPeriods2FineTune = bbPeriods2FineTune6;
         bbValuesFineTune = bbValuesFineTune6;
+        stoPeriodsFineTune = stoPeriodsFineTune6;
+        stoPeriods2FineTune = stoPeriods2FineTune6;
+        stoPeriods3FineTune = stoPeriods3FineTune6;
+        stoPeriods4FineTune = stoPeriods4FineTune6;
+        stoValuesFineTune = stoValuesFineTune6;
         ruleVariations = getRuleVariationsFineTune(rule);
         break;
       default:
