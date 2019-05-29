@@ -270,7 +270,8 @@ async function showExecutionResult(id) {
         let classColor = trade.type === 'Buy'
           ? 'text-green'
           : 'text-red';
-        $('#executionStrategiesTable').append('<tr><td class="text-left ' + classColor + '">' + trade.type + '</td><td>' + formatDateFull(trade.date) + '</td><td>' + trade.entry.toFixed(8) + '</td></tr>');
+        let entry = await binanceRoundTickAmmount(trade.entry, execution.instrument);
+        $('#executionStrategiesTable').append('<tr><td class="text-left ' + classColor + '">' + trade.type + '</td><td>' + formatDateFull(trade.date) + '</td><td>' + entry + '</td></tr>');
       }
     } else {
       let totalReturn = 0;
@@ -319,9 +320,14 @@ async function showExecutionResult(id) {
           totalReturn += trade.result;
           resultMoney += trade.resultMoney;
 
-          $('#executionStrategiesTable').append('<tr><td class="text-left">' + count + '&nbsp;<i class="' + classes + '"></td><td>' + formatDateFull(trade.openDate) + '</td><td>' + formatDateFull(trade.closeDate) + '</td><td>' + trade.entry.toFixed(8) + '</td><td>' + trade.exit.toFixed(8) + '</td><td>' + trade.posSize.toFixed(8) + '</td><td class="' + resultClass + '">' + trade.result.toFixed(2) + '</td><td class="' + resultClass + '">' + trade.resultMoney.toFixed(8) + '</td></tr>');
+          let entry = await binanceRoundTickAmmount(trade.entry, execution.instrument);
+          let exit = await binanceRoundTickAmmount(trade.exit, execution.instrument);
+          let posSize = await binanceRoundTickAmmount(trade.posSize, execution.instrument);
+          $('#executionStrategiesTable').append('<tr><td class="text-left">' + count + '&nbsp;<i class="' + classes + '"></td><td>' + formatDateFull(trade.openDate) + '</td><td>' + formatDateFull(trade.closeDate) + '</td><td>' + entry + '</td><td>' + exit + '</td><td>' + posSize + '</td><td class="' + resultClass + '">' + trade.result.toFixed(2) + '</td><td class="' + resultClass + '">' + trade.resultMoney.toFixed(8) + '</td></tr>');
         } else {
-          $('#executionStrategiesTable').append('<tr><td class="text-left">' + count + '</td><td>' + formatDateFull(trade.openDate) + '</td><td></td><td>' + trade.entry.toFixed(8) + '</td><td></td><td>' + trade.posSize.toFixed(8) + '</td><td ></td><td ></td></tr>');
+          let entry = await binanceRoundTickAmmount(trade.entry, execution.instrument);
+          let posSize = await binanceRoundTickAmmount(trade.posSize, execution.instrument);
+          $('#executionStrategiesTable').append('<tr><td class="text-left">' + count + '</td><td>' + formatDateFull(trade.openDate) + '</td><td></td><td>' + entry + '</td><td></td><td>' + posSize + '</td><td ></td><td ></td></tr>');
           executedTrades--;
         }
         count++;
@@ -702,8 +708,7 @@ async function notifications() {
       email = '';
     }
 
-    openModalConfirm('<div class="text-justify">If you want to receive trading updates on your Real Trading strategies, please fill your email below.<br>You will receive an e-mail report every 10 minutes in case of new trades.</div>' + '<input style="width:100%"class="search main-field white" id="emailBoxTmp" type="text" placeholder="E-mail to receive Notifications" value="' + email +
-    '"/>', async function() {
+    openModalConfirm('<div class="text-justify">If you want to receive trading updates on your Real Trading strategies, please fill your email below.<br>You will receive an e-mail report every 20 minutes in case of new trades.</div>' + '<input style="width:100%"class="search main-field white" id="emailBoxTmp" type="text" placeholder="E-mail to receive Notifications" value="' + email + '"/>', async function() {
       let email = $('#emailBoxTmp').val();
       if (email.indexOf('@') === -1) {
         openModalInfo('Please type a valid email!', function() {
@@ -933,7 +938,7 @@ const notificationsMutex = new Mutex();
 async function sendNotificationTask() {
   while (true) {
     try {
-      await sleep(1000 * 60 * 10); //10 mins
+      await sleep(1000 * 60 * 20); //20 mins
       let email = await getEmailFromDb();
       if (!sendNotifications || email == null || notificationsToSend === '') {
         continue;
@@ -984,9 +989,11 @@ async function sendTradeMail(execution) {
     let trade = execution.trades[execution.trades.length - 1];
     let text = '';
     if (trade.exit != undefined && trade.exit != null) {
-      text = '<li>SELL: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were sold at ' + trade.exit.toFixed(8) + ' by "' + execution.strategy.name + '" on ' + execution.instrument + '. Result: ' + trade.result.toFixed(2) + '% (' + trade.resultMoney.toFixed(8) + ' ' + getQuotedCurrency(execution.instrument) + ').</li>';
+      let exit = await binanceRoundTickAmmount(trade.entry, execution.instrument);
+      text = '<li>SELL: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were sold at ' + exit + ' by "' + execution.strategy.name + '" on ' + execution.instrument + '. Result: ' + trade.result.toFixed(2) + '% (' + trade.resultMoney.toFixed(8) + ' ' + getQuotedCurrency(execution.instrument) + ').</li>';
     } else {
-      text = '<li>BUY: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were bought at ' + trade.entry.toFixed(8) + ' by "' + execution.strategy.name + '" on ' + execution.instrument + '.</li>';
+      let entry = await binanceRoundTickAmmount(trade.entry, execution.instrument);
+      text = '<li>BUY: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were bought at ' + entry + ' by "' + execution.strategy.name + '" on ' + execution.instrument + '.</li>';
     }
     try {
       await notificationsMutex.lock();
@@ -1079,14 +1086,14 @@ async function checkPositionSize(positionSize, exchange, instrument) {
     return [false];
   }
   if (curPrice !== null && curPrice * positionSize < instrumentInfo.minNotional) {
-    openModalInfo('Position Size for ' + instrument + ' does not meet Binance requirement for minimum trading amount! Try with bigger size than ' + (
+    openModalInfo('Position Size for ' + instrument + ' does not meet Binance requirement for net minimum trading amount (MIN_NOTIONAL)! Try with bigger size than ' + (
     instrumentInfo.minNotional / curPrice).toFixed(8) + ' ' + getBaseCurrency(instrument));
     return [false];
   }
 
-  let newAmount = binanceRoundAmmount(positionSize, instrumentInfo.stepSize); //TODO
+  let newAmount = await binanceRoundAmmount(positionSize, instrument);
   if (newAmount.toFixed(8) !== positionSize.toFixed(8)) {
-    openModalInfo('The position size will be rounded to ' + newAmount.toFixed(8) + ' to meet Binance API requirements.');
+    openModalInfo('The position size will be rounded to ' + newAmount + ' to meet Binance API requirements.');
     positionSize = newAmount;
     return [false, positionSize];
   } else {
@@ -1113,6 +1120,7 @@ async function checkPositionSizeQuoted(positionSize, exchange, instrument) {
   if (exchange === 'Binance') {
     instrumentInfo = await getBinanceInstrumentsInfo(instrument);
   }
+
   if (instrumentInfo === null || instrumentInfo === undefined) {
     openModalInfo('Cannot obtain information for ' + instrument + ' from ' + exchange + ' exchange. Plase try later!');
     return false;

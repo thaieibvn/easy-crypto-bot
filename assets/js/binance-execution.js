@@ -26,16 +26,15 @@ function getBidAsk(pair) {
   });
 }
 
-function getPrecisionFromTickSize(tickSize) {
-  if (tickSize === null || tickSize === undefined) {
-    return 8;
-  }
-  let startIndex = tickSize.indexOf('.');
-  let endIndex = tickSize.indexOf('1');
-  if (startIndex !== -1 && endIndex !== -1) {
-    return tickSize.substring(startIndex, endIndex).length;
-  }
-  return 8;
+function binanceRoundAmmount(amount) {
+  let stepIndex = -1
+  try {
+    stepIndex = instrumentInfo.stepSize.toString().split(".")[1].indexOf('1');
+  } catch (err) {}
+  let precision = stepIndex != -1
+    ? stepIndex + 1
+    : 0;
+  return Number.parseFloat(amount.toFixed(precision));
 }
 
 function getBalance(instrument) {
@@ -147,7 +146,7 @@ function getOrderTradePrice(execution, orderId, type) {
             let balance = await getBalance(execution.instrument);
             if (balance < execution.positionSize) {
               //Change position size as we don't have the initial ammount to sell because of the commision
-              execution.positionSize = binance.roundStep(qty - commision, instrumentInfo.stepSize);
+              execution.positionSize = binanceRoundAmmount(qty - commision);
               if (execution.positionSizeQuoted == null || execution.positionSizeQuoted == undefined || execution.positionSizeQuoted <= 0) {
                 self.postMessage([execId, 'CH_POS_SIZE', execution.positionSize]);
               }
@@ -172,7 +171,7 @@ function getOrderTradePrice(execution, orderId, type) {
 async function updatePositionSize(curPrice) {
   if (execution.positionSizeQuoted != null && execution.positionSizeQuoted != undefined && execution.positionSizeQuoted > 0) {
     let tradeSize = execution.positionSizeQuoted / curPrice;
-    execution.positionSize = binance.roundStep(tradeSize, instrumentInfo.stepSize);
+    execution.positionSize = binanceRoundAmmount(tradeSize);
   }
 }
 

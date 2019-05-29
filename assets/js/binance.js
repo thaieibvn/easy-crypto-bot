@@ -535,9 +535,30 @@ async function getBinanceInstrumentsInfo(instrument) {
   }
 }
 
-function binanceRoundAmmount(amount, stepSize) {
-  let precision = stepSize.toString().split(".")[1].length || 0; // easier version: binance.getPrecision(number)
+async function binanceRoundAmmount(amount, instrument) {
+  instrumentInfo = await getBinanceInstrumentsInfo(instrument);
+  let stepIndex = -1
+  try {
+    stepIndex = instrumentInfo.stepSize.toString().split(".")[1].indexOf('1');
+  } catch (err) {}
+  let precision = stepIndex != -1
+    ? stepIndex + 1
+    : 0;
+  // easier version: binance.getPrecision(number)
+  //return Number.parseFloat(binance.roundStep(amount, stepSize))
+  return Number.parseFloat(amount.toFixed(precision));
+}
 
+async function binanceRoundTickAmmount(amount, instrument) {
+  instrumentInfo = await getBinanceInstrumentsInfo(instrument);
+  let stepIndex = -1
+  try {
+    stepIndex = instrumentInfo.tickSize.toString().split(".")[1].indexOf('1');
+  } catch (err) {}
+  let precision = stepIndex != -1
+    ? stepIndex + 1
+    : 0;
+  // easier version: binance.getPrecision(number)
   //return Number.parseFloat(binance.roundStep(amount, stepSize))
   return Number.parseFloat(amount.toFixed(precision));
 }
@@ -599,7 +620,7 @@ function binanceTest() {
       let instrument = "SCETH";
       binance.prevDay(instrument, (error, prevDay, symbol) => {
         //openModalInfoBig(JSON.stringify(prevDay.lastPrice));
-        openModalInfoBig('LastPrice: '+prevDay.lastPrice+'<br>LastQty: '+ prevDay.lastQty + '<br>LastId: '+ prevDay.lastId + '<br>Count:'+prevDay.count);
+        openModalInfoBig('LastPrice: ' + prevDay.lastPrice + '<br>LastQty: ' + prevDay.lastQty + '<br>LastId: ' + prevDay.lastId + '<br>Count:' + prevDay.count);
         resolve(true);
       });
     });
