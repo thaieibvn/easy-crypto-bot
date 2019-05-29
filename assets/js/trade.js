@@ -250,6 +250,7 @@ async function rmExecutionFromTable(id) {
 
 async function showExecutionResult(id) {
   try {
+    showLoading();
     let execution = await getExecutionById(id);
     $('#executionStrategiesTable').html('<thead><tr><td class="text-left">Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Trade Size (' + getBaseCurrency(execution.instrument) + ')</td><td>Result %</td><td>Result ' + getQuotedCurrency(execution.instrument) + '</td> </tr></thead>');
     if (execution.type === 'Alerts') {
@@ -404,6 +405,8 @@ async function showExecutionResult(id) {
     $('#executionResultsWindow').fadeIn();
   } catch (err) {
     log('error', 'showExecutionResult', err.stack);
+  } finally {
+    hideLoading();
   }
 }
 
