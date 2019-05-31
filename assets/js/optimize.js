@@ -244,24 +244,13 @@ async function runOptimize() {
       return;
     }
 
-    let rulesNumber = strategy.buyRules.length + strategy.sellRules.length;
-
-    if (rulesNumber > 5) {
-      openModalInfo('The Optimization feature is not available for strategies that have more than 5 rules. If you want to use this feature, please, edit your strategy!');
+    let fieldsToChange = calculateFieldsToChange(strategy, changeStoplossAndTarget);
+    if (fieldsToChange > 20) {
+      openModalInfo('Your strategy contains too many input fields (' + fieldsToChange + ') to be optimized. The maximum allowed number is 20.');
       $('#runOptBtn').removeClass('disabled');
       $('#opRunning').hide();
       $('#opResult').hide();
       optimizationRunning = false;
-      return;
-    }
-
-    if (changeStoplossAndTarget && rulesNumber > 4) {
-      openModalInfo('The Stoploss & Target Change option is not available for strategies that have more than 4 rules. If you want to use this option, please, edit your strategy!');
-      $('#runOptBtn').removeClass('disabled');
-      $('#opRunning').hide();
-      $('#opResult').hide();
-      optimizationRunning = false;
-      $("#opChangeStoplossNo").prop("checked", true);
       return;
     }
 
@@ -301,8 +290,9 @@ async function runOptimize() {
     strategyVariations = [];
     fineTune = 0;
     strategyVariationsTested = 0;
-    setRulesVariationsPatterns(rulesNumber, changeStoplossAndTarget);
-    strategyVariations = getStrategyVariations(strategy, fineTune, changeStoplossAndTarget);
+    setRulesVariationsPatterns(strategy, changeStoplossAndTarget);
+
+    strategyVariations = await getStrategyVariations(strategy, fineTune, changeStoplossAndTarget);
     strategyVariationsTested = strategyVariations.length;
 
     strategyVariationsResults = [];
@@ -475,8 +465,68 @@ async function runOptimize() {
   }
 }
 
-function setRulesVariationsPatterns(rulesNumber, changeStoplossAndTarget) {
-  //if (rulesNumber <= 2 && !changeStoplossAndTarget) {
+function countRuleFields(rule) {
+  let fieldsToChange = 0;
+  switch (rule.indicator) {
+    case 'sma':
+    case 'ema':
+      if (rule.direction === 'crossing') {
+        fieldsToChange++;
+      } else {
+        fieldsToChange += 2;
+      }
+      break;
+    case "cma":
+      fieldsToChange += 2;
+      break;
+    case 'rsi':
+      fieldsToChange += 2;
+      break;
+    case 'macd':
+      if (rule.type === 'signal line') {
+        if (rule.direction === 'crossing') {
+          fieldsToChange += 3;
+        } else {
+          fieldsToChange += 4;
+        }
+      } else {
+        fieldsToChange += 2;
+      }
+      break;
+    case 'bb':
+      if (rule.direction === 'crossing') {
+        fieldsToChange += 2;
+      } else {
+        fieldsToChange += 3;
+      }
+      break;
+    case 'sto':
+      fieldsToChange += 4;
+      break;
+    case 'stoRsi':
+      fieldsToChange += 5;
+      break;
+  }
+
+  return fieldsToChange;
+}
+
+function calculateFieldsToChange(strategy, changeStoplossAndTarget) {
+  let fieldsToChange = changeStoplossAndTarget
+    ? 2
+    : 0;
+
+  for (let rule of strategy.buyRules) {
+    fieldsToChange += countRuleFields(rule);
+  }
+  for (let rule of strategy.sellRules) {
+    fieldsToChange += countRuleFields(rule);
+  }
+  return fieldsToChange;
+}
+
+function setRulesVariationsPatterns(strategy, changeStoplossAndTarget) {
+
   fineTuneMaxCycles = 6;
 
   //MA
@@ -572,7 +622,6 @@ function setRulesVariationsPatterns(rulesNumber, changeStoplossAndTarget) {
   stoPeriodsFineTune4 = [-3, 3];
   stoPeriodsFineTune5 = [-2, 2];
   stoPeriodsFineTune6 = [-1, 1];
-
   stoPeriods2 = [3, 8];
   stoPeriods2FineTune1 = [-1, 1];
   stoPeriods2FineTune2 = [-1, 1];
@@ -580,7 +629,6 @@ function setRulesVariationsPatterns(rulesNumber, changeStoplossAndTarget) {
   stoPeriods2FineTune4 = [-1, 1];
   stoPeriods2FineTune5 = [-1, 1];
   stoPeriods2FineTune6 = [-1, 1];
-
   stoPeriods3 = [3, 8];
   stoPeriods3FineTune1 = [-1, 1];
   stoPeriods3FineTune2 = [-1, 1];
@@ -588,7 +636,6 @@ function setRulesVariationsPatterns(rulesNumber, changeStoplossAndTarget) {
   stoPeriods3FineTune4 = [-1, 1];
   stoPeriods3FineTune5 = [-1, 1];
   stoPeriods3FineTune6 = [-1, 1];
-
   stoPeriods4 = [7, 14];
   stoPeriods4FineTune1 = [-4, 4];
   stoPeriods4FineTune2 = [-3, 3];
@@ -596,7 +643,6 @@ function setRulesVariationsPatterns(rulesNumber, changeStoplossAndTarget) {
   stoPeriods4FineTune4 = [-3, 3];
   stoPeriods4FineTune5 = [-2, 2];
   stoPeriods4FineTune6 = [-1, 1];
-
   stoValues = [30, 70];
   stoValuesFineTune1 = [-10, 10];
   stoValuesFineTune2 = [-5, 5];
@@ -612,6 +658,7 @@ function rulesAreSame(rule1, rule2) {
 
 function pushNewStrategyVariation(variations, strategy) {
   let hasTheSameStrategy = false;
+  let counter = 0;
   for (let strategyTmp of variations) {
     let allBuyRulesAreSame = true;
     for (let i = 0; i < strategyTmp.buyRules.length; i++) {
@@ -642,17 +689,27 @@ function pushNewStrategyVariation(variations, strategy) {
   return !hasTheSameStrategy;
 }
 
-function getStrategyVariationsFromResult(biggestTradeMultiplier, strategiesToAdd) {
+async function getStrategyVariationsFromResult(biggestTradeMultiplier, strategiesToAdd) {
   let addedStrategies = 0;
   let result = [];
+  let usedStrategies = [];
+  let counter = 0;
   for (let strategyRes of strategyVariationsResults) {
     if (biggestTradeMultiplier != 0 && strategyRes.biggestGain * biggestTradeMultiplier > strategyRes.totalReturn) {
       continue;
     }
+
+    let pushedRes = pushNewStrategyVariation(usedStrategies, strategyRes.strategy);
+    if (!pushedRes) {
+      continue;
+    }
+
     strategyVariationsIntermitBestResults.push(strategyRes);
-    let strategyVariationsTmp = getStrategyVariations(strategyRes.strategy, fineTune, changeStoplossAndTarget);
+    let strategyVariationsTmp = await getStrategyVariations(strategyRes.strategy, fineTune, changeStoplossAndTarget);
+
     for (let strategyTmp of strategyVariationsTmp) {
-      pushNewStrategyVariation(result, strategyTmp);
+      result.push(strategyTmp);
+      counter = await incrementCounterWithSleep(counter);
     }
     addedStrategies++;
     if (addedStrategies >= strategiesToAdd) {
@@ -729,7 +786,6 @@ async function doFineTuneOfResult() {
     strategyVariationsResults.sort(function(a, b) {
       return compareStrategyResults(a, b)
     });
-
     fineTune++;
     strategyVariations = [];
     opExecutedIndex = 0;
@@ -737,27 +793,22 @@ async function doFineTuneOfResult() {
     opCompleted = 0;
 
     let strategiesToAdd = 5;
-
-    let strategyVariationsTmp = [];
     if (optType === 'consistency') {
-      strategyVariationsTmp = getStrategyVariationsFromResult(3, strategiesToAdd);
-      if (strategyVariationsTmp.length === 0) {
-        strategyVariationsTmp = getStrategyVariationsFromResult(2, strategiesToAdd);
-        if (strategyVariationsTmp.length === 0) {
-          strategyVariationsTmp = getStrategyVariationsFromResult(1, strategiesToAdd);
-          if (strategyVariationsTmp.length === 0) {
-            strategyVariationsTmp = getStrategyVariationsFromResult(0, strategiesToAdd);
+      strategyVariations = await getStrategyVariationsFromResult(3, strategiesToAdd);
+      if (strategyVariations.length === 0) {
+        strategyVariations = await getStrategyVariationsFromResult(2, strategiesToAdd);
+        if (strategyVariations.length === 0) {
+          strategyVariations = await getStrategyVariationsFromResult(1, strategiesToAdd);
+          if (strategyVariations.length === 0) {
+            strategyVariations = await getStrategyVariationsFromResult(0, strategiesToAdd);
           }
         }
       }
     } else {
-      strategyVariationsTmp = getStrategyVariationsFromResult(0, strategiesToAdd);
+      strategyVariations = await getStrategyVariationsFromResult(0, strategiesToAdd);
     }
 
-    for (let strategyTmp of strategyVariationsTmp) {
-      strategyVariations.push(strategyTmp);
-    }
-    strategyVariationsTested += strategyVariationsTmp.length;
+    strategyVariationsTested += strategyVariations.length;
 
     if (strategyVariations.length == 0) {
       fineTune = fineTuneMaxCycles;
@@ -765,7 +816,6 @@ async function doFineTuneOfResult() {
       return;
     }
     strategyVariationsResults = [];
-
     for (let i = 0; i < maxOpWorkers; i++) {
       try {
         await opWorkerTerminateMutex.lock();
@@ -1045,6 +1095,36 @@ let stoPeriods2FineTune = [];
 let stoPeriods3FineTune = [];
 let stoPeriods4FineTune = [];
 let stoValuesFineTune = [];
+let stoPeriodsFineTune1 = [];
+let stoPeriodsFineTune2 = [];
+let stoPeriodsFineTune3 = [];
+let stoPeriodsFineTune4 = [];
+let stoPeriodsFineTune5 = [];
+let stoPeriodsFineTune6 = [];
+let stoPeriods2FineTune1 = [];
+let stoPeriods2FineTune2 = [];
+let stoPeriods2FineTune3 = [];;
+let stoPeriods2FineTune4 = [];
+let stoPeriods2FineTune5 = [];
+let stoPeriods2FineTune6 = [];
+let stoPeriods3FineTune1 = [];
+let stoPeriods3FineTune2 = [];
+let stoPeriods3FineTune3 = [];
+let stoPeriods3FineTune4 = [];
+let stoPeriods3FineTune5 = [];
+let stoPeriods3FineTune6 = [];
+let stoPeriods4FineTune1 = [];
+let stoPeriods4FineTune2 = [];
+let stoPeriods4FineTune3 = [];
+let stoPeriods4FineTune4 = [];
+let stoPeriods4FineTune5 = [];
+let stoPeriods4FineTune6 = [];
+let stoValuesFineTune1 = [];
+let stoValuesFineTune2 = [];
+let stoValuesFineTune3 = [];
+let stoValuesFineTune4 = [];
+let stoValuesFineTune5 = [];
+let stoValuesFineTune6 = [];
 
 let stoplossesFineTune0 = [2, 4.5, 7];
 let stoplossesFineTune1 = [-0.5, 0.5];
@@ -1523,12 +1603,20 @@ function createStrategyVariationWithStoplossRules(finalStrategiesList, strategie
   return finalStrategiesList;
 }
 
-function getStrategyVariations(strategy, fineTune, changeStoplossAndTarget) {
+async function incrementCounterWithSleep(counter) {
+  if (counter > 500 && counter % 500 == 0) {
+    await sleep(0);
+  }
+  return counter + 1;
+}
+
+async function getStrategyVariations(strategy, fineTune, changeStoplossAndTarget) {
   try {
     let buyRulesVariations = getRulesVariations(strategy.buyRules, fineTune);
     let sellRulesVariations = getRulesVariations(strategy.sellRules, fineTune);
     let strategiesWithBuyRuleVariations = [];
     let strategiesWithBuySellRuleVariations = [];
+    let counter = 0;
     for (let ruleVariations of buyRulesVariations[0]) {
       if (buyRulesVariations.length > 1) {
         for (let rule2Variations of buyRulesVariations[1]) {
@@ -1538,21 +1626,26 @@ function getStrategyVariations(strategy, fineTune, changeStoplossAndTarget) {
                 for (let rule4Variations of buyRulesVariations[3]) {
                   if (buyRulesVariations.length > 4) {
                     for (let rule5Variations of buyRulesVariations[4]) {
+                      counter = await incrementCounterWithSleep(counter);
                       strategiesWithBuyRuleVariations.push(createStrategyVariationWithBuyRules(strategy, [ruleVariations, rule2Variations, rule3Variations, rule4Variations, rule5Variations]));
                     }
                   } else {
+                    counter = await incrementCounterWithSleep(counter);
                     strategiesWithBuyRuleVariations.push(createStrategyVariationWithBuyRules(strategy, [ruleVariations, rule2Variations, rule3Variations, rule4Variations]));
                   }
                 }
               } else {
+                counter = await incrementCounterWithSleep(counter);
                 strategiesWithBuyRuleVariations.push(createStrategyVariationWithBuyRules(strategy, [ruleVariations, rule2Variations, rule3Variations]));
               }
             }
           } else {
+            counter = await incrementCounterWithSleep(counter);
             strategiesWithBuyRuleVariations.push(createStrategyVariationWithBuyRules(strategy, [ruleVariations, rule2Variations]));
           }
         }
       } else {
+        counter = await incrementCounterWithSleep(counter);
         strategiesWithBuyRuleVariations.push(createStrategyVariationWithBuyRules(strategy, [ruleVariations]));
       }
     }
@@ -1564,17 +1657,21 @@ function getStrategyVariations(strategy, fineTune, changeStoplossAndTarget) {
               for (let rule3Variations of sellRulesVariations[2]) {
                 if (sellRulesVariations.length > 3) {
                   for (let rule4Variations of sellRulesVariations[3]) {
+                    counter = await incrementCounterWithSleep(counter);
                     createStrategyVariationWithSellRules(strategiesWithBuySellRuleVariations, strategiesWithBuyRuleVariations, [ruleVariations, rule2Variations, rule3Variations, rule4Variations]);
                   }
                 } else {
+                  counter = await incrementCounterWithSleep(counter);
                   createStrategyVariationWithSellRules(strategiesWithBuySellRuleVariations, strategiesWithBuyRuleVariations, [ruleVariations, rule2Variations, rule3Variations]);
                 }
               }
             } else {
+              counter = await incrementCounterWithSleep(counter);
               createStrategyVariationWithSellRules(strategiesWithBuySellRuleVariations, strategiesWithBuyRuleVariations, [ruleVariations, rule2Variations]);
             }
           }
         } else {
+          counter = await incrementCounterWithSleep(counter);
           createStrategyVariationWithSellRules(strategiesWithBuySellRuleVariations, strategiesWithBuyRuleVariations, [ruleVariations]);
         }
       }
@@ -1669,7 +1766,8 @@ async function fillOptimizationResult(marketReturn) {
     let rowsShown = 100;
 
     for (let res of strategyVariationsResults) {
-      if (pushNewStrategyVariation(strategiesTmpList, res.strategy)) {
+      let pushedRes = pushNewStrategyVariation(strategiesTmpList, res.strategy);
+      if (pushedRes) {
         resultTmp.push(res);
       }
       if (resultTmp.length == rowsShown) {

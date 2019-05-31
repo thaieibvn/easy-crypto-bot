@@ -2,14 +2,6 @@
 const {app, BrowserWindow, ipcMain, dialog} = require('electron')
 const {download} = require("electron-dl");
 
-global.optimizatin = {
-  timeframe: null,
-  startDate: null,
-  ticks: null,
-  ticks1m: null,
-  strategyVariations: null,
-  results: null
-};
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow;
