@@ -248,6 +248,8 @@ async function marketSell(execution, curPrice) {
     return;
   }
 
+  positionSize = binanceRoundAmmount(positionSize);
+
   return new Promise((resolve, reject) => {
     binance.useServerTime(function() {
       binance.marketSell(execution.instrument, positionSize, async (error, response) => {
@@ -299,6 +301,7 @@ function placeTakeProfitLimit(execution, target) {
   return new Promise(async (resolve, reject) => {
     let price = Number.parseFloat(target.toFixed(instrumentInfo.precision));
     let positionSize = execution.positionSize + execution.minNotionalAmountLeft;
+    positionSize = binanceRoundAmmount(positionSize);
     binance.useServerTime(function() {
       binance.sell(execution.instrument, positionSize, price, {
         type: "LIMIT"

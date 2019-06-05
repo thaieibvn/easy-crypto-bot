@@ -711,7 +711,7 @@ async function notifications() {
       email = '';
     }
 
-    openModalConfirm('<div class="text-justify">If you want to receive trading updates on your Real Trading strategies, please fill your email below.<br>You will receive an e-mail report every 20 minutes in case of new trades.</div>' + '<input style="width:100%"class="search main-field white" id="emailBoxTmp" type="text" placeholder="E-mail to receive Notifications" value="' + email + '"/>', async function() {
+    openModalConfirm('<div class="text-justify">If you want to receive trading updates on your Real Trading strategies, please fill your email below.<br>You will receive an e-mail report every 30 minutes in case of new trades.</div>' + '<input style="width:100%"class="search main-field white" id="emailBoxTmp" type="text" placeholder="E-mail to receive Notifications" value="' + email + '"/>', async function() {
       let email = $('#emailBoxTmp').val();
       if (email.indexOf('@') === -1) {
         openModalInfo('Please type a valid email!', function() {
@@ -941,7 +941,7 @@ const notificationsMutex = new Mutex();
 async function sendNotificationTask() {
   while (true) {
     try {
-      await sleep(1000 * 60 * 20); //20 mins
+      await sleep(1000 * 60 * 30); //30 mins
       let email = await getEmailFromDb();
       if (!sendNotifications || email == null || notificationsToSend === '') {
         continue;
