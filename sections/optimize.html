@@ -8,7 +8,7 @@
         <p>Check how your strategy will perform with different parameters!</p>
       </div>
       <div class="text-center font-large">
-        <div class="text-left main-fields-div">
+        <div class="text-left inline-block">
           <div class="inline" id="opStrategy">
             <span class="inline-block min-width5">Strategy:&nbsp;<a class="show-on-s" id="editOpStrategy" title="Edit Strategy" onclick="editOpStrategy()" href="#/"><i class="far fa-edit"></i></a></span>
             <div class="drop-down-white">
@@ -32,7 +32,7 @@
           <div class="inline" id="opInstrument">
             <span class="inline-block min-width5">Instrument:&nbsp;</span>
             <div id="opInstrumentList" class="drop-down-white">
-              <input autocomplete="off" class="search main-field white" onkeyup="opInstrumentKeyup()" id="opInstrumentSearch" type="text" placeholder="Ticker"/>
+              <input autocomplete="off" style="width:410px;" class="search main-field white" onkeyup="opInstrumentKeyup()" id="opInstrumentSearch" type="text" placeholder="Ticker" />
               <ul class="backtest-dropdown">
               </ul>
             </div>
@@ -41,45 +41,46 @@
           <div class="inline">
             <span class="inline-block min-width5">Fee Rate %:&nbsp;</span>
             <div class="drop-down-white">
-              <input autocomplete="off" class="search main-field white" id="opFeeSearch" type="number" placeholder="Fee" value="0.075"/>
+              <input autocomplete="off" style="width:410px;" class="search main-field white" id="opFeeSearch" type="number" placeholder="Fee" value="0.075" />
             </div>
           </div>
           <br>
 
           <span class="inline-block min-width5" id="opPeriodFrom">Period from:&nbsp;</span><input class="white" id="opFromDate" type="date" />&nbsp;&nbsp;to:&nbsp;&nbsp;<input class="white" id="opToDate" type="date" />
-          <div id="opStopLossTargetDiv" class="margin-t10 ">
-            <span class="inline-block min-width10" id="opStopLossTarget">Stoploss &amp; Target:&nbsp;</span>
-            <input type="radio" id="opChangeStoplossNo" name="opChangeStoploss" value="no" checked><label class="min-width10" for="opChangeStoplossNo">Don't change</label>
-            <input type="radio" id="opChangeStoplossYes" name="opChangeStoploss" value="yes"> <label for="opChangeStoplossYes">Change</label>
-          </div>
+          <hr>
           <div>
-            <span class="inline-block min-width10" id="opOptType">Optimize For <a title="Info" onclick="opOptInfo()" href="#/"><i class="fa fa-info-circle"></i></a> :&nbsp;</span>
+            <span class="inline-block min-width5" id="opOptType"><a title="Info" onclick="opOptInfo()" href="#/"><i class="fa fa-info-circle"></i></a> Type :&nbsp;</span>
             <div class="inline-block">
               <input type="radio" id="opTypeMaxReturn" name="opOpType" value="full" checked><label class="min-width10" for="opTypeMaxReturn">Max Return</label>
-              <input type="radio" id="opTypeConsistency" name="opOpType" value="fine"> <label for="opTypeConsistency">Consistency</label>
+              <input type="radio" id="opTypeSmooth" name="opOpType" value="fine"> <label class="min-width7" for="opTypeSmooth">Smooth</label>
+              <input type="radio" id="opTypeRiskReward" name="opOpType" value="risk"> <label for="opTypeRiskReward">Risk/Reward</label>
             </div>
           </div>
-          <div>
-            <span class="inline-block min-width10" id="opOptType">&nbsp;</span>
-            <div class="inline-block">
-              <input type="radio" id="opTypeRiskReward" name="opOpType" value="risk"> <label class="min-width10" for="opTypeRiskReward">Risk/Reward</label>
-              <input type="radio" id="opTypeSpikes" name="opOpType" value="spike"> <label for="opTypeSpikes">Spikes</label>
-            </div>
+          <div id="opStopLossDiv" class="">
+            <span class="inline-block min-width5" id="opStopLoss"><a title="Info" onclick="opOptTypeInfo('Stoploss')" href="#/"><i class="fa fa-info-circle"></i></a> Stoploss :&nbsp;</span>
+            <input type="radio" id="opChangeStoplossNo" name="opChangeStoploss" value="no" checked><label class="min-width10" for="opChangeStoplossNo">Don't change</label>
+            <input type="radio" id="opChangeStoplossYes" name="opChangeStoploss" value="yes"> <label class="min-width7" for="opChangeStoplossYes">Change</label>
+            <input type="radio" id="opChangeStoplossFine" name="opChangeStoploss" value="yes"> <label for="opChangeStoplossFine">Fine Tune</label>
           </div>
-
+          <div id="opTargetDiv" class="">
+            <span class="inline-block min-width5" id="opTarget"><a title="Info" onclick="opOptTypeInfo('Target')" href="#/"><i class="fa fa-info-circle"></i></a> Target :&nbsp;</span>
+            <input type="radio" id="opChangeTargetNo" name="opChangeTarget" value="no" checked><label class="min-width10" for="opChangeTargetNo">Don't change</label>
+            <input type="radio" id="opChangeTargetYes" name="opChangeTarget" value="yes"> <label class="min-width7" for="opChangeTargetYes">Change</label>
+            <input type="radio" id="opChangeTargetFine" name="opChangeTarget" value="yes"> <label for="opChangeTargetFine">Fine Tune</label>
+          </div>
+          <hr>
         </div>
       </div>
-
       <div class="text-center">
         <a id="runOptBtn" href="#/" onkeydown="opKeyDownDoNothing(event)" onclick="runOptimize(event)" class="button white margin-s-b30"><i class="text-green fas fa-play"></i> Optimize</a>
       </div>
-      <div class="text-center" id="opStopLossTargetDiv" class="margin-t10 ">
-        <span class="inline-block min-width10" id="opStopLossTarget">CPU Usage <a title="Info" onclick="opCpuInfo()" href="#/"><i class="fa fa-info-circle"></i></a> :&nbsp;</span>
-        <input type="radio" id="opOneCore" name="opCPUCores" value="one" ><label class="min-width10" for="opOneCore">One Core</label>
-        <input type="radio" id="opHalfCores" name="opCPUCores" value="half" checked><label class="min-width10" for="opHalfCores">1/2 Cores</label>
-        <input type="radio" id="opAllCores" name="opCPUCores" value="all"> <label for="opAllCores">All Cores</label>
+      <div class="text-center" id="opStopLossTargetDiv" class="margin-t10">
+        <span class="inline-block min-width10" id="opStopLossTarget"><a title="Info" onclick="opCpuInfo()" href="#/"><i class="fa fa-info-circle"></i></a> CPU Usage :&nbsp;</span>
+        <input type="radio" id="opOneCore" name="opCPUCores" value="one"><label class="min-width10 text-left" for="opOneCore">One Core</label>
+        <input type="radio" id="opHalfCores" name="opCPUCores" value="half" checked><label class="min-width10 text-left" for="opHalfCores">1/2 Cores</label>
+        <input type="radio" id="opAllCores" name="opCPUCores" value="all"> <label class="min-width10 text-left" for="opAllCores">All Cores</label>
       </div>
-      <div id="opResultDiv" class="display-none">
+      <div id="opResultDiv" class="display-none ">
         <div id="opRunning">
           <h3 class="text-center" id="opRunPercent"></h3>
           <div id="opRunPercent2" class="text-center" style="margin-top:1em;"> </div>

@@ -546,6 +546,12 @@ async function binanceRoundAmmount(amount, instrument) {
     : 0;
   // easier version: binance.getPrecision(number)
   //return Number.parseFloat(binance.roundStep(amount, stepSize))
+
+  let factor = 1;
+  for (let i = 0; i < precision; i++) {
+    factor *= 10;
+  }
+  amount = Math.floor(amount * factor) / factor;
   return Number.parseFloat(amount.toFixed(precision));
 }
 

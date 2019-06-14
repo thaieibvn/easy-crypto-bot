@@ -253,6 +253,8 @@ async function showExecutionResult(id) {
     showLoading();
     let execution = await getExecutionById(id);
     $('#executionStrategiesTable').html('<thead><tr><td class="text-left">Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Trade Size (' + getBaseCurrency(execution.instrument) + ')</td><td>Result %</td><td>Result ' + getQuotedCurrency(execution.instrument) + '</td> </tr></thead>');
+    $('#executionMarketResDiv').hide();
+    $('#executionDates').html('');
     if (execution.type === 'Alerts') {
       $('#executionDetailsLabel').html('Alerts');
       $('.trade-section').hide();
@@ -296,6 +298,15 @@ async function showExecutionResult(id) {
         $('#executionFeeRate').html('Fee Rate per trade: ' + execution.feeRate.toFixed(4) + '%');
       } else {
         $('#executionFeeRate').html('');
+      }
+
+      if (execution.trades.length > 0) {
+        let prices = await getLastBinancePrices();
+        let lastPrice = prices[execution.instrument];
+        let startPrice = execution.trades[0].entry;
+        $('#executionMarketResDiv').show();
+        $('#executionMarketRes').html((100*(lastPrice - startPrice) / startPrice).toFixed(2) + '%');
+        $('#executionDates').html(' ' + formatDateSmall(execution.trades[0].openDate) + ' - ' + formatDateSmall(new Date()));
       }
       for (let trade of execution.trades) {
         if (trade.closeDate !== undefined && trade.exit != null) {
@@ -483,13 +494,14 @@ async function fillOldExecutions() {
       for (let execution of executions) {
         //Check for old version strategies without individual rule timeframes
         let hasRuleWithNoTf = false;
-        for (let rule of execution.strategy.buyRules) {
+        let strategy = await getStrategyByName(execution.name);
+        for (let rule of strategy.buyRules) {
           if (rule.timeframe === null || rule.timeframe === undefined) {
             hasRuleWithNoTf = true;
             break;
           }
         }
-        for (let rule of execution.strategy.sellRules) {
+        for (let rule of strategy.sellRules) {
           if (rule.timeframe === null || rule.timeframe === undefined) {
             hasRuleWithNoTf = true;
             break;
@@ -636,7 +648,7 @@ function sendEmail(execution, type, date, entry) {
   $.post("https://easycryptobot.com/mail-sender.php", {
     f: 'ecb',
     m: execution.email,
-    s: execution.strategy.name,
+    s: execution.name,
     i: execution.instrument,
     d: formatDateFull(date),
     e: entry,
@@ -778,7 +790,7 @@ async function clearErrors() {
 
 async function editExecution(id) {
   let execution = await getExecutionById(id);
-  $('#executionStrategyEdit').html(execution.strategy.name);
+  $('#executionStrategyEdit').html(execution.name);
   $('#executionExchangeEdit').html(execution.exchange);
   $('#executionInstrumentEdit').html(execution.instrument);
 
@@ -872,7 +884,7 @@ function calculateUsdtValue(coin, total, prices) {
 async function fillBinanceBalancesTask() {
   while (true) {
     await fillBinanceBalances();
-    await sleep(1000 * 60 * 5); // 5 minutes
+    await sleep(1000 * 60 * 10); // 10 minutes
   }
 }
 
@@ -924,7 +936,7 @@ async function sendErrorMail(execution) {
     if (!sendNotifications || email == null) {
       return;
     }
-    let text = 'The execution of strategy "' + execution.strategy.name + '" on instrument ' + execution.instrument + ' was stopped due to the following event:<br><br>' + execution.error;
+    let text = 'The execution of strategy "' + execution.name + '" on instrument ' + execution.instrument + ' was stopped due to the following event:<br><br>' + execution.error;
 
     $.post("https://easycryptobot.com/mail-error-sender.php", {
       f: 'ecb',
@@ -993,10 +1005,10 @@ async function sendTradeMail(execution) {
     let text = '';
     if (trade.exit != undefined && trade.exit != null) {
       let exit = await binanceRoundTickAmmount(trade.entry, execution.instrument);
-      text = '<li>SELL: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were sold at ' + exit + ' by "' + execution.strategy.name + '" on ' + execution.instrument + '. Result: ' + trade.result.toFixed(2) + '% (' + trade.resultMoney.toFixed(8) + ' ' + getQuotedCurrency(execution.instrument) + ').</li>';
+      text = '<li>SELL: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were sold at ' + exit + ' by "' + execution.name + '" on ' + execution.instrument + '. Result: ' + trade.result.toFixed(2) + '% (' + trade.resultMoney.toFixed(8) + ' ' + getQuotedCurrency(execution.instrument) + ').</li>';
     } else {
       let entry = await binanceRoundTickAmmount(trade.entry, execution.instrument);
-      text = '<li>BUY: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were bought at ' + entry + ' by "' + execution.strategy.name + '" on ' + execution.instrument + '.</li>';
+      text = '<li>BUY: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were bought at ' + entry + ' by "' + execution.name + '" on ' + execution.instrument + '.</li>';
     }
     try {
       await notificationsMutex.lock();
@@ -1163,7 +1175,7 @@ async function isStrategyRunning(name) {
   for (let worker of executionWorkers) {
     if (worker.status === 'running') {
       let execution = await getExecutionById(worker.execId)
-      if (execution.strategy.name === name) {
+      if (execution.name === name) {
         return true;
       }
     }
@@ -1174,7 +1186,7 @@ async function isStrategyRunning(name) {
 async function isStrategyUsedInExecutions(name) {
   let executions = await getExecutionsFromDb();
   for (let execution of executions) {
-    if (execution.strategy.name === name) {
+    if (execution.name === name) {
       return true;
     }
   }
@@ -1185,10 +1197,10 @@ async function hasStrategyOpenTrades(name) {
   let executions = await getExecutionsFromDb();
   for (let execution of executions) {
     if (execution.name === name && execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit === undefined || execution.trades[execution.trades.length - 1].exit === null)) {
-      return [true, execution.strategy.target];
+      return true;
     }
   }
-  return [false];
+  return false;
 }
 
 async function executeStrategy() {
@@ -1296,7 +1308,6 @@ async function executeStrategy() {
       date: date.getTime(),
       type: executionType,
       name: strategyName,
-      strategy: strategy,
       exchange: exchange,
       instrument: instrument,
       positionSize: positionSize,
@@ -1354,8 +1365,8 @@ async function runStrategy(id) {
 
     setStatusAndActions(id, 'Starting');
     let execution = await getExecutionById(id);
-
-    let timeframes = getTimeframes(execution.strategy);
+    let strategy = await getStrategyByName(execution.name);
+    let timeframes = getTimeframes(strategy);
     if (timeframes === null) {
       let errorMsg = 'Your strategy contains a rule without a timeframe. Please remove this execution and edit your strategy!';
       execution.error = errorMsg;
@@ -1397,7 +1408,8 @@ async function runStrategy(id) {
         worker.execId = id;
         hasFreeWorker = true;
         let instrumentInfo = await getBinanceInstrumentsInfo(execution.instrument);
-        worker.wk.postMessage([execution, apiKey, apiSecret, instrumentInfo]);
+        let strategy = await getStrategyByName(execution.name);
+        worker.wk.postMessage([execution, strategy, apiKey, apiSecret, instrumentInfo]);
         break;
       }
     }
@@ -1525,7 +1537,8 @@ async function runStrategy(id) {
 
       executionWorkers.push({status: 'running', execId: id, wk: wk});
       let instrumentInfo = await getBinanceInstrumentsInfo(execution.instrument);
-      wk.postMessage([execution, apiKey, apiSecret, instrumentInfo]);
+      let strategy = await getStrategyByName(execution.name);
+      wk.postMessage([execution, strategy, apiKey, apiSecret, instrumentInfo]);
       return true;
     }
   } catch (err) {
@@ -1819,18 +1832,18 @@ function lastTickInfo() {
 }
 
 async function updateExecutionStrategy(name, orgName) {
-  let strategy = await getStrategyByName(name);
   let executions = await getExecutionsFromDb();
   for (let execution of executions) {
-    if (execution.strategy.name === orgName) {
-      execution.strategy = strategy;
-      execution.name = name;
-      await updateExecutionDb(execution);
-      $('#executionName' + execution.id).html(name);
+    if (execution.name === orgName) {
+      if (name !== orgName) {
+        execution.name = name;
+        await updateExecutionDb(execution);
+        $('#executionName' + execution.id).html(name);
+      }
       for (let worker of executionWorkers) {
         if (worker.execId === execution.id) {
+          let strategy = await getStrategyByName(name);
           worker.wk.postMessage(['UPDATE_STRATEGY', strategy]);
-          break;
         }
       }
     }

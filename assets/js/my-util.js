@@ -510,6 +510,18 @@ function formatDate(date) {
   return srt;
 }
 
+function formatDateSmall(date) {
+  if (!(date instanceof Date)) {
+    return '';
+  }
+  var srt = date.getFullYear() + '-' + addZero(date.getMonth() + 1) + '-' + addZero(date.getDate());
+  return srt;
+}
+
+function fixNumber(number, decimals) {
+   return Number.parseFloat((number).toFixed(decimals));
+}
+
 function formatDateFull(date) {
   if (!(date instanceof Date)) {
     return '';

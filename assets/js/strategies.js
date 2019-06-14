@@ -318,26 +318,22 @@ async function saveStrategy() {
     let hasOpenTrades = await hasStrategyOpenTrades(strategy.name);
     let hasOpenTrades2 = await hasStrategyOpenTrades(orgStrategyName);
 
-    if (hasOpenTrades[0]) {
-      if ((isNaN(strategy.target) && hasOpenTrades[1] !== null) || (!isNaN(strategy.target) && (strategy.target !== hasOpenTrades[1]))) {
-        openModalInfo('Edit of the Target filed is not allowed for strategies with open trades.<br>If you want to edit the Target, please close the trade.')
+    if (hasOpenTrades) {
+        openModalInfo('Edit is not allowed for executing strategies with open trades.<br>If you want to edit, please close the trade.')
         return;
-      }
     }
-    if (hasOpenTrades2[0]) {
-      if ((isNaN(strategy.target) && hasOpenTrades2[1] !== null) || (!isNaN(strategy.target) && (strategy.target !== hasOpenTrades2[1]))) {
-        openModalInfo('Edit of the Target filed is not allowed for strategies with open trades.<br>If you want to edit the Target, please close the trade.')
+    if (hasOpenTrades2) {
+        openModalInfo('Edit is not allowed for executing strategies with open trades.<br>If you want to edit, please close the trade.')
         return;
-      }
     }
     let isUsedInExecutions = await isStrategyUsedInExecutions(strategy.name);
 
     if (srtTmp !== null && orgStrategyName !== srtTmp.name) {
       let label = isUsedInExecutions
-        ? 'Strategy with name ' + strategy.name + ' already exists and is also in the "Executions" list. Your changes will apply to the execution as well. <br>Do you like to overwrite it?'
-        : 'Strategy with name ' + strategy.name + ' already exists.<br>Do you like to overwrite it?';
-      openModalConfirm(label, function() {
-        overwriteStrategy(strategy, orgStrategyName);
+        ? 'Strategy with name ' + strategy.name + ' already exists and is also in the "Executions" list. Your changes will apply to the execution as well. <br>Do you want to overwrite it?'
+        : 'Strategy with name ' + strategy.name + ' already exists.<br>Do you want to overwrite it?';
+      openModalConfirm(label, async function() {
+        await overwriteStrategy(strategy, orgStrategyName);
         if (orgStrategyName !== null) {
           if ($('#btStrategyCombobox').text() === orgStrategyName) {
             $('#btStrategyCombobox').text(strategy.name);
@@ -353,7 +349,7 @@ async function saveStrategy() {
           }
         }
         if (isUsedInExecutions) {
-          updateExecutionStrategy(strategy.name, orgStrategyName);
+          updateExecutionStrategy(strategy.name, strategy.name);
         }
       });
       return;
@@ -586,6 +582,8 @@ function duplicateStrategy() {
   strategyDuplicated = true;
   lastTFUsed = 'Choose Timeframe';
   orgStrategyName = null;
+  $('#saveStrategyBtn').removeClass('disabled')
+  $('#saveStrategyDisabled').hide();
 }
 
 function openStrategyVariationStrategy(strategy) {

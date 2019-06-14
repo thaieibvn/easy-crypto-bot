@@ -93,7 +93,10 @@ let startDate = null;
 let ticks = {};
 let feeRate = null;
 let optType = 'return';
-let changeStoplossAndTarget;
+let changeStoploss;
+let changeTarget;
+let changeStoplossFine;
+let changeTargetFine;
 let etaLastDate = null;
 let etaStr = '';
 let etaLastNum = null;
@@ -198,15 +201,17 @@ async function runOptimize() {
 
   if ($('#opTypeMaxReturn').is(':checked')) {
     optType = 'return';
-  } else if ($('#opTypeConsistency').is(':checked')) {
-    optType = 'consistency';
+  } else if ($('#opTypeSmooth').is(':checked')) {
+    optType = 'smooth';
   } else if ($('#opTypeRiskReward').is(':checked')) {
     optType = 'riskReward';
-  } else if ($('#opTypeSpikes').is(':checked')) {
-    optType = 'spikes';
   }
 
-  changeStoplossAndTarget = $('#opChangeStoplossYes').is(':checked');
+  changeStoploss = $('#opChangeStoplossYes').is(':checked') || $('#opChangeStoplossFine').is(':checked');
+  changeTarget = $('#opChangeTargetYes').is(':checked') || $('#opChangeTargetFine').is(':checked');
+
+  changeStoplossFine = $('#opChangeStoplossFine').is(':checked');
+  changeTargetFine = $('#opChangeTargetFine').is(':checked');
 
   try {
     optimizationRunning = true;
@@ -219,6 +224,21 @@ async function runOptimize() {
       $('#runOptBtn').removeClass('disabled');
       return;
     }
+
+    if ($('#opChangeStoplossFine').is(':checked') && (strategy.stoploss == undefined || strategy.stoploss == null || isNaN(strategy.stoploss)) && (strategy.trailingSl == undefined || strategy.trailingSl == null || isNaN(strategy.trailingSl))) {
+      openModalInfo('The Fine Tune Stoploss option works only for strategies with a stoploss or a trailing stoploss.');
+      optimizationRunning = false;
+      $('#runOptBtn').removeClass('disabled');
+      return;
+    }
+
+    if ($('#opChangeTargetFine').is(':checked') && (strategy.target == undefined || strategy.target == null || isNaN(strategy.target))) {
+      openModalInfo('The Fine Tune Target option works only for strategies with a target.');
+      optimizationRunning = false;
+      $('#runOptBtn').removeClass('disabled');
+      return;
+    }
+
     strategyNameToUse = strategy.name + ' (' + instrument + ' Opt.)';
     $('#opRunPercent').html('Starting Optimization..');
     $('#opRunRemaining').html('&nbsp;');
@@ -244,7 +264,7 @@ async function runOptimize() {
       return;
     }
 
-    let fieldsToChange = calculateFieldsToChange(strategy, changeStoplossAndTarget);
+    let fieldsToChange = calculateFieldsToChange(strategy);
     if (fieldsToChange > 20) {
       openModalInfo('Your strategy contains too many input fields (' + fieldsToChange + ') to be optimized. The maximum allowed number is 20.');
       $('#runOptBtn').removeClass('disabled');
@@ -290,9 +310,10 @@ async function runOptimize() {
     strategyVariations = [];
     fineTune = 0;
     strategyVariationsTested = 0;
-    setRulesVariationsPatterns(strategy, changeStoplossAndTarget);
+    setRulesVariationsPatterns(strategy);
 
-    strategyVariations = await getStrategyVariations(strategy, fineTune, changeStoplossAndTarget);
+    strategyVariations = await getStrategyVariations(strategy, fineTune);
+    strategyVariations.push(strategy);
     strategyVariationsTested = strategyVariations.length;
 
     strategyVariationsResults = [];
@@ -511,10 +532,13 @@ function countRuleFields(rule) {
   return fieldsToChange;
 }
 
-function calculateFieldsToChange(strategy, changeStoplossAndTarget) {
-  let fieldsToChange = changeStoplossAndTarget
-    ? 2
+function calculateFieldsToChange(strategy) {
+  let fieldsToChange = changeStoploss
+    ? 1
     : 0;
+  if (changeTarget) {
+    fieldsToChange++;
+  }
 
   for (let rule of strategy.buyRules) {
     fieldsToChange += countRuleFields(rule);
@@ -525,7 +549,7 @@ function calculateFieldsToChange(strategy, changeStoplossAndTarget) {
   return fieldsToChange;
 }
 
-function setRulesVariationsPatterns(strategy, changeStoplossAndTarget) {
+function setRulesVariationsPatterns(strategy) {
 
   fineTuneMaxCycles = 6;
 
@@ -657,8 +681,6 @@ function rulesAreSame(rule1, rule2) {
 }
 
 function pushNewStrategyVariation(variations, strategy) {
-  let hasTheSameStrategy = false;
-  let counter = 0;
   for (let strategyTmp of variations) {
     let allBuyRulesAreSame = true;
     for (let i = 0; i < strategyTmp.buyRules.length; i++) {
@@ -677,35 +699,28 @@ function pushNewStrategyVariation(variations, strategy) {
       }
       if (allSellRulesAreSame) {
         if (strategyTmp.stoploss == strategy.stoploss && strategyTmp.target == strategy.target && strategyTmp.trailingSl == strategy.trailingSl) {
-          hasTheSameStrategy = true;
-          break;
+          return false;
         }
       }
     }
   }
-  if (!hasTheSameStrategy) {
-    variations.push(strategy);
-  }
-  return !hasTheSameStrategy;
+  variations.push(strategy);
+  return true;
 }
 
-async function getStrategyVariationsFromResult(biggestTradeMultiplier, strategiesToAdd) {
+async function getStrategyVariationsFromResult(strategiesToAdd) {
   let addedStrategies = 0;
   let result = [];
   let usedStrategies = [];
   let counter = 0;
   for (let strategyRes of strategyVariationsResults) {
-    if (biggestTradeMultiplier != 0 && strategyRes.biggestGain * biggestTradeMultiplier > strategyRes.totalReturn) {
-      continue;
-    }
-
     let pushedRes = pushNewStrategyVariation(usedStrategies, strategyRes.strategy);
     if (!pushedRes) {
       continue;
     }
 
     strategyVariationsIntermitBestResults.push(strategyRes);
-    let strategyVariationsTmp = await getStrategyVariations(strategyRes.strategy, fineTune, changeStoplossAndTarget);
+    let strategyVariationsTmp = await getStrategyVariations(strategyRes.strategy, fineTune);
 
     for (let strategyTmp of strategyVariationsTmp) {
       result.push(strategyTmp);
@@ -733,13 +748,11 @@ function compareStrategyResults(a, b) {
   } else if (optType === 'return') {
     ratioA = a.totalReturn;
     ratioB = b.totalReturn;
-  } else if (optType === 'spikes') {
-    ratioA = a.totalReturn * a.biggestGain;
-    ratioB = b.totalReturn * b.biggestGain;
-
-  } else if (optType === 'consistency') {
-    let returnWithoutBestTradeA = a.totalReturn - a.biggestGain;
-    let returnWithoutBestTradeB = b.totalReturn - b.biggestGain;
+  } else if (optType === 'smooth') {
+    //ratioA = a.totalReturn - (a.biggestGain-Math.abs(a.avgGainLossPerTrade));
+    //ratioB = b.totalReturn - (b.biggestGain-Math.abs(b.avgGainLossPerTrade));
+    let returnWithoutBestTradeA = a.totalReturn - (a.biggestGain-Math.abs(a.avgGainLossPerTrade));
+    let returnWithoutBestTradeB = b.totalReturn - (b.biggestGain-Math.abs(b.avgGainLossPerTrade));
 
     let avgTradesCountA = a.executedTrades - 1;
     let avgTradesCountB = b.executedTrades - 1;
@@ -760,7 +773,7 @@ function compareStrategyResults(a, b) {
 
     ratioA = (totalReturnToMaxDrawdownA < 0 && avgTradeWithoutBestTradeA < 0)
       ? (-1) * totalReturnToMaxDrawdownA * avgTradeWithoutBestTradeA
-      : totalReturnToMaxDrawdownA * avgTradeWithoutBestTradeA;
+      : totalReturnToMaxDrawdownA * avgTradeWithoutBestTradeA ;
 
     ratioB = (totalReturnToMaxDrawdownB < 0 && avgTradeWithoutBestTradeB < 0)
       ? (-1) * totalReturnToMaxDrawdownB * avgTradeWithoutBestTradeB
@@ -792,22 +805,8 @@ async function doFineTuneOfResult() {
     opExecutionCanceled = false;
     opCompleted = 0;
 
-    let strategiesToAdd = 5;
-    if (optType === 'consistency') {
-      strategyVariations = await getStrategyVariationsFromResult(3, strategiesToAdd);
-      if (strategyVariations.length === 0) {
-        strategyVariations = await getStrategyVariationsFromResult(2, strategiesToAdd);
-        if (strategyVariations.length === 0) {
-          strategyVariations = await getStrategyVariationsFromResult(1, strategiesToAdd);
-          if (strategyVariations.length === 0) {
-            strategyVariations = await getStrategyVariationsFromResult(0, strategiesToAdd);
-          }
-        }
-      }
-    } else {
-      strategyVariations = await getStrategyVariationsFromResult(0, strategiesToAdd);
-    }
-
+    let strategiesToAdd = 10;
+    strategyVariations = await getStrategyVariationsFromResult(strategiesToAdd);
     strategyVariationsTested += strategyVariations.length;
 
     if (strategyVariations.length == 0) {
@@ -1131,16 +1130,16 @@ let stoplossesFineTune1 = [-0.5, 0.5];
 let stoplossesFineTune2 = [-0.25, 0.25];
 let stoplossesFineTune3 = [-0.25, 0.25];
 let stoplossesFineTune4 = [-0.25, 0.25];
-let stoplossesFineTune5 = [0];
-let stoplossesFineTune6 = [0];
+let stoplossesFineTune5 = [-0.15, 0.15];
+let stoplossesFineTune6 = [-0.1, 0.1];
 
-let targetsFineTune0 = [3, 7, 12.5];
-let targetsFineTune1 = [-1, 1];
-let targetsFineTune2 = [-1, 1];
-let targetsFineTune3 = [-0.5, 0.5];
-let targetsFineTune4 = [-0.2, 0.2];
-let targetsFineTune5 = [0];
-let targetsFineTune6 = [0];
+let targetsFineTune0 = [2, 4.5, 7];
+let targetsFineTune1 = [-0.5, 0.5];
+let targetsFineTune2 = [-0.25, 0.25];
+let targetsFineTune3 = [-0.25, 0.25];
+let targetsFineTune4 = [-0.25, 0.25];
+let targetsFineTune5 = [-0.15, 0.15];
+let targetsFineTune6 = [-0.1, 0.1];
 
 function getRuleVariationsFineTune(rule) {
   let ruleVariations = [];
@@ -1157,7 +1156,7 @@ function getRuleVariationsFineTune(rule) {
           if (valueToUse <= 0) {
             valueToUse = 0.1
           }
-          ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse));
+          ruleVariations.push(createRuleVariation(rule, periodToUse, fixNumber(valueToUse, 2)));
         }
       }
     } else {
@@ -1196,7 +1195,7 @@ function getRuleVariationsFineTune(rule) {
         } else if (valueToUse >= 100) {
           valueToUse = 99;
         }
-        ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse));
+        ruleVariations.push(createRuleVariation(rule, periodToUse, fixNumber(valueToUse, 2)));
       }
     }
   } else if (rule.indicator === 'macd') {
@@ -1219,7 +1218,7 @@ function getRuleVariationsFineTune(rule) {
                 if (valueToUse <= 0) {
                   valueToUse = 0.1
                 }
-                ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, null, null, periodToUse2, periodToUse3));
+                ruleVariations.push(createRuleVariation(rule, periodToUse, fixNumber(valueToUse, 2), null, null, periodToUse2, periodToUse3));
               }
             }
           }
@@ -1272,7 +1271,7 @@ function getRuleVariationsFineTune(rule) {
             if (valueToUse <= 0) {
               valueToUse = 0.1
             }
-            ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, null, null, periodToUse2, null));
+            ruleVariations.push(createRuleVariation(rule, periodToUse, fixNumber(valueToUse, 2), null, null, periodToUse2, null));
           }
         }
       }
@@ -1314,7 +1313,7 @@ function getRuleVariationsFineTune(rule) {
             } else if (valueToUse >= 100) {
               valueToUse = 99;
             }
-            ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, rule.crossDirection, null, periodToUse2, periodToUse3));
+            ruleVariations.push(createRuleVariation(rule, periodToUse, fixNumber(valueToUse, 2), rule.crossDirection, null, periodToUse2, periodToUse3));
           }
         }
       }
@@ -1347,7 +1346,7 @@ function getRuleVariationsFineTune(rule) {
               } else if (valueToUse >= 100) {
                 valueToUse = 99;
               }
-              ruleVariations.push(createRuleVariation(rule, periodToUse, valueToUse, rule.crossDirection, null, periodToUse2, periodToUse3, periodToUse4));
+              ruleVariations.push(createRuleVariation(rule, periodToUse, fixNumber(valueToUse, 2), rule.crossDirection, null, periodToUse2, periodToUse3, periodToUse4));
             }
           }
         }
@@ -1531,73 +1530,171 @@ function createStrategyVariationWithSellRules(finalStrategiesList, strategiesWit
 
 function createStrategyVariationWithStoplossRules(finalStrategiesList, strategiesWithBuySellOnly, fineTune) {
   let stoplosses = [];
-  let targets = [];
+  if (changeStoplossFine) {
+    switch (fineTune) {
+      case 0:
+        stoplosses = [-0.7, 0, 0.7];
+        break;
+      case 1:
+        stoplosses = [-0.4, 0.4];
+        break;
+      case 2:
+        stoplosses = [-0.2, 0.2];
+        break;
+      case 3:
+        stoplosses = [-0.15, 0.15];
+        break;
+      case 4:
+        stoplosses = [-0.03, 0.03];
+        break;
+      case 5:
+        stoplosses = [-0.01, 0.01];
+        break;
+    };
+  } else {
+    switch (fineTune) {
+      case 0:
+        stoplosses = stoplossesFineTune0;
+        break;
+      case 1:
+        stoplosses = stoplossesFineTune1;
+        break;
+      case 2:
+        stoplosses = stoplossesFineTune2;
+        break;
+      case 3:
+        stoplosses = stoplossesFineTune3;
+        break;
+      case 4:
+        stoplosses = stoplossesFineTune4;
+        break;
+      case 5:
+        stoplosses = stoplossesFineTune5;
+        break;
+      case 6:
+        stoplosses = stoplossesFineTune6;
+        break;
+      default:
+        break;
+    };
+  }
 
-  switch (fineTune) {
-    case 0:
-      stoplosses = stoplossesFineTune0;
-      targets = targetsFineTune0;
-      break;
-    case 1:
-      stoplosses = stoplossesFineTune1;
-      targets = targetsFineTune1;
-      break;
-    case 2:
-      stoplosses = stoplossesFineTune2;
-      targets = targetsFineTune2;
-      break;
-    case 3:
-      stoplosses = stoplossesFineTune3;
-      targets = targetsFineTune3;
-      break;
-    case 4:
-      stoplosses = stoplossesFineTune4;
-      targets = targetsFineTune4;
-      break;
-    case 5:
-      stoplosses = stoplossesFineTune5;
-      targets = targetsFineTune5;
-      break;
-    case 6:
-      stoplosses = stoplossesFineTune6;
-      targets = targetsFineTune6;
-      break;
-    default:
-      break;
-  };
   let useTrailingStop = strategiesWithBuySellOnly.length > 0 && strategiesWithBuySellOnly[0].trailingSl !== null && !isNaN(strategiesWithBuySellOnly[0].trailingSl);
   for (let stoploss of stoplosses) {
-    for (let target of targets) {
-      for (let strategy of strategiesWithBuySellOnly) {
-        let newStrategy = {};
-        newStrategy.name = strategy.name;
-        newStrategy.timeClose = strategy.timeClose;
-        newStrategy.buyRules = [];
-        newStrategy.sellRules = [];
-        for (let buyRule of strategy.buyRules) {
-          newStrategy.buyRules.push(buyRule);
-        }
-        for (let sellRule of strategy.sellRules) {
-          newStrategy.sellRules.push(sellRule);
-        }
-        if (fineTune > 0) {
-          if (useTrailingStop) {
-            newStrategy.trailingSl = strategy.trailingSl + stoploss;
-          } else {
-            newStrategy.stoploss = strategy.stoploss + stoploss;
-          }
-          newStrategy.target = strategy.target + target;
-        } else {
-          if (useTrailingStop) {
-            newStrategy.trailingSl = stoploss;
-          } else {
-            newStrategy.stoploss = stoploss;
-          }
-          newStrategy.target = target;
-        }
-
-        finalStrategiesList.push(newStrategy);
+    for (let strategy of strategiesWithBuySellOnly) {
+      let newStrategy = {};
+      newStrategy.name = strategy.name;
+      newStrategy.timeClose = strategy.timeClose;
+      newStrategy.buyRules = [];
+      newStrategy.sellRules = [];
+      for (let buyRule of strategy.buyRules) {
+        newStrategy.buyRules.push(buyRule);
       }
+      for (let sellRule of strategy.sellRules) {
+        newStrategy.sellRules.push(sellRule);
+      }
+      if (fineTune > 0 || changeStoplossFine) {
+        if (useTrailingStop) {
+          newStrategy.trailingSl = fixNumber(strategy.trailingSl + stoploss, 2);
+        } else {
+          newStrategy.stoploss = fixNumber(strategy.stoploss + stoploss, 2);
+        }
+        newStrategy.target = strategy.target;
+      } else {
+        if (useTrailingStop) {
+          newStrategy.trailingSl = stoploss;
+        } else {
+          newStrategy.stoploss = stoploss;
+        }
+        newStrategy.target = strategy.target;
+      }
+      finalStrategiesList.push(newStrategy);
+    }
+  }
+  return finalStrategiesList;
+}
+
+function createStrategyVariationWithTargetRules(finalStrategiesList, strategiesWithBuySellOnly, fineTune) {
+  let targets = [];
+  if (changeTargetFine) {
+    switch (fineTune) {
+      case 0:
+        targets = [-0.7, 0, 0.7];
+        break;
+      case 1:
+        targets = [-0.4, 0.4];
+        break;
+      case 2:
+        targets = [-0.2, 0.2];
+        break;
+      case 3:
+        targets = [-0.15, 0.15];
+        break;
+      case 4:
+        targets = [-0.03, 0.03];
+        break;
+      case 5:
+        targets = [-0.01, 0.01];
+        break;
+    };
+  } else {
+    switch (fineTune) {
+      case 0:
+        targets = targetsFineTune0;
+        break;
+      case 1:
+        targets = targetsFineTune1;
+        break;
+      case 2:
+        targets = targetsFineTune2;
+        break;
+      case 3:
+        targets = targetsFineTune3;
+        break;
+      case 4:
+        targets = targetsFineTune4;
+        break;
+      case 5:
+        targets = targetsFineTune5;
+        break;
+      case 6:
+        targets = targetsFineTune6;
+        break;
+      default:
+        break;
+    };
+  }
+  let useTrailingStop = strategiesWithBuySellOnly.length > 0 && strategiesWithBuySellOnly[0].trailingSl !== null && !isNaN(strategiesWithBuySellOnly[0].trailingSl);
+  for (let target of targets) {
+    for (let strategy of strategiesWithBuySellOnly) {
+      let newStrategy = {};
+      newStrategy.name = strategy.name;
+      newStrategy.timeClose = strategy.timeClose;
+      newStrategy.buyRules = [];
+      newStrategy.sellRules = [];
+      for (let buyRule of strategy.buyRules) {
+        newStrategy.buyRules.push(buyRule);
+      }
+      for (let sellRule of strategy.sellRules) {
+        newStrategy.sellRules.push(sellRule);
+      }
+      if (fineTune > 0 || changeTargetFine) {
+        if (useTrailingStop) {
+          newStrategy.trailingSl = strategy.trailingSl;
+        } else {
+          newStrategy.stoploss = strategy.stoploss;
+        }
+        newStrategy.target = fixNumber(strategy.target + target, 2);
+      } else {
+        if (useTrailingStop) {
+          newStrategy.trailingSl = strategy.trailingSl;
+        } else {
+          newStrategy.stoploss = strategy.stoploss;
+        }
+        newStrategy.target = target;
+      }
+
+      finalStrategiesList.push(newStrategy);
     }
   }
   return finalStrategiesList;
@@ -1610,7 +1707,7 @@ async function incrementCounterWithSleep(counter) {
   return counter + 1;
 }
 
-async function getStrategyVariations(strategy, fineTune, changeStoplossAndTarget) {
+async function getStrategyVariations(strategy, fineTune) {
   try {
     let buyRulesVariations = getRulesVariations(strategy.buyRules, fineTune);
     let sellRulesVariations = getRulesVariations(strategy.sellRules, fineTune);
@@ -1679,13 +1776,19 @@ async function getStrategyVariations(strategy, fineTune, changeStoplossAndTarget
       strategiesWithBuySellRuleVariations = strategiesWithBuyRuleVariations;
     }
 
-    if (changeStoplossAndTarget) {
+    if (changeStoploss) {
       let strategiesWithBuySellAndStoplossRuleVariations = [];
       createStrategyVariationWithStoplossRules(strategiesWithBuySellAndStoplossRuleVariations, strategiesWithBuySellRuleVariations, fineTune);
-      return strategiesWithBuySellAndStoplossRuleVariations;
-    } else {
-      return strategiesWithBuySellRuleVariations;
+      strategiesWithBuySellRuleVariations = strategiesWithBuySellAndStoplossRuleVariations;
     }
+
+    if (changeTarget) {
+      let strategiesWithBuySellAndTargetsRuleVariations = [];
+      createStrategyVariationWithTargetRules(strategiesWithBuySellAndTargetsRuleVariations, strategiesWithBuySellRuleVariations, fineTune);
+      strategiesWithBuySellRuleVariations = strategiesWithBuySellAndTargetsRuleVariations;
+    }
+
+    return strategiesWithBuySellRuleVariations;
 
   } catch (err) {
     log('error', 'getStrategyVariations', err.stack);
@@ -1867,7 +1970,10 @@ function openOpStrategy(index) {
 }
 
 function opOptInfo() {
-  openModalInfoBig('<h2 class="text-center">Optimize For:</h2><strong>Max Return</strong> - optimize the parameters to find the strategies that generate the highest return.<br><br>' + '<strong>Risk/Reward</strong> - optimize the parameters to find the strategies that generate the highest return for the lowest drawdown.<br><br>' + '<strong>Consistency</strong> - optimize the parameters to find the strategies that generate relatively consistent trades. Usually, those strategies generate less return as they are not designed to catch price spikes but they have more predictable results. Use this type for stable coins whithout too many spikes in the price.<br><br>' + '<strong>Spikes</strong> - optimize the parameters to find the strategies that are able to catch spikes in the price of the asset. Use this for coins that do not have a stable price and have many spikes in the price.');
+  openModalInfoBig('<h2 class="text-center">Optimization Type:</h2><strong>Max Return</strong> - optimize the parameters to find the strategies that generate the highest return.<br><strong>Smooth</strong> - optimize the parameters to find the strategies that generate relatively consistent trades. Usually, those strategies generate less return but they have more predictable and smooth results.<br><strong>Risk/Reward</strong> - optimize the parameters to find the strategies that generate the highest return for the lowest drawdown.');
+}
+function opOptTypeInfo(field) {
+  openModalInfoBig('<h2 class="text-center">' + field + ' Type:</h2><strong>Don\'t change</strong> - the provided ' + field.toLowerCase() + ' will not be changed.<br><strong>Change</strong> - uses wide range of values to create strategy variations.<br>' + '<strong>Fine Tune</strong> - uses values close to the provided ' + field.toLowerCase() + ' in the original strategy.');
 }
 
 function opCpuInfo() {
