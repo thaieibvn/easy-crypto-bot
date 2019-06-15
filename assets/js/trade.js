@@ -973,7 +973,7 @@ async function sendNotificationTask() {
             result += trade.result;
             resultMoney += trade.resultMoney;
           }
-          executionsText += '<tr><td>' + executionTmp.strategy.name + '</td><td>' + executionTmp.exchange + '</td><td>' + executionTmp.instrument + '</td><td>' + executionTmp.trades.length + '</td><td>' + result.toFixed(2) + '%</td><td>' + resultMoney.toFixed(8) + ' ' + getQuotedCurrency(executionTmp.instrument) + '</td></tr>';
+          executionsText += '<tr><td>' + executionTmp.name + '</td><td>' + executionTmp.exchange + '</td><td>' + executionTmp.instrument + '</td><td>' + executionTmp.trades.length + '</td><td>' + result.toFixed(2) + '%</td><td>' + resultMoney.toFixed(8) + ' ' + getQuotedCurrency(executionTmp.instrument) + '</td></tr>';
         }
       }
       try {
