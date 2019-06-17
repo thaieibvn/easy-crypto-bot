@@ -1356,7 +1356,7 @@ async function executeStrategy() {
       resMStr='';
     }
 
-    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td id="executionName' + dbId + '">' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="posSizePercent' + dbId + '"></td><td class="text-center" id="executedTrades' + dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td class="text-right"><span id="executionRes' + dbId + '">' + resStr + '</span></td><td class="text-right"><span id="executionResMoney' + dbId + '">resMStr</span></td><td class="text-center" id="lastUpdatedExecution' + dbId + '"></td><td id="statusStr' + dbId + '">Starting</td><td id="actionsBtns' + dbId + '"></td></tr>');
+    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td id="executionName' + dbId + '">' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="posSizePercent' + dbId + '"></td><td class="text-center" id="executedTrades' + dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td class="text-right"><span id="executionRes' + dbId + '">' + resStr + '</span></td><td class="text-right"><span id="executionResMoney' + dbId + '">'+resMStr+'</span></td><td class="text-center" id="lastUpdatedExecution' + dbId + '"></td><td id="statusStr' + dbId + '">Starting</td><td id="actionsBtns' + dbId + '"></td></tr>');
     if (executionType === 'Trading') {
       fillBinanceBalances();
     }
