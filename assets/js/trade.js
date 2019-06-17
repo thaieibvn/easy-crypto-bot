@@ -238,7 +238,7 @@ function setStatusAndActions(id, status, errorMsg) {
     $('#actionsBtns' + id).html('<a class="stop-stgy-exec text-red" title="Stop Execution" href="#/" onclick="stopStrategyExecution(' + id + ')"><i class="fas fa-stop"></i></a>&nbsp;&nbsp;<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + id + ')"><i class="fas fa-chart-pie"></i></a>');
   } else {
     $('#statusStr' + id).html(status);
-    $('#actionsBtns' + id).html('<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + id + ')"><i class="fas fa-chart-pie"></i></a>');
+    $('#actionsBtns' + id).html('');
   }
 }
 
