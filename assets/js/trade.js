@@ -1074,6 +1074,9 @@ async function fillPosSizePercent(accountValueUsd, prices) {
   let executions = await getExecutionsFromDb();
   if (executions !== null && executions.length > 0) {
     for (let execution of executions) {
+      if (execution.type !== 'Alerts') {
+        fillExecResInTable(execution);
+      }
       if (execution.type === 'Trading') {
         let ustdValue = null;
         if (execution.positionSize != null && execution.positionSize != undefined && execution.positionSize > 0) {
