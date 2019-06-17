@@ -153,20 +153,38 @@ async function fillMaxLossDetailsImpl(instrument, quotedCurrencyId, posSizeId) {
   }
 }
 
-function fillExecResInTable(trades, id) {
+async function fillExecResInTable(execution) {
   let result = 0;
-  for (let trade of trades) {
+  let resultMoney = 0;
+  for (let trade of execution.trades) {
     result += trade.result;
+    if (trade.resultMoney != null && trade.resultMoney != undefined && !isNaN(trade.resultMoney)) {
+      resultMoney += trade.resultMoney;
+    }
   }
-  $('#executionRes' + id).removeClass('text-green');
-  $('#executionRes' + id).removeClass('text-red');
-  $('#executionRes' + id).html(result.toFixed(2) + '%');
-  $('#executionRes' + id).addClass(
+  $('#executionRes' + execution.id).removeClass('text-green');
+  $('#executionRes' + execution.id).removeClass('text-red');
+  $('#executionRes' + execution.id).html(result.toFixed(2) + '%');
+  $('#executionRes' + execution.id).addClass(
     result > 0
     ? 'text-green'
     : result < 0
       ? 'text-red'
       : '');
+
+  let prices = await getLastBinancePrices();
+  let ustdValue = calculateUsdtValue(getQuotedCurrency(execution.instrument), resultMoney, prices);
+  if (ustdValue != null && !isNaN(ustdValue)) {
+    $('#executionResMoney' + execution.id).removeClass('text-green');
+    $('#executionResMoney' + execution.id).removeClass('text-red');
+    $('#executionResMoney' + execution.id).addClass(
+      ustdValue > 0
+      ? 'text-green'
+      : ustdValue < 0
+        ? 'text-red'
+        : '');
+    $('#executionResMoney' + execution.id).html('$' + ustdValue.toFixed(2));
+  }
 }
 
 async function checkMaxLossReached(id) {
@@ -205,22 +223,22 @@ function setStatusAndActions(id, status, errorMsg) {
 
   if (status === 'MaxLoss') {
     $('#statusStr' + id).html('<span class="text-red">MaxLoss&nbsp;<a title="Show Error" href="#/" onclick="showErrorMsg(\'' + errorMsg + '\', ' + id + ')"><i class="fas fa-question-circle"></i></a></span>');
-    $('#actionsBtns' + id).html('<a title="Clear Error" href="#/" onclick="clearError(' + id + ')"><i class="fas fa-recycle"></i></a>&nbsp;&nbsp;<a title="Edit Execution" href="#/" onclick="editExecution(' + id + ')"><i class="far fa-edit"></i></a>&nbsp;&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-trash"></i></a>');
+    $('#actionsBtns' + id).html('<a title="Clear Error" href="#/" onclick="clearError(' + id + ')"><i class="fas fa-recycle"></i></a>&nbsp;&nbsp;<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + id + ')"><i class="fas fa-chart-pie"></i></a>&nbsp;&nbsp;<a title="Edit Execution" href="#/" onclick="editExecution(' + id + ')"><i class="far fa-edit"></i></a>&nbsp;&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-trash"></i></a>');
   } else if (status === 'Error') {
     $('#statusStr' + id).html('<span class="text-red">Error&nbsp;<a title="Show Error" href="#/" onclick="showErrorMsg(\'' + errorMsg + '\', ' + id + ')"><i class="fas fa-question-circle"></i></a></span>');
-    $('#actionsBtns' + id).html('<a title="Clear Error" href="#/" onclick="clearError(' + id + ')"><i class="fas fa-recycle"></i></a>&nbsp;&nbsp;<a title="Edit Execution" href="#/" onclick="editExecution(' + id + ')"><i class="far fa-edit"></i></a>&nbsp;&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-trash"></i></a>');
+    $('#actionsBtns' + id).html('<a title="Clear Error" href="#/" onclick="clearError(' + id + ')"><i class="fas fa-recycle"></i></a>&nbsp;&nbsp;<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + id + ')"><i class="fas fa-chart-pie"></i></a>&nbsp;&nbsp;<a title="Edit Execution" href="#/" onclick="editExecution(' + id + ')"><i class="far fa-edit"></i></a>&nbsp;&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-trash"></i></a>');
   } else if (status === 'Stopped') {
     $('#statusStr' + id).html('Stopped');
-    $('#actionsBtns' + id).html('<a class="text-green" title="Resume Execution" href="#/" onclick="runStrategy(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;&nbsp;<a title="Edit Execution" href="#/" onclick="editExecution(' + id + ')"><i class="far fa-edit"></i></a>&nbsp;&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-trash"></i></a>');
+    $('#actionsBtns' + id).html('<a class="text-green" title="Resume Execution" href="#/" onclick="runStrategy(' + id + ')"><i class="fas fa-play"></i></a>&nbsp;&nbsp;<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + id + ')"><i class="fas fa-chart-pie"></i></a>&nbsp;&nbsp;<a title="Edit Execution" href="#/" onclick="editExecution(' + id + ')"><i class="far fa-edit"></i></a>&nbsp;&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-trash"></i></a>');
   } else if (status === 'Running') {
     $('#statusStr' + id).html('Running');
-    $('#actionsBtns' + id).html('<a class="stop-stgy-exec text-red" title="Stop Execution" href="#/" onclick="stopStrategyExecution(' + id + ')"><i class="fas fa-stop"></i></a>');
+    $('#actionsBtns' + id).html('<a class="stop-stgy-exec text-red" title="Stop Execution" href="#/" onclick="stopStrategyExecution(' + id + ')"><i class="fas fa-stop"></i></a>&nbsp;&nbsp;<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + id + ')"><i class="fas fa-chart-pie"></i></a>');
   } else if (status === 'Stalled') {
     $('#statusStr' + id).html('Stalled<a title="Info" onclick="stalledInfo()" href="#/">&nbsp;<i class="fa fa-info-circle"></i></a>');
-    $('#actionsBtns' + id).html('<a class="stop-stgy-exec text-red" title="Stop Execution" href="#/" onclick="stopStrategyExecution(' + id + ')"><i class="fas fa-stop"></i></a>');
+    $('#actionsBtns' + id).html('<a class="stop-stgy-exec text-red" title="Stop Execution" href="#/" onclick="stopStrategyExecution(' + id + ')"><i class="fas fa-stop"></i></a>&nbsp;&nbsp;<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + id + ')"><i class="fas fa-chart-pie"></i></a>');
   } else {
     $('#statusStr' + id).html(status);
-    $('#actionsBtns' + id).html('');
+    $('#actionsBtns' + id).html('<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + id + ')"><i class="fas fa-chart-pie"></i></a>');
   }
 }
 
@@ -305,7 +323,7 @@ async function showExecutionResult(id) {
         let lastPrice = prices[execution.instrument];
         let startPrice = execution.trades[0].entry;
         $('#executionMarketResDiv').show();
-        $('#executionMarketRes').html((100*(lastPrice - startPrice) / startPrice).toFixed(2) + '%');
+        $('#executionMarketRes').html((100 * (lastPrice - startPrice) / startPrice).toFixed(2) + '%');
         $('#executionDates').html(' ' + formatDateSmall(execution.trades[0].openDate) + ' - ' + formatDateSmall(new Date()));
       }
       for (let trade of execution.trades) {
@@ -557,10 +575,10 @@ async function fillOldExecutions() {
         if (execution.type === 'Alerts' && execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].type === 'Sell')) {
           openTrade = '';
         }
-        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td id="executionName' + execution.id + '">' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td class="text-center" id="posSizePercent' + execution.id + '"></td>' + '<td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td><td class="text-center" id="openTrade' + execution.id + '">' + openTrade + '</td><td class="text-right"><span id="executionRes' + execution.id + '"></span></td><td><a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + execution.id + ')"><i class="far fa-file-alt"></i></a></td>' + '<td class="text-center" id="lastUpdatedExecution' + execution.id + '"></td><td id="statusStr' + execution.id + '"></td><td id="actionsBtns' + execution.id + '"></td></tr>');
+        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td id="executionName' + execution.id + '">' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td class="text-center" id="posSizePercent' + execution.id + '"></td>' + '<td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td><td class="text-center" id="openTrade' + execution.id + '">' + openTrade + '</td><td class="text-right"><span id="executionRes' + execution.id + '"></span></td><td class="text-right"><span id="executionResMoney' + execution.id + '"></span></td>' + '<td class="text-center" id="lastUpdatedExecution' + execution.id + '"></td><td id="statusStr' + execution.id + '"></td><td id="actionsBtns' + execution.id + '"></td></tr>');
         setStatusAndActions(execution.id, status, execution.error);
         if (execution.type !== 'Alerts') {
-          fillExecResInTable(execution.trades, execution.id);
+          fillExecResInTable(execution);
         }
       }
       $('#tsResultDiv').show();
@@ -1327,7 +1345,7 @@ async function executeStrategy() {
       resStr = '';
     }
 
-    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td id="executionName' + dbId + '">' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="posSizePercent' + dbId + '"></td><td class="text-center" id="executedTrades' + dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td class="text-right"><span id="executionRes' + dbId + '">' + resStr + '</span></td><td><a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(\'' + dbId + '\')"><i class="far fa-file-alt"></i></a></td><td class="text-center" id="lastUpdatedExecution' + dbId + '"></td><td id="statusStr' + dbId + '">Starting</td><td id="actionsBtns' + dbId + '"></td></tr>');
+    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td id="executionName' + dbId + '">' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="posSizePercent' + dbId + '"></td><td class="text-center" id="executedTrades' + dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td class="text-right"><span id="executionRes' + dbId + '">' + resStr + '</span></td><td class="text-right"><span id="executionResMoney' + dbId + '"></span></td><td class="text-center" id="lastUpdatedExecution' + dbId + '"></td><td id="statusStr' + dbId + '">Starting</td><td id="actionsBtns' + dbId + '"></td></tr>');
     if (executionType === 'Trading') {
       fillBinanceBalances();
     }
@@ -1512,7 +1530,7 @@ async function runStrategy(id) {
                 execution.trades[execution.trades.length - 1] = data;
                 execution.takeProfitOrderId = null;
                 await updateExecutionDb(execution);
-                fillExecResInTable(execution.trades, id);
+                fillExecResInTable(execution);
                 $('#openTrade' + id).html('');
                 await checkMaxLossReached(id);
                 if (execution.type === 'Trading') {
@@ -1695,7 +1713,7 @@ async function manualCloseOpenTrade(id) {
     execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (execution.feeRate * 2);
     execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * curPrice);
     await updateExecutionDb(execution);
-    fillExecResInTable(execution.trades, execution.id);
+    fillExecResInTable(execution);
     $('#openTrade' + execution.id).html('');
   } else if (execution.type === 'Trading') {
     if (binanceRealTrading == null) {
@@ -1734,7 +1752,7 @@ async function manualCloseOpenTrade(id) {
         }
       }
       await updateExecutionDb(execution);
-      fillExecResInTable(execution.trades, execution.id);
+      fillExecResInTable(execution);
       $('#openTrade' + execution.id).html('');
       await checkMaxLossReached(execution.id);
       fillBinanceBalances();
