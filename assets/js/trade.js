@@ -184,7 +184,28 @@ async function fillExecResInTable(execution) {
         ? 'text-red'
         : '');
     $('#executionResMoney' + execution.id).html('$' + ustdValue.toFixed(2));
+    fillTotalExecutionResult();
   }
+}
+
+async function fillTotalExecutionResult() {
+  await sleep(2000);
+  let sum = 0;
+  $('span[id^="executionResMoney"]').each(function() {
+    let value = Number.parseFloat($(this).text().replace('$', ''));
+    if (!isNaN(value)) {
+      sum += value;
+    }
+  });
+  $('#executionsTotalResult').removeClass('text-green');
+  $('#executionsTotalResult').removeClass('text-red');
+  $('#executionsTotalResult').html('$' + sum.toFixed(2));
+  $('#executionsTotalResult').addClass(
+    sum > 0
+    ? 'text-green'
+    : sum < 0
+      ? 'text-red'
+      : '');
 }
 
 async function checkMaxLossReached(id) {
@@ -260,6 +281,7 @@ async function rmExecutionFromTable(id) {
     await sleep(200);
     await removeExecutionFromDb(id);
     let executions = await getExecutionsFromDb();
+    fillTotalExecutionResult();
     if (executions.length == 0) {
       $('#tsResultDiv').hide();
     }
@@ -579,7 +601,7 @@ async function fillOldExecutions() {
         if (execution.type === 'Alerts' && execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].type === 'Sell')) {
           openTrade = '';
         }
-        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td id="executionName' + execution.id + '">' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td class="text-center" id="posSizePercent' + execution.id + '"></td>' + '<td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td><td class="text-center" id="openTrade' + execution.id + '">' + openTrade + '</td><td class="text-right"><span id="executionRes' + execution.id + '"></span></td><td class="text-right"><span id="executionResMoney' + execution.id + '"></span></td>' + '<td class="text-center" id="lastUpdatedExecution' + execution.id + '"></td><td id="statusStr' + execution.id + '"></td><td id="actionsBtns' + execution.id + '"></td></tr>');
+        $('#tsStrategiesTable').append('<tr id="executionTableItem' + execution.id + '"><td>' + execution.type + '</td><td id="executionName' + execution.id + '">' + execution.name + '</td><td>' + execution.exchange + '</td><td>' + execution.instrument + '</td><td class="text-center" id="posSizePercent' + execution.id + '"></td>' + '<td class="text-center" id="executedTrades' + execution.id + '">' + execution.trades.length + '</td><td class="text-center" id="openTrade' + execution.id + '">' + openTrade + '</td><td class="text-right"><span id="executionRes' + execution.id + '"></span></td><td class="text-right"><span id="executionResMoney' + execution.id + '"></span></td><td class="text-center" id="lastUpdatedExecution' + execution.id + '"></td><td id="statusStr' + execution.id + '"></td><td id="actionsBtns' + execution.id + '"></td></tr>');
         setStatusAndActions(execution.id, status, execution.error);
         if (execution.type !== 'Alerts') {
           fillExecResInTable(execution);
@@ -1353,10 +1375,10 @@ async function executeStrategy() {
     let resMStr = '$0.00';
     if (executionType === "Alerts") {
       resStr = '';
-      resMStr='';
+      resMStr = '';
     }
 
-    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td id="executionName' + dbId + '">' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="posSizePercent' + dbId + '"></td><td class="text-center" id="executedTrades' + dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td class="text-right"><span id="executionRes' + dbId + '">' + resStr + '</span></td><td class="text-right"><span id="executionResMoney' + dbId + '">'+resMStr+'</span></td><td class="text-center" id="lastUpdatedExecution' + dbId + '"></td><td id="statusStr' + dbId + '">Starting</td><td id="actionsBtns' + dbId + '"></td></tr>');
+    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td id="executionName' + dbId + '">' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="posSizePercent' + dbId + '"></td><td class="text-center" id="executedTrades' + dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td class="text-right"><span id="executionRes' + dbId + '">' + resStr + '</span></td><td class="text-right"><span id="executionResMoney' + dbId + '">' + resMStr + '</span></td><td class="text-center" id="lastUpdatedExecution' + dbId + '"></td><td id="statusStr' + dbId + '">Starting</td><td id="actionsBtns' + dbId + '"></td></tr>');
     if (executionType === 'Trading') {
       fillBinanceBalances();
     }
@@ -1726,6 +1748,13 @@ async function manualCloseOpenTrade(id) {
     await updateExecutionDb(execution);
     fillExecResInTable(execution);
     $('#openTrade' + execution.id).html('');
+    for (let worker of executionWorkers) {
+      if (worker.execId == execution.id) {
+        worker.wk.postMessage(['UPDATE_TRADE', curPrice]);
+        await sleep(1000);
+        break;
+      }
+    }
   } else if (execution.type === 'Trading') {
     if (binanceRealTrading == null) {
       openModalConfirm('<div class="text-justify">Please provide your API key for ' + execution.exchange + '. </div><br><div class="text-left"><span class="inline-block min-width5">API Key:&nbsp;</span><input class="min-width20" id="exchangeApiKey" type="text" placeholder="API KEY" /><br>' + '<span class="inline-block min-width5">Secret:&nbsp;</span><input class="min-width20" id="exchangeApiSecret" type="text" placeholder="Secret" /></div><br><div class="text-justify">Your key and secret are not stored anywhere by this application.</div>', async function() {
