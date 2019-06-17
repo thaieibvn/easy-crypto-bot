@@ -566,7 +566,11 @@ async function fillOldExecutions() {
 
         let status = 'Stopped';
         if (execution.error !== null && execution.error !== undefined) {
-          status = 'Error'
+          if (execution.error.indexOf('Max Loss') == 0) {
+            status = 'MaxLoss';
+          } else {
+            status = 'Error';
+          }
         }
         let openTrade = '';
         if (execution.trades.length > 0 && execution.trades[execution.trades.length - 1].exit === undefined) {
@@ -979,7 +983,7 @@ async function sendNotificationTask() {
 
       let executions = await getExecutionsFromDb();
       let executionsText = '';
-
+      let prices = await getLastBinancePrices();
       for (let executionTmp of executions) {
         if (executionTmp.type === 'Trading') {
           let result = 0;
@@ -991,7 +995,12 @@ async function sendNotificationTask() {
             result += trade.result;
             resultMoney += trade.resultMoney;
           }
-          executionsText += '<tr><td>' + executionTmp.name + '</td><td>' + executionTmp.exchange + '</td><td>' + executionTmp.instrument + '</td><td>' + executionTmp.trades.length + '</td><td>' + result.toFixed(2) + '%</td><td>' + resultMoney.toFixed(8) + ' ' + getQuotedCurrency(executionTmp.instrument) + '</td></tr>';
+          let ustdValue = calculateUsdtValue(getQuotedCurrency(executionTmp.instrument), resultMoney, prices);
+          let resultMoneyStr = resultMoney.toFixed(8) + ' ' + getQuotedCurrency(executionTmp.instrument);
+          if (ustdValue != null && !isNaN(ustdValue)) {
+            resultMoneyStr = '$' + ustdValue.toFixed(2);
+          }
+          executionsText += '<tr><td>' + executionTmp.name + '</td><td>' + executionTmp.exchange + '</td><td>' + executionTmp.instrument + '</td><td>' + executionTmp.trades.length + '</td><td>' + result.toFixed(2) + '%</td><td>' + resultMoneyStr + '</td></tr>';
         }
       }
       try {
@@ -1341,11 +1350,13 @@ async function executeStrategy() {
     }
     addExecutionToDb(curExecution);
     let resStr = '0.00%';
+    let resMStr = '$0.00';
     if (executionType === "Alerts") {
       resStr = '';
+      resMStr='';
     }
 
-    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td id="executionName' + dbId + '">' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="posSizePercent' + dbId + '"></td><td class="text-center" id="executedTrades' + dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td class="text-right"><span id="executionRes' + dbId + '">' + resStr + '</span></td><td class="text-right"><span id="executionResMoney' + dbId + '"></span></td><td class="text-center" id="lastUpdatedExecution' + dbId + '"></td><td id="statusStr' + dbId + '">Starting</td><td id="actionsBtns' + dbId + '"></td></tr>');
+    $('#tsStrategiesTable').append('<tr id="executionTableItem' + dbId + '"><td>' + executionType + '</td><td id="executionName' + dbId + '">' + strategyName + '</td><td>' + exchange + '</td><td>' + instrument + '</td><td class="text-center" id="posSizePercent' + dbId + '"></td><td class="text-center" id="executedTrades' + dbId + '">0</td><td class="text-center" id="openTrade' + dbId + '"></td><td class="text-right"><span id="executionRes' + dbId + '">' + resStr + '</span></td><td class="text-right"><span id="executionResMoney' + dbId + '">resMStr</span></td><td class="text-center" id="lastUpdatedExecution' + dbId + '"></td><td id="statusStr' + dbId + '">Starting</td><td id="actionsBtns' + dbId + '"></td></tr>');
     if (executionType === 'Trading') {
       fillBinanceBalances();
     }
@@ -1473,7 +1484,7 @@ async function runStrategy(id) {
               }
               break;
             case 'LAST_UPDATED':
-              $('#lastUpdatedExecution' + id).html(formatDateNoYear(new Date()));
+              $('#lastUpdatedExecution' + id).html(formatDateTimeOnly(new Date()));
               break;
             case 'STALLED':
               setStatusAndActions(id, 'Stalled');
