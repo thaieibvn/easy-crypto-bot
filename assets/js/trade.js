@@ -271,7 +271,7 @@ function showErrorMsg(msg, id) {
 }
 
 function showUnavailableMsg(msg, id) {
-  openModalInfoBig('<h3 class="text-red text-center">Option Unavailable</h3><div class="text-red">' + msg + '</div><br>' + 'In order to be a supporter you have to help somehow in the App development. For example: <b>coding, testing, documentation writing, writing posts or comments in the internet, donating and etc.</b>.<br>If you are a supporter please click on the "I am a Supporter" button below:' + '<div class="text-center"><a style="width:auto"class="button alt white" title="I am a supporter" href="#/" onclick="openIamSupporterDialog()">I am a Supporter</a></div>')
+  openModalInfoBig('<h3 class="text-red text-center">Option Unavailable</h3><div class="text-red">' + msg + '</div><br>' + 'In order to be a supporter you have to contribute for the development. For example: <b>donating, coding, testing, documentation writing, writing posts or comments in the internet and etc.</b>.<br>If you are a supporter please click on the "I am a Supporter" button below:' + '<div class="text-center"><a style="width:auto"class="button alt white" title="I am a supporter" href="#/" onclick="openIamSupporterDialog()">I am a Supporter</a></div>')
 }
 
 function openIamSupporterDialog() {
