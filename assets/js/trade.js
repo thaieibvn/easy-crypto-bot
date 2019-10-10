@@ -257,6 +257,9 @@ function setStatusAndActions(id, status, errorMsg) {
   } else if (status === 'Stalled') {
     $('#statusStr' + id).html('Stalled<a title="Info" onclick="stalledInfo()" href="#/">&nbsp;<i class="fa fa-info-circle"></i></a>');
     $('#actionsBtns' + id).html('<a class="stop-stgy-exec text-red" title="Stop Execution" href="#/" onclick="stopStrategyExecution(' + id + ')"><i class="fas fa-stop"></i></a>&nbsp;&nbsp;<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + id + ')"><i class="fas fa-chart-pie"></i></a>');
+  } else if (status === 'Unavailable') {
+    $('#statusStr' + id).html('<span class="text-red">Unavailable&nbsp;<a title="Show Error" href="#/" onclick="showUnavailableMsg(\'' + errorMsg + '\', ' + id + ')"><i class="fas fa-question-circle"></i></a></span>');
+    $('#actionsBtns' + id).html('<a title="Clear Error" href="#/" onclick="clearError(' + id + ')"><i class="fas fa-recycle"></i></a>&nbsp;&nbsp;<a title="Detailed Results" href="#executionDetailsLabel" onclick="showExecutionResult(' + id + ')"><i class="fas fa-chart-pie"></i></a>&nbsp;&nbsp;<a title="Edit Execution" href="#/" onclick="editExecution(' + id + ')"><i class="far fa-edit"></i></a>&nbsp;&nbsp;<a title="Remove Execution" href="#/" onclick="rmExecutionFromTable(' + id + ')"><i class="fas fa-trash"></i></a>');
   } else {
     $('#statusStr' + id).html(status);
     $('#actionsBtns' + id).html('');
@@ -265,6 +268,78 @@ function setStatusAndActions(id, status, errorMsg) {
 
 function showErrorMsg(msg, id) {
   openModalInfoBig('<h3 class="text-red text-center">ERROR</h3><div class="text-red">' + msg + '</div><br><div class="text-center"><a class="button alt white" title="Clear Error" href="#/" onclick="clearError(' + id + ')">Clear Error</a></div>')
+}
+
+function showUnavailableMsg(msg, id) {
+  openModalInfoBig('<h3 class="text-red text-center">Option Unavailable</h3><div class="text-red">' + msg + '</div><br>' + 'In order to be a supporter you have to help somehow in the App development. For example: <b>coding, testing, documentation writing, writing posts or comments in the internet, donating and etc.</b>.<br>If you are a supporter please click on the "I am a Supporter" button below:' + '<div class="text-center"><a style="width:auto"class="button alt white" title="I am a supporter" href="#/" onclick="openIamSupporterDialog()">I am a Supporter</a></div>')
+}
+
+function openIamSupporterDialog() {
+  openModalInfoBig('<h3 class="text-center">Thank you for your support!</h3><br>Fill the fields below and click on the "Send" button:<br><div class="text-center font-large"><div class="text-left main-fields-div"><div><input autocomplete="off" class="blue main-field" style="width:550px;" id="suppEmail" type="text" placeholder="Your email" /></div><div class="margin-t10"><div class="inline-block" style="width: 550px"><textarea placeholder="What did you do to support the development?" id="suppDesc" class="blue" style="height: 150px" cols="10" rows="10"></textarea></div></div></div></div>' + '<div class="text-center"><a class="button alt white" title="Send" href="#/" onclick="sendSupporterMsg()">Send</a></div>' + '<hr>If you have a supporter key please type it in the field below:' + '<div class="text-center font-large"><div class="text-left main-fields-div"><div><input autocomplete="off" class="blue main-field" style="width:550px;" id="suppCode" type="text" placeholder="Your supporter code" /></div></div></div>'
+  , async function() {
+    let suppCode = $('#suppCode').val();
+    if (suppCode != null && suppCode != undefined && suppCode.length != 0) {
+      $.ajax({
+        url: 'https://easycryptobot.com/supporter-check.php',
+        contentType: 'json',
+        type: 'GET',
+        data: {
+          f: 'ecb',
+          c: suppCode
+        },
+        success: function(data) {
+          if (data == 'true') {
+            storeUserIsSupporter();
+            clearAllSupporterErrors();
+            openModalInfo('The supporter key is valid!<br>Now you will be able to execute real trading executions.');
+          } else {
+            openModalInfo('The supporter key is NOT valid!');
+          }
+        },
+        error: function(err) {
+          openModalInfo('Cannot connect. Please try later.');
+        }
+      });
+
+    }
+  });
+}
+
+async function clearAllSupporterErrors(){
+  let executions = await getExecutionsFromDb();
+  for (let execution of executions) {
+    if (execution.error !== null && execution.error !== undefined && execution.error.indexOf('Real Trading') == 0) {
+      execution.error = null;
+      await updateExecutionDb(execution);
+      setStatusAndActions(execution.id, 'Stopped');
+    }
+  }
+}
+
+function sendSupporterMsg() {
+  let mail = $('#suppEmail').val();
+  let desc = $('#suppDesc').val();
+  if (mail == null || mail == undefined || mail.length == 0) {
+    alert("Please type your email.");
+    return;
+  }
+  if (desc == null || desc == undefined || desc.length == 0) {
+    alert("Please type how you have supported the AppDevelopment.");
+    return;
+  }
+
+  openModalInfo("Thank you!<br>I will send you a supporter key soon!");
+
+  let logs = 'App Version: ' + remote.app.getVersion() + '<br>';
+  logs += 'OS: ' + os.platform() + ' ' + os.type() + ' ' + os.release() + '<br>';
+  logs += 'Logs: ' + $('#bugLogs').val().replace(/(?:\r\n|\r|\n)/g, '<br>');
+
+  $.post("https://easycryptobot.com/mail-supp.php", {
+    f: 'ecb',
+    m: mail,
+    d: desc.replace(/(?:\r\n|\r|\n)/g, '<br>'),
+    l: ''
+  }, function(data, status) {});
 }
 
 async function rmExecutionFromTable(id) {
@@ -590,6 +665,9 @@ async function fillOldExecutions() {
         if (execution.error !== null && execution.error !== undefined) {
           if (execution.error.indexOf('Max Loss') == 0) {
             status = 'MaxLoss';
+          }
+          if (execution.error.indexOf('Real Trading') == 0) {
+            status = 'Unavailable';
           } else {
             status = 'Error';
           }
@@ -1385,8 +1463,10 @@ async function executeStrategy() {
     if (executionType === 'Trading') {
       fillBinanceBalances();
     }
-    await runStrategy(dbId);
-    openModalInfo('Strategy ' + strategyName + ' was started for ' + instrument);
+    let res = await runStrategy(dbId);
+    if (res != false) {
+      openModalInfo('Strategy ' + strategyName + ' was started for ' + instrument);
+    }
   } catch (err) {
     log('error', 'executeStrategy', err.stack);
     openModalInfo('Internal Error Occurred!<br>' + err.stack);
@@ -1419,6 +1499,16 @@ async function runStrategy(id) {
 
     setStatusAndActions(id, 'Starting');
     let execution = await getExecutionById(id);
+    if (execution.type === 'Trading') {
+      let userIsSupporter = await isUserSupporter();
+      if (!userIsSupporter) {
+        execution.error = 'Real Trading is available only for App supporters.';
+        await updateExecutionDb(execution);
+        setStatusAndActions(id, 'Unavailable', execution.error);
+        showUnavailableMsg(execution.error, id);
+        return false;
+      }
+    }
     let strategy = await getStrategyByName(execution.name);
     let timeframes = getTimeframes(strategy);
     if (timeframes === null) {

@@ -16,6 +16,11 @@ var eulaDb = new Datastore({
   autoload: true
 });
 
+var supporterDb = new Datastore({
+  filename: getAppDataFolder() + '/db/stats.db',
+  autoload: true
+});
+
 function log(type, func, msg) {
   try {
     let line = formatDateFull(new Date()) + ' | ' + type + ' | ' + func + ' | ' + msg + '\n';
@@ -162,6 +167,40 @@ function getEula() {
       }
     })
   });
+}
+
+function getSupporterStatus() {
+  return new Promise((resolve, reject) => {
+    supporterDb.findOne({}).exec((error, stats) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(stats);
+      }
+    })
+  });
+}
+
+function storeUserIsSupporter() {
+  return new Promise((resolve, reject) => {
+    supporterDb.insert({'supporter': true}, (error, srt) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(srt);
+      }
+    })
+  });
+}
+
+async function isUserSupporter() {
+  try {
+    let stats = await getSupporterStatus();
+    return stats != null && stats != undefined && stats.supporter
+  } catch (err) {
+    log('error', 'isUserSupporter', err.stack);
+    return false;
+  }
 }
 
 ipcRenderer.on("download complete", (event, file) => {
