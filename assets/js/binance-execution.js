@@ -882,6 +882,55 @@ self.addEventListener('message', async function(e) {
       await mutex.release();
       await sleep(5000)
       self.close();
+      return;
+    }
+    if (typeof e.data === 'string' && e.data === ('SELL_AND_STOP')) {
+      paused = true;
+      lastUpdated = null;
+      startTries = 0;
+      tooManyOrders = 0;
+      let endpoints = binance.websockets.subscriptions();
+      for (let endpoint in endpoints) {
+        binance.websockets.terminate(endpoint);
+      }
+      await mutex.release();
+
+      //get current price
+      if (tradeType == "sell") {
+        let curPrice = null;
+        for (let i = 0; i < 100; i++) {
+          //There may not be BID price at the moment. Try 100 times to find one
+          let bidAsk = await getBidAsk(execution.instrument);
+          if (isNaN(bidAsk[0])) {
+            await sleep(200);
+          } else {
+            curPrice = bidAsk[0];
+            break;
+          }
+        }
+        if (curPrice == null) {
+          self.postMessage([]);
+          execId,
+          'ERROR',
+          'Cannot connect to Binance and sell ' + execution.instrument
+          return;
+        }
+
+        if (execution.type === 'Simulation') {
+          let tradeIndex = execution.trades.length - 1;
+          execution.trades[tradeIndex]['closeDate'] = new Date();
+          execution.trades[tradeIndex]['exit'] = curPrice;
+          execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (feeRate * 2);
+          execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * curPrice);
+          self.postMessage([
+            execId, 'SELL', execution.trades[tradeIndex]
+          ]);
+        } else if (execution.type === 'Trading') {
+          await marketSell(execution, curPrice);
+          tradeType = 'buy';
+        }
+      }
+      return;
     }
     if (typeof e.data === 'string' && e.data === ('TERMINATE')) {
       let endpoints = binance.websockets.subscriptions();

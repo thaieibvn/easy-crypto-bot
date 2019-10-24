@@ -275,8 +275,7 @@ function showUnavailableMsg(msg, id) {
 }
 
 function openIamSupporterDialog() {
-  openModalInfoBig('<h3 class="text-center">Thank you for your support!</h3><br>Fill the fields below and click on the "Send" button:<br><div class="text-center font-large"><div class="text-left main-fields-div"><div><input autocomplete="off" class="blue main-field" style="width:550px;" id="suppEmail" type="text" placeholder="Your email" /></div><div class="margin-t10"><div class="inline-block" style="width: 550px"><textarea placeholder="What did you do to support the development?" id="suppDesc" class="blue" style="height: 150px" cols="10" rows="10"></textarea></div></div></div></div>' + '<div class="text-center"><a class="button alt white" title="Send" href="#/" onclick="sendSupporterMsg()">Send</a></div>' + '<hr>If you have a supporter key please type it in the field below:' + '<div class="text-center font-large"><div class="text-left main-fields-div"><div><input autocomplete="off" class="blue main-field" style="width:550px;" id="suppCode" type="text" placeholder="Your supporter code" /></div></div></div>'
-  , async function() {
+  openModalInfoBig('<h3 class="text-center">Thank you for your support!</h3><br>Fill the fields below and click on the "Send" button:<br><div class="text-center font-large"><div class="text-left main-fields-div"><div><input autocomplete="off" class="blue main-field" style="width:550px;" id="suppEmail" type="text" placeholder="Your email" /></div><div class="margin-t10"><div class="inline-block" style="width: 550px"><textarea placeholder="What did you do to support the development?" id="suppDesc" class="blue" style="height: 150px" cols="10" rows="10"></textarea></div></div></div></div>' + '<div class="text-center"><a class="button alt white" title="Send" href="#/" onclick="sendSupporterMsg()">Send</a></div>' + '<hr>If you have a supporter key please type it in the field below:' + '<div class="text-center font-large"><div class="text-left main-fields-div"><div><input autocomplete="off" class="blue main-field" style="width:550px;" id="suppCode" type="text" placeholder="Your supporter code" /></div></div></div>', async function() {
     let suppCode = $('#suppCode').val();
     if (suppCode != null && suppCode != undefined && suppCode.length != 0) {
       $.ajax({
@@ -305,7 +304,7 @@ function openIamSupporterDialog() {
   });
 }
 
-async function clearAllSupporterErrors(){
+async function clearAllSupporterErrors() {
   let executions = await getExecutionsFromDb();
   for (let execution of executions) {
     if (execution.error !== null && execution.error !== undefined && execution.error.indexOf('Real Trading') == 0) {
@@ -1290,6 +1289,7 @@ async function checkPositionSizeQuoted(positionSize, exchange, instrument) {
 const maxExecutions = 20;
 let executionWorkers = [];
 const executionMutex = new Mutex();
+
 function hasTradingStrategies() {
   let has = false;
   for (let worker of executionWorkers) {
@@ -1735,6 +1735,30 @@ async function stopAllExecutions(terminate) {
   } finally {
     hideLoading();
   }
+}
+
+function sellAllAndStop() {
+  openModalConfirm('<h2 class="text-red">WARNING</h2><div class="text-justify">This option will stop all executions, cancel all pending Limit orders and close all open trades by executing a <span class="text-red"> MARKET SELL</span> at current price!</div><br>Are you sure you want to do this?', async function() {
+    try {
+      showLoading();
+      let executions = await getExecutionsFromDb();
+      if (executions !== null && executions.length > 0) {
+        for (let execution of executions) {
+          if (execution.error === null || execution.error === undefined) {
+            for (let worker of executionWorkers) {
+              if (worker.execId == execution.id) {
+                worker.wk.postMessage('SELL_AND_STOP');
+              }
+            }
+            await stopStrategyExecution(execution.id, null, true);
+          }
+        }
+      }
+      await sleep(2000);
+    } finally {
+      hideLoading();
+    }
+  });
 }
 
 async function startAllSimulations(executions) {

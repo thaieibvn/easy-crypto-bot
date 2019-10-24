@@ -231,6 +231,10 @@ async function saveStrategy() {
     openModalInfo('Please type a name for the strategy!');
     return;
   }
+  if (strategyName.indexOf('"') != -1 || strategyName.indexOf("'") != -1 || strategyName.indexOf("\\") != -1) {
+    openModalInfo('The strategy name cannot contain any of the following symbols: \', ", \\');
+    return;
+  }
 
   let buyRules = $('#buyRules>ul>li');
   if (buyRules.length === 0) {
