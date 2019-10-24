@@ -499,9 +499,9 @@ async function loadStrategiesBt() {
     $('#tsStrategiesList').html("");
     $('#opStrategiesList').html("");
     strategies.forEach(function(d) {
-      $('#btStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#btStrategy\')">' + d.name + '</a></li>');
-      $('#tsStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#tsStrategy\')">' + d.name + '</a></li>');
-      $('#opStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#opStrategy\')">' + d.name + '</a></li>');
+      $('#btStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#btStrategy\')">' + d.name.replace(/'/g,"\\'") + '</a></li>');
+      $('#tsStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#tsStrategy\')">' + d.name.replace(/'/g,"\\'") + '</a></li>');
+      $('#opStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#opStrategy\')">' + d.name.replace(/'/g,"\\'") + '</a></li>');
     });
   } catch (err) {
     log('error', 'loadStrategiesBt', err.stack);

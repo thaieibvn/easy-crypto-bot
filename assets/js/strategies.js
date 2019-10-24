@@ -290,6 +290,8 @@ async function saveStrategy() {
     openModalInfo('The target cannot be less than 0.25');
     return;
   }
+  let ttarget = Number.parseFloat($('#ttarget').val());
+
 
   let timeClose = Number.parseFloat($('#timeClose').val());
   if (!isNaN(timeClose) && timeClose < 1) {
@@ -307,6 +309,7 @@ async function saveStrategy() {
       sellRules: sellRulesList,
       stoploss: stoploss,
       target: target,
+      ttarget:ttarget,
       trailingSl: trailingSl,
       timeClose: timeClose
     };
@@ -485,6 +488,15 @@ function timeCloseInfo() {
 function targetInfo() {
   openModalInfoBig("If you provide a target the bot will place a LIMIT SELL order on the exchange to ensure the desired percent.");
 }
+
+function ttargetInfo() {
+  openModalInfoBig('<div style="display:inline-block;width:40%;margin:0 5%"><h3 class="text-center">Trailing Target</h3><br>This option will place a trailing stoploss bellow the current price after given target is reached first.<br> '+
+  '<br>For example: <br>1. Buy at $100 with target 10% and trailing target 1%.<br>2. When the price reaches the 10% target at $110 a trailing stoploss will be placed at 108.9 (1% bellow the curent price).'+
+  '<br>3. The price continue going up along with the trailing stop.<br>4. Finally after reaching $117.5 the price drops more than 1% and the stop closes the trade at $116.'+
+  '<br>5. So you made $16 per coin instead of $10 (the initial target)'+
+  '</div><img style="display:inline-block;width:40%;margin:0 5%;vertical-align:top;" src="./assets/images/ttarget-info.png" alt="">');
+}
+
 
 function stoplossInfo() {
   openModalInfoBig("If the stoploss is reached the bot will execute a MARKET SELL order. Please note that if the bot is not running the stoploss order will not be placed! ");
@@ -702,6 +714,7 @@ function openStrategy(strategy, hideSaveBtn) {
     $('#stoploss').val(strategy.stoploss);
     $('#trailingSl').val(strategy.trailingSl);
     $('#target').val(strategy.target);
+    $('#ttarget').val(strategy.ttarget);
     $('#timeClose').val(strategy.timeClose);
 
     let buyRuleTypeTmp = buyRuleType;
@@ -763,6 +776,7 @@ function clearStrategyFields() {
   $('#stoploss').val('');
   $('#trailingSl').val('');
   $('#target').val('');
+  $('#ttarget').val('');
   $('#timeClose').val('');
   $('#saveStrategyBtn').removeClass('disabled')
   $('#saveStrategyDisabled').hide();
@@ -818,7 +832,7 @@ async function loadStrategies() {
     const strategies = await getStrategies();
     $('#strategiesTable tbody').html('');
     strategies.forEach(function(d) {
-      $('#strategiesTable tbody').append('<tr><td>' + d.name + '</td><td class="text-center"><a title="Edit Strategy" href="#newStrategyLabel" onclick="editStrategy(\'' + d.name + '\')" ><i class="far fa-edit"></i></a>' + '&nbsp;&nbsp;&nbsp;<a title="Backtest Strategy" href="#/" onclick="openBacktestStrategy(\'' + d.name + '\')" ><i class="fas fa-chart-line"></i></a>' + '&nbsp;&nbsp;&nbsp;<a title="Optimize Strategy" href="#/" onclick="openOptimizeStrategy(\'' + d.name + '\')" ><i class="fas fa-cogs"></i></a>' + '&nbsp;&nbsp;&nbsp;<a title="Remove Strategy" href="#/" onclick="rmStrategy(\'' + d.name + '\')"><i class="fas fa-trash"></i></a></td></tr>');
+      $('#strategiesTable tbody').append('<tr><td>' + d.name + '</td><td class="text-center"><a title="Edit Strategy" href="#newStrategyLabel" onclick="editStrategy(\'' + d.name.replace(/'/g,"\\'") + '\')" ><i class="far fa-edit"></i></a>' + '&nbsp;&nbsp;&nbsp;<a title="Backtest Strategy" href="#/" onclick="openBacktestStrategy(\'' + d.name.replace(/'/g,"\\'") + '\')" ><i class="fas fa-chart-line"></i></a>' + '&nbsp;&nbsp;&nbsp;<a title="Optimize Strategy" href="#/" onclick="openOptimizeStrategy(\'' + d.name.replace(/'/g,"\\'") + '\')" ><i class="fas fa-cogs"></i></a>' + '&nbsp;&nbsp;&nbsp;<a title="Remove Strategy" href="#/" onclick="rmStrategy(\'' + d.name.replace(/'/g,"\\'") + '\')"><i class="fas fa-trash"></i></a></td></tr>');
     });
   } catch (err) {
     log('error', 'loadStrategies', err.stack);
