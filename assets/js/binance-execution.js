@@ -228,7 +228,7 @@ async function marketSell(execution, curPrice) {
   await cancelOrder(execution.instrument, execution.takeProfitOrderId);
   let takeProfitExecutedQty = await checkTakeProfitExecuted();
   let positionSize = execution.positionSize + execution.minNotionalAmountLeft;
-  if (takeProfitExecutedQty === positionSize) {
+  if (takeProfitExecutedQty > positionSize) {
     return;
   }
   positionSize -= takeProfitExecutedQty;
