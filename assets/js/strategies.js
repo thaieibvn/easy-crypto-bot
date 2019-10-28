@@ -291,7 +291,14 @@ async function saveStrategy() {
     return;
   }
   let ttarget = Number.parseFloat($('#ttarget').val());
-
+  if (!isNaN(ttarget) && ttarget <= 0) {
+    openModalInfo('The trailing target cannot be less than 0');
+    return;
+  }
+  if (isNaN(target) && !isNaN(ttarget)) {
+    openModalInfo('Please povide a target, when using a trailing target.');
+    return;
+  }
 
   let timeClose = Number.parseFloat($('#timeClose').val());
   if (!isNaN(timeClose) && timeClose < 1) {
@@ -396,8 +403,11 @@ async function saveStrategy() {
 function stoplossTypeChange(type) {
   if (type === 'sl') {
     $('#trailingSl').val('');
-  } else {
+  } else if (type === 'tsl') {
     $('#stoploss').val('');
+    $('#ttarget').val('');
+  } else if (type === 'tt') {
+    $('#trailingSl').val('');
   }
 }
 

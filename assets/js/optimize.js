@@ -101,6 +101,8 @@ let etaLastDate = null;
 let etaStr = '';
 let etaLastNum = null;
 let strategyNameToUse = '';
+let useTrailingStop = false;
+let useTrailingTarget = false;
 const executionOpMutex = new Mutex();
 const addOpResultMutex = new Mutex();
 const opWorkerTerminateMutex = new Mutex();
@@ -274,7 +276,11 @@ async function runOptimize() {
       return;
     }
 
-    ticks = {};
+    useTrailingStop = strategy.trailingSl !== null && !isNaN(strategy.trailingSl);
+    useTrailingTarget = strategy.ttarget !== null && !isNaN(strategy.ttarget);
+    if (strategy.ttarget != null && strategy.ttarget != undefined)
+
+      ticks = {};
     for (let tf of timeframes) {
       let tfTicks = await getBinanceTicks(instrument, getShortTimeframe(tf), getStartDate(tf, startDate), endDate, false);
       if (tfTicks === null) {
@@ -538,6 +544,9 @@ function calculateFieldsToChange(strategy) {
     : 0;
   if (changeTarget) {
     fieldsToChange++;
+    if (useTrailingTarget) {
+      fieldsToChange++;
+    }
   }
 
   for (let rule of strategy.buyRules) {
@@ -698,7 +707,7 @@ function pushNewStrategyVariation(variations, strategy) {
         }
       }
       if (allSellRulesAreSame) {
-        if (strategyTmp.stoploss == strategy.stoploss && strategyTmp.target == strategy.target && strategyTmp.trailingSl == strategy.trailingSl) {
+        if (strategyTmp.stoploss == strategy.stoploss && strategyTmp.trailingSl == strategy.trailingSl && strategyTmp.target == strategy.target && strategyTmp.ttarget == strategy.ttarget) {
           return false;
         }
       }
@@ -751,8 +760,8 @@ function compareStrategyResults(a, b) {
   } else if (optType === 'smooth') {
     //ratioA = a.totalReturn - (a.biggestGain-Math.abs(a.avgGainLossPerTrade));
     //ratioB = b.totalReturn - (b.biggestGain-Math.abs(b.avgGainLossPerTrade));
-    let returnWithoutBestTradeA = a.totalReturn - (a.biggestGain-Math.abs(a.avgGainLossPerTrade));
-    let returnWithoutBestTradeB = b.totalReturn - (b.biggestGain-Math.abs(b.avgGainLossPerTrade));
+    let returnWithoutBestTradeA = a.totalReturn - (a.biggestGain - Math.abs(a.avgGainLossPerTrade));
+    let returnWithoutBestTradeB = b.totalReturn - (b.biggestGain - Math.abs(b.avgGainLossPerTrade));
 
     let avgTradesCountA = a.executedTrades - 1;
     let avgTradesCountB = b.executedTrades - 1;
@@ -773,7 +782,7 @@ function compareStrategyResults(a, b) {
 
     ratioA = (totalReturnToMaxDrawdownA < 0 && avgTradeWithoutBestTradeA < 0)
       ? (-1) * totalReturnToMaxDrawdownA * avgTradeWithoutBestTradeA
-      : totalReturnToMaxDrawdownA * avgTradeWithoutBestTradeA ;
+      : totalReturnToMaxDrawdownA * avgTradeWithoutBestTradeA;
 
     ratioB = (totalReturnToMaxDrawdownB < 0 && avgTradeWithoutBestTradeB < 0)
       ? (-1) * totalReturnToMaxDrawdownB * avgTradeWithoutBestTradeB
@@ -1141,6 +1150,14 @@ let targetsFineTune4 = [-0.25, 0.25];
 let targetsFineTune5 = [-0.15, 0.15];
 let targetsFineTune6 = [-0.1, 0.1];
 
+let ttargetsFineTune0 = [2, 4.5, 7];
+let ttargetsFineTune1 = [-0.5, 0.5];
+let ttargetsFineTune2 = [-0.25, 0.25];
+let ttargetsFineTune3 = [-0.25, 0.25];
+let ttargetsFineTune4 = [-0.25, 0.25];
+let ttargetsFineTune5 = [-0.15, 0.15];
+let ttargetsFineTune6 = [-0.1, 0.1];
+
 function getRuleVariationsFineTune(rule) {
   let ruleVariations = [];
 
@@ -1505,6 +1522,7 @@ function createStrategyVariationWithBuyRules(strategy, buyRules) {
   newStrategy.stoploss = strategy.stoploss;
   newStrategy.trailingSl = strategy.trailingSl;
   newStrategy.target = strategy.target;
+  newStrategy.ttarget = strategy.ttarget;
   return newStrategy;
 }
 
@@ -1524,6 +1542,7 @@ function createStrategyVariationWithSellRules(finalStrategiesList, strategiesWit
     newStrategy.stoploss = strategy.stoploss;
     newStrategy.trailingSl = strategy.trailingSl;
     newStrategy.target = strategy.target;
+    newStrategy.ttarget = strategy.ttarget;
     finalStrategiesList.push(newStrategy);
   }
 }
@@ -1579,7 +1598,6 @@ function createStrategyVariationWithStoplossRules(finalStrategiesList, strategie
     };
   }
 
-  let useTrailingStop = strategiesWithBuySellOnly.length > 0 && strategiesWithBuySellOnly[0].trailingSl !== null && !isNaN(strategiesWithBuySellOnly[0].trailingSl);
   for (let stoploss of stoplosses) {
     for (let strategy of strategiesWithBuySellOnly) {
       let newStrategy = {};
@@ -1600,6 +1618,7 @@ function createStrategyVariationWithStoplossRules(finalStrategiesList, strategie
           newStrategy.stoploss = fixNumber(strategy.stoploss + stoploss, 2);
         }
         newStrategy.target = strategy.target;
+        newStrategy.ttarget = strategy.ttarget;
       } else {
         if (useTrailingStop) {
           newStrategy.trailingSl = stoploss;
@@ -1607,6 +1626,7 @@ function createStrategyVariationWithStoplossRules(finalStrategiesList, strategie
           newStrategy.stoploss = stoploss;
         }
         newStrategy.target = strategy.target;
+        newStrategy.ttarget = strategy.ttarget;
       }
       finalStrategiesList.push(newStrategy);
     }
@@ -1616,88 +1636,118 @@ function createStrategyVariationWithStoplossRules(finalStrategiesList, strategie
 
 function createStrategyVariationWithTargetRules(finalStrategiesList, strategiesWithBuySellOnly, fineTune) {
   let targets = [];
+  let ttargets = [];
   if (changeTargetFine) {
     switch (fineTune) {
       case 0:
         targets = [-0.7, 0, 0.7];
+        ttargets = [-0.7, 0, 0.7];
         break;
       case 1:
         targets = [-0.4, 0.4];
+        ttargets = [-0.4, 0.4];
         break;
       case 2:
         targets = [-0.2, 0.2];
+        ttargets = [-0.2, 0.2];
         break;
       case 3:
         targets = [-0.15, 0.15];
+        ttargets = [-0.15, 0.15];
         break;
       case 4:
         targets = [-0.03, 0.03];
+        ttargets = [-0.03, 0.03];
         break;
       case 5:
         targets = [-0.01, 0.01];
+        ttargets = [-0.01, 0.01];
         break;
     };
   } else {
     switch (fineTune) {
       case 0:
         targets = targetsFineTune0;
+        ttargets = ttargetsFineTune0;
         break;
       case 1:
         targets = targetsFineTune1;
+        ttargets = ttargetsFineTune1;
         break;
       case 2:
         targets = targetsFineTune2;
+        ttargets = ttargetsFineTune2;
         break;
       case 3:
         targets = targetsFineTune3;
+        ttargets = ttargetsFineTune3;
         break;
       case 4:
         targets = targetsFineTune4;
+        ttargets = ttargetsFineTune4;
         break;
       case 5:
         targets = targetsFineTune5;
+        ttargets = ttargetsFineTune5;
         break;
       case 6:
         targets = targetsFineTune6;
+        ttargets = ttargetsFineTune6;
         break;
       default:
         break;
     };
   }
-  let useTrailingStop = strategiesWithBuySellOnly.length > 0 && strategiesWithBuySellOnly[0].trailingSl !== null && !isNaN(strategiesWithBuySellOnly[0].trailingSl);
   for (let target of targets) {
     for (let strategy of strategiesWithBuySellOnly) {
-      let newStrategy = {};
-      newStrategy.name = strategy.name;
-      newStrategy.timeClose = strategy.timeClose;
-      newStrategy.buyRules = [];
-      newStrategy.sellRules = [];
-      for (let buyRule of strategy.buyRules) {
-        newStrategy.buyRules.push(buyRule);
-      }
-      for (let sellRule of strategy.sellRules) {
-        newStrategy.sellRules.push(sellRule);
-      }
-      if (fineTune > 0 || changeTargetFine) {
-        if (useTrailingStop) {
-          newStrategy.trailingSl = strategy.trailingSl;
-        } else {
-          newStrategy.stoploss = strategy.stoploss;
+      if (useTrailingTarget) {
+        for (let ttarget of ttargets) {
+          let newStrategy = createStrategyWithTarget(target, ttarget, strategy, fineTune);
+          if (newStrategy != null) {
+            finalStrategiesList.push(newStrategy);
+          }
         }
-        newStrategy.target = fixNumber(strategy.target + target, 2);
       } else {
-        if (useTrailingStop) {
-          newStrategy.trailingSl = strategy.trailingSl;
-        } else {
-          newStrategy.stoploss = strategy.stoploss;
-        }
-        newStrategy.target = target;
+        let newStrategy = createStrategyWithTarget(target, null, strategy, fineTune);
+        finalStrategiesList.push(newStrategy);
       }
-
-      finalStrategiesList.push(newStrategy);
     }
   }
   return finalStrategiesList;
+}
+
+function createStrategyWithTarget(target, ttarget, strategy, fineTune) {
+  let newStrategy = {};
+  newStrategy.name = strategy.name;
+  newStrategy.timeClose = strategy.timeClose;
+  newStrategy.buyRules = [];
+  newStrategy.sellRules = [];
+  for (let buyRule of strategy.buyRules) {
+    newStrategy.buyRules.push(buyRule);
+  }
+  for (let sellRule of strategy.sellRules) {
+    newStrategy.sellRules.push(sellRule);
+  }
+  if (useTrailingStop) {
+    newStrategy.trailingSl = strategy.trailingSl;
+  } else {
+    newStrategy.stoploss = strategy.stoploss;
+  }
+  if (fineTune > 0 || changeTargetFine) {
+    newStrategy.target = fixNumber(strategy.target + target, 2);
+    if (ttarget != null) {
+      newStrategy.ttarget = fixNumber(strategy.ttarget + ttarget, 2);
+    }
+  } else {
+    newStrategy.target = target;
+    if (ttarget != null) {
+      newStrategy.ttarget = ttarget;
+    }
+  }
+  if (ttarget != null && (newStrategy.ttarget > newStrategy.target || newStrategy.ttarget <= 0)) {
+    newStrategy = null;
+  }
+  return newStrategy;
 }
 
 async function incrementCounterWithSleep(counter) {

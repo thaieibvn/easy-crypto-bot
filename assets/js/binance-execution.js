@@ -120,7 +120,13 @@ function getOrderTradePrice(execution, orderId, type) {
             let usdtQty = await getBinanceUSDTValue(qty, execution.instrument, getQuotedCurrency(execution.instrument));
             let usdtCommission = await getBinanceUSDTValue(bnbCommision, 'BNBUSDT', 'USDT');
             feeRate = (usdtCommission / usdtQty) * 100;
-            if (feeRate > 0.07) {
+            if (feeRate > 0.095) {
+              feeRate = 0.1;
+            } else if (feeRate > 0.085) {
+              feeRate = 0.09
+            } else if (feeRate > 0.075) {
+              feeRate = 0.08
+            } else if (feeRate > 0.07) {
               feeRate = 0.075;
             } else if (feeRate > 0.065) {
               feeRate = 0.0675
@@ -150,23 +156,27 @@ function getOrderTradePrice(execution, orderId, type) {
 
         if (qty !== 0) {
           if (commision !== 0 && type === 'buy') {
+            //Change position size as we don't have the initial ammount to sell because of the commision
+            execution.positionSizeToSell = binanceRoundAmmount(qty - commision);
+            self.postMessage([execId, 'CH_POS_SIZE', execution.positionSizeToSell]);
+          } else if (bnbCommision !== 0 && type === 'buy' && execution.instrument.indexOf('BNB') == 0) {
             let balance = await getBalance(execution.instrument);
             if (balance < execution.positionSize) {
               //Change position size as we don't have the initial ammount to sell because of the commision
-              execution.positionSize = binanceRoundAmmount(qty - commision);
-              if (execution.positionSizeQuoted == null || execution.positionSizeQuoted == undefined || execution.positionSizeQuoted <= 0) {
-                self.postMessage([execId, 'CH_POS_SIZE', execution.positionSize]);
-              }
+              execution.positionSizeToSell = binanceRoundAmmount(qty - bnbCommision);
+              self.postMessage([execId, 'CH_POS_SIZE', execution.positionSizeToSell]);
+            } else {
+              execution.positionSizeToSell = binanceRoundAmmount(qty);
             }
-          }
-          if (qty !== 0) {
-            resolve([
-              Number.parseFloat((sum / qty).toFixed(8)),
-              Number.parseFloat((qty).toFixed(8))
-            ]);
           } else {
-            resolve(null);
+            execution.positionSizeToSell = binanceRoundAmmount(qty);
           }
+
+          resolve([
+            Number.parseFloat((sum / qty).toFixed(8)),
+            Number.parseFloat((qty).toFixed(8))
+          ]);
+
         } else {
           resolve(null);
         }
@@ -212,7 +222,7 @@ async function marketBuy(execution, curPrice) {
             'openDate': new Date(),
             'entry': tradePrice[0],
             'result': 0,
-            'posSize': execution.positionSize
+            'posSize': execution.positionSizeToSell
           };
           execution.trades.push(trade);
           self.postMessage([execId, 'BUY', trade, feeRate]);
@@ -227,8 +237,8 @@ async function marketBuy(execution, curPrice) {
 async function marketSell(execution, curPrice) {
   await cancelOrder(execution.instrument, execution.takeProfitOrderId);
   let takeProfitExecutedQty = await checkTakeProfitExecuted();
-  let positionSize = execution.positionSize + execution.minNotionalAmountLeft;
-  if (takeProfitExecutedQty > positionSize) {
+  let positionSize = execution.positionSizeToSell + execution.minNotionalAmountLeft;
+  if (takeProfitExecutedQty >= positionSize) {
     return;
   }
   positionSize -= takeProfitExecutedQty;
@@ -242,6 +252,9 @@ async function marketSell(execution, curPrice) {
     }
     execution.minNotionalAmountLeft = positionSize;
     self.postMessage([execId, 'MIN_NOTIONAL', execution.minNotionalAmountLeft]);
+    trailingSlPriceUsed = -1;
+    stoploss = null;
+    self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
     tradeType = 'buy';
     let tradeIndex = execution.trades.length - 1;
     execution.trades[tradeIndex]['closeDate'] = new Date();
@@ -286,13 +299,13 @@ async function marketSell(execution, curPrice) {
           let finalPrice = tradePrice[0];
           if (takeProfitExecutedQty !== 0) {
             let takeProfitPrice = await getOrderTradePrice(execution, execution.takeProfitOrderId, 'sell');
-            finalPrice = ((takeProfitPrice[0] * takeProfitPrice[1]) + (tradePrice[0] * tradePrice[1])) / execution.positionSize;
+            finalPrice = ((takeProfitPrice[0] * takeProfitPrice[1]) + (tradePrice[0] * tradePrice[1])) / positionSize;
           }
           let tradeIndex = execution.trades.length - 1;
           execution.trades[tradeIndex]['closeDate'] = new Date();
           execution.trades[tradeIndex]['exit'] = finalPrice;
           execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (feeRate * 2);
-          execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * finalPrice);
+          execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (positionSize * finalPrice);
           self.postMessage([
             execId, 'SELL', execution.trades[tradeIndex]
           ]);
@@ -307,7 +320,7 @@ async function marketSell(execution, curPrice) {
 function placeTakeProfitLimit(execution, target) {
   return new Promise(async (resolve, reject) => {
     let price = Number.parseFloat(target.toFixed(instrumentInfo.precision));
-    let positionSize = execution.positionSize + execution.minNotionalAmountLeft;
+    let positionSize = execution.positionSizeToSell + execution.minNotionalAmountLeft;
     positionSize = binanceRoundAmmount(positionSize);
     binance.useServerTime(function() {
       binance.sell(execution.instrument, positionSize, price, {
@@ -367,7 +380,7 @@ async function checkTakeProfitExecuted() {
     return 0;
   }
   let positionSize = execution.positionSize + execution.minNotionalAmountLeft;
-  if (priceAndQty[1] == positionSize) {
+  if (priceAndQty[1] >= positionSize) {
     execution.minNotionalAmountLeft = 0;
     self.postMessage([execId, 'MIN_NOTIONAL', execution.minNotionalAmountLeft]);
     tradeType = 'buy';
@@ -735,7 +748,9 @@ async function startBinanceWebsocket() {
                     }
                     if (strategy.target !== null && !isNaN(strategy.target)) {
                       target = execution.trades[execution.trades.length - 1].entry * (1 + (strategy.target / 100));
-                      await placeTakeProfitLimit(execution, target);
+                      if (strategy.ttarget == null || isNaN(strategy.ttarget)) {
+                        await placeTakeProfitLimit(execution, target);
+                      }
                     }
                     if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
                       timeClose = new Date(execution.trades[execution.trades.length - 1].openDate.getTime());
@@ -773,6 +788,9 @@ async function startBinanceWebsocket() {
                 } else {
                   await marketSell(execution, curPrice);
                 }
+                trailingSlPriceUsed = -1;
+                stoploss = null;
+                self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
                 tradeType = 'buy';
                 startTries = 0;
                 return;
@@ -792,8 +810,24 @@ async function startBinanceWebsocket() {
             stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
             self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
           }
+          if (strategy.target !== null && !isNaN(strategy.target) && strategy.ttarget !== null && !isNaN(strategy.ttarget)) {
+            if (trailingSlPriceUsed == -1) {
+              if (target <= curPrice) {
+                trailingSlPriceUsed = curPrice;
+                stoploss = trailingSlPriceUsed * (1 - (strategy.ttarget / 100));
+                self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
+              }
+            } else {
+              if (trailingSlPriceUsed < curPrice) {
+                trailingSlPriceUsed = curPrice;
+                stoploss = trailingSlPriceUsed * (1 - (strategy.ttarget / 100));
+                self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
+              }
+            }
+          }
+
           if (execution.type === 'Simulation') {
-            if ((stoploss !== null && stoploss >= curPrice) || (target !== null && target <= curPrice) || (timeClose !== null && timeClose <= new Date())) {
+            if ((stoploss !== null && stoploss >= curPrice) || (target !== null && target <= curPrice && (strategy.ttarget == null || isNaN(strategy.ttarget))) || (timeClose !== null && timeClose <= new Date())) {
               //Get current BID price and use it as a trade exit.
               for (let i = 0; i < 10; i++) {
                 //There may not be BID price at the moment. Try 10 times to find one
@@ -814,12 +848,18 @@ async function startBinanceWebsocket() {
               self.postMessage([
                 execId, 'SELL', execution.trades[tradeIndex]
               ]);
+              trailingSlPriceUsed = -1;
+              stoploss = null;
+              self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
               tradeType = 'buy';
             }
           }
           if (execution.type === 'Trading') {
             if ((stoploss !== null && stoploss >= curPrice) || (timeClose !== null && timeClose <= new Date())) {
               await marketSell(execution, curPrice);
+              trailingSlPriceUsed = -1;
+              stoploss = null;
+              self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
               tradeType = 'buy';
             }
           }
@@ -925,8 +965,15 @@ self.addEventListener('message', async function(e) {
           self.postMessage([
             execId, 'SELL', execution.trades[tradeIndex]
           ]);
+          trailingSlPriceUsed = -1;
+          stoploss = null;
+          self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
+          tradeType = 'buy';
         } else if (execution.type === 'Trading') {
           await marketSell(execution, curPrice);
+          trailingSlPriceUsed = -1;
+          stoploss = null;
+          self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
           tradeType = 'buy';
         }
       }
@@ -982,6 +1029,8 @@ self.addEventListener('message', async function(e) {
         execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * e.data[1]);
       }
       execution.takeProfitOrderId = null;
+      trailingSlPriceUsed = -1;
+      self.postMessage([execId, 'TRAILING_STOP_PRICE', trailingSlPriceUsed]);
       tradeType = 'buy';
       return;
     } else if (typeof e.data[0] === 'string' && e.data[0] === ('UPDATE_STRATEGY')) {
@@ -1000,7 +1049,13 @@ self.addEventListener('message', async function(e) {
             stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
           }
         }
-
+        if (strategy.target !== null && !isNaN(strategy.target)) {
+          target = execution.trades[execution.trades.length - 1].entry * (1 + (strategy.target / 100));
+          if (strategy.ttarget !== null && !isNaN(strategy.ttarget) && execution.trailingSlPriceUsed !== undefined && execution.trailingSlPriceUsed !== null) {
+            trailingSlPriceUsed = execution.trailingSlPriceUsed;
+            stoploss = trailingSlPriceUsed * (1 - (strategy.ttarget / 100));
+          }
+        }
         if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
           timeClose = new Date(execution.trades[execution.trades.length - 1].openDate.getTime());
           timeClose.setHours(timeClose.getHours() + strategy.timeClose);
@@ -1031,6 +1086,9 @@ self.addEventListener('message', async function(e) {
       test: testMode
     });
 
+    if(execution.positionSizeToSell == null || execution.positionSizeToSell==undefined) {
+      execution.positionSizeToSell = execution.positionSize;
+    }
     if (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit === undefined || execution.trades[execution.trades.length - 1].exit === null)) {
       tradeType = 'sell';
       if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
@@ -1047,6 +1105,10 @@ self.addEventListener('message', async function(e) {
       }
       if (strategy.target !== null && !isNaN(strategy.target)) {
         target = execution.trades[execution.trades.length - 1].entry * (1 + (strategy.target / 100));
+        if (strategy.ttarget !== null && !isNaN(strategy.ttarget) && execution.trailingSlPriceUsed !== undefined && execution.trailingSlPriceUsed !== null) {
+          trailingSlPriceUsed = execution.trailingSlPriceUsed;
+          stoploss = trailingSlPriceUsed * (1 - (strategy.ttarget / 100));
+        }
       }
       if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
         timeClose = new Date(execution.trades[execution.trades.length - 1].openDate.getTime());

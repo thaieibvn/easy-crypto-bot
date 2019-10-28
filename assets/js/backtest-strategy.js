@@ -40,9 +40,9 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
       break;
     }
     closePrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].c);
-      highPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].h);
-        lowPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].l);
-          openPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].o);
+    highPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].h);
+    lowPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].l);
+    openPrices[timeframes[0]].push(ticks[timeframes[0]][bigTfIndex].o);
     bigTfIndex++;
   }
 
@@ -65,6 +65,8 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
   let tradeType = 'buy';
   let stoploss = Number.MIN_VALUE;
   let target = Number.MAX_VALUE;
+  let tTargetActive = false;
+  let trailingTtPriceUsed = -1;
   let timeClose = null;
   let trailingSlPriceUsed = -1;
   while (ticks[timeframes[0]].length > bigTfIndex) {
@@ -110,7 +112,12 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
               stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100))
             }
             if (strategy.target !== null && !isNaN(strategy.target)) {
-              target = trade.entry * (1 + (strategy.target / 100))
+              target = trade.entry * (1 + (strategy.target / 100));
+              tTargetActive = false;
+              trailingTtPriceUsed = -1;
+            }
+            if ((strategy.stoploss == null || isNaN(strategy.stoploss)) && strategy.ttarget !== null && !isNaN(strategy.ttarget)) {
+              stoploss = Number.MIN_VALUE;
             }
             if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
               timeClose = new Date(date.getTime());
@@ -145,10 +152,6 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
             }
             trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
             tradeType = 'buy';
-            if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
-              trailingSlPriceUsed = highPrice;
-              stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
-            }
             closePrices[timeframes[1]].push(closePrice);
             highPrices[timeframes[1]].push(highPrice);
             lowPrices[timeframes[1]].push(lowPrice);
@@ -157,6 +160,31 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
             continue;
           }
           if (target <= highPrice) {
+            if (tTargetActive) {
+              if (strategy.ttarget != null && strategy.ttarget != undefined && !isNaN(strategy.ttarget) && trailingTtPriceUsed < highPrice) {
+                trailingTtPriceUsed = highPrice;
+                stoploss = trailingTtPriceUsed * (1 - (strategy.ttarget / 100));
+              }
+              closePrices[timeframes[1]].push(closePrice);
+              highPrices[timeframes[1]].push(highPrice);
+              lowPrices[timeframes[1]].push(lowPrice);
+              openPrices[timeframes[1]].push(openPrice);
+              smallTfIndex++;
+              continue;
+            }
+            if (strategy.ttarget != null && strategy.ttarget != undefined && !isNaN(strategy.ttarget)) {
+              tTargetActive = true;
+              trailingTtPriceUsed = highPrice;
+              stoploss = trailingTtPriceUsed * (1 - (strategy.ttarget / 100));
+
+              closePrices[timeframes[1]].push(closePrice);
+              highPrices[timeframes[1]].push(highPrice);
+              lowPrices[timeframes[1]].push(lowPrice);
+              openPrices[timeframes[1]].push(openPrice);
+              smallTfIndex++;
+              continue;
+            }
+
             trades[trades.length - 1]['closeDate'] = date;
             if (openPrice < smallNumber) {
               if (target <= openPrice) {
@@ -183,10 +211,7 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
 
             trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
             tradeType = 'buy';
-            if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
-              trailingSlPriceUsed = highPrice;
-              stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
-            }
+
             closePrices[timeframes[1]].push(closePrice);
             highPrices[timeframes[1]].push(highPrice);
             lowPrices[timeframes[1]].push(lowPrice);
@@ -212,6 +237,10 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
               trailingSlPriceUsed = highPrice;
               stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
             }
+            if (tTargetActive && strategy.ttarget != null && strategy.ttarget != undefined && !isNaN(strategy.ttarget) && trailingTtPriceUsed < highPrice) {
+              trailingTtPriceUsed = highPrice;
+              stoploss = trailingTtPriceUsed * (1 - (strategy.ttarget / 100));
+            }
             closePrices[timeframes[1]].push(closePrice);
             highPrices[timeframes[1]].push(highPrice);
             lowPrices[timeframes[1]].push(lowPrice);
@@ -234,6 +263,10 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
         if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
           trailingSlPriceUsed = highPrice;
           stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+        }
+        if (tTargetActive && strategy.ttarget != null && strategy.ttarget != undefined && !isNaN(strategy.ttarget) && trailingTtPriceUsed < highPrice) {
+          trailingTtPriceUsed = highPrice;
+          stoploss = trailingTtPriceUsed * (1 - (strategy.ttarget / 100));
         }
         closePrices[timeframes[1]].push(closePrice);
         highPrices[timeframes[1]].push(highPrice);
@@ -264,7 +297,12 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
             stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100))
           }
           if (strategy.target !== null && !isNaN(strategy.target)) {
-            target = trade.entry * (1 + (strategy.target / 100))
+            target = trade.entry * (1 + (strategy.target / 100));
+            tTargetActive = false;
+            trailingTtPriceUsed = -1;
+          }
+          if ((strategy.stoploss == null || isNaN(strategy.stoploss)) && strategy.ttarget !== null && !isNaN(strategy.ttarget)) {
+            stoploss = Number.MIN_VALUE;
           }
           if (strategy.timeClose !== null && !isNaN(strategy.timeClose)) {
             timeClose = new Date(date.getTime());
@@ -299,10 +337,7 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
           }
           trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
           tradeType = 'buy';
-          if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
-            trailingSlPriceUsed = highPrice;
-            stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
-          }
+
           closePrices[timeframes[0]].push(closePrice);
           highPrices[timeframes[0]].push(highPrice);
           lowPrices[timeframes[0]].push(lowPrice);
@@ -311,6 +346,31 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
           continue;
         }
         if (target <= highPrice) {
+          if (tTargetActive) {
+            if (strategy.ttarget != null && strategy.ttarget != undefined && !isNaN(strategy.ttarget) && trailingTtPriceUsed < highPrice) {
+              trailingTtPriceUsed = highPrice;
+              stoploss = trailingTtPriceUsed * (1 - (strategy.ttarget / 100));
+            }
+            closePrices[timeframes[0]].push(closePrice);
+            highPrices[timeframes[0]].push(highPrice);
+            lowPrices[timeframes[0]].push(lowPrice);
+            openPrices[timeframes[0]].push(openPrice);
+            bigTfIndex++;
+            continue;
+          }
+          if (strategy.ttarget != null && strategy.ttarget != undefined && !isNaN(strategy.ttarget)) {
+            tTargetActive = true;
+            trailingTtPriceUsed = highPrice;
+            stoploss = trailingTtPriceUsed * (1 - (strategy.ttarget / 100));
+
+            closePrices[timeframes[0]].push(closePrice);
+            highPrices[timeframes[0]].push(highPrice);
+            lowPrices[timeframes[0]].push(lowPrice);
+            openPrices[timeframes[0]].push(openPrice);
+            bigTfIndex++;
+            continue;
+          }
+
           trades[trades.length - 1]['closeDate'] = date;
           if (openPrice < smallNumber) {
             if (target <= openPrice) {
@@ -337,10 +397,7 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
 
           trades[trades.length - 1]['result'] = (((trades[trades.length - 1]['exit'] - trades[trades.length - 1].entry) / trades[trades.length - 1].entry) * 100) - feeRate;
           tradeType = 'buy';
-          if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
-            trailingSlPriceUsed = highPrice;
-            stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
-          }
+
           closePrices[timeframes[0]].push(closePrice);
           highPrices[timeframes[0]].push(highPrice);
           lowPrices[timeframes[0]].push(lowPrice);
@@ -366,6 +423,10 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
             trailingSlPriceUsed = highPrice;
             stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
           }
+          if (tTargetActive && strategy.ttarget != null && strategy.ttarget != undefined && !isNaN(strategy.ttarget) && trailingTtPriceUsed < highPrice) {
+            trailingTtPriceUsed = highPrice;
+            stoploss = trailingTtPriceUsed * (1 - (strategy.ttarget / 100));
+          }
           closePrices[timeframes[0]].push(closePrice);
           highPrices[timeframes[0]].push(highPrice);
           lowPrices[timeframes[0]].push(lowPrice);
@@ -388,6 +449,10 @@ async function executeBacktest(strategy, ticks, startDate, useSleep, feeRate) {
       if (strategy.trailingSl !== null && !isNaN(strategy.trailingSl) && trailingSlPriceUsed !== -1 && trailingSlPriceUsed < highPrice) {
         trailingSlPriceUsed = highPrice;
         stoploss = trailingSlPriceUsed * (1 - (strategy.trailingSl / 100));
+      }
+      if (tTargetActive && strategy.ttarget != null && strategy.ttarget != undefined && !isNaN(strategy.ttarget) && trailingTtPriceUsed < highPrice) {
+        trailingTtPriceUsed = highPrice;
+        stoploss = trailingTtPriceUsed * (1 - (strategy.ttarget / 100));
       }
 
     }

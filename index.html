@@ -113,7 +113,12 @@ EasyCryptoBot Copyright (C) 2018 Insentico Ltd.
 					<span class="min-width7 inline-block text-left"><a title="Info" onclick="stoplossInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;Trailing SL:&nbsp;</span>
 					<input class="white" id="trailingSl" onkeydown="stoplossTypeChange('tsl')" style="width:10em;" type="number" value="" />&nbsp;%<br>
 					<span class="min-width7 inline-block text-left"><a title="Info" onclick="targetInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;Target:&nbsp;</span>
-					<input class="white" id="target" style="width:10em;" type="number" value="" />&nbsp;%<br><span style="margin-left:1.4em;" class="min-width7 inline-block text-left"><a title="Info" onclick="timeCloseInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;Time Close:&nbsp;</span>
+					<input class="white" id="target" style="width:10em;" type="number" onkeydown="stoplossTypeChange('t')" />&nbsp;%<br>
+
+					<span class="min-width7 inline-block text-left"><a title="Info" onclick="ttargetInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;Trailing T.:&nbsp;</span>
+					<input class="white" id="ttarget" style="width:10em;" onkeydown="stoplossTypeChange('tt')" type="number" value="" />&nbsp;%<br>
+
+					<span style="margin-left:1.4em;" class="min-width7 inline-block text-left"><a title="Info" onclick="timeCloseInfo()" href="#/"><i class="text-blue fa fa-info-circle"></i></a>&nbsp;Time Close:&nbsp;</span>
 					<input class="white" id="timeClose" style="width:10em;" type="number" value="" />&nbsp;hours<br>
 					<span style="font-size:small">If you don't want Stoloss or Target, leave them empty.</span>
 				</div>
