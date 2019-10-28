@@ -183,7 +183,9 @@ function getSupporterStatus() {
 
 function storeUserIsSupporter() {
   return new Promise((resolve, reject) => {
-    supporterDb.insert({'supporter': true}, (error, srt) => {
+    supporterDb.insert({
+      'supporter': true
+    }, (error, srt) => {
       if (error) {
         reject(error);
       } else {
@@ -308,11 +310,13 @@ function showUpdateMsg(curVersion, latestVersion) {
   let curSplited = curVersion.split('.');
   let latestSplited = latestVersion.split('.');
   if (curSplited[0] === latestSplited[0]) {
-    openModalConfirm('<h3>An update is available!</h3><br>Check on the button below to see what is new since your current version ' + curVersion + '<br> <a href="https://easycryptobot.com/update" target="_blank" class="button alt white">Update Info</a><br><br><h3>Update now?</h3>', function() {
+    let random = Math.floor((Math.random() * 8999999999) + 1000000000);
+    openModalConfirm('<h3>An update is available!</h3><br>Check on the button below to see what is new since your current version ' + curVersion + '<br> <a href="https://easycryptobot.com/update?n=' + random + '" target="_blank" class="button alt white">Update Info</a><br><br><h3>Update now?</h3>', function() {
       downloadUpdates()
     });
   } else {
-    openModalInfo('<h3>An update is available!</h3><br>Check on the button below to see what is new since your current version ' + curVersion + '<br> <a href="https://easycryptobot.com/update" target="_blank" class="button alt white">Update Info</a><br><br>No automatic update is available for your version. In order to update, you need to download again the app from <span class="one-click-select">https://easycryptobot.com/</span>. After the download you can extract the app at a new location and start it from there.')
+    let random = Math.floor((Math.random() * 8999999999) + 1000000000);
+    openModalInfo('<h3>An update is available!</h3><br>Check on the button below to see what is new since your current version ' + curVersion + '<br> <a href="https://easycryptobot.com/update?n=' + random + '" target="_blank" class="button alt white">Update Info</a><br><br>No automatic update is available for your version. In order to update, you need to download again the app from <span class="one-click-select">https://easycryptobot.com/</span>. After the download you can extract the app at a new location and start it from there.')
   }
 }
 
@@ -397,8 +401,8 @@ async function checkEulaAccepted() {
   try {
     let eula = await getEula();
     if (eula === null || eula === undefined || !eula.accepted) {
-      openModalAcceptBig('<h2 class="text-center">End User License Agreement</h2><br>By clicking on "Accept" below you are accepting the full Terms and Conditions of the EasyCryptoBot application, available at '+
-      '<a href="https://easycryptobot.com/terms.html" target="_blank" style="font-weight:bold;margin:0 18px 0 0;padding:0;text-decoration:underline">https://easycryptobot.com/terms.html</a>. Cryptocurrency trading involves risk, and is not suitable for all investors. ' + 'You are responsible for all the risks and financial resources that you are using for trading and you should carefully consider your investment objectives. ' + 'You are agreeing that you are using the EasyCryptoBot application at your own risk. ' + 'EasyCryptoBot and it\'s developers are not liable for any loss or damage resulting from the use of the application. ' + 'If you do not fully understand these risks and conditions or you are not agreeing with them you must NOT USE the Easy Crypto Bot.', function() {
+      let random = Math.floor((Math.random() * 8999999999) + 1000000000);
+      openModalAcceptBig('<h2 class="text-center">End User License Agreement</h2><br>By clicking on "Accept" below you are accepting the full Terms and Conditions of the EasyCryptoBot application, available at ' + '<a href="https://easycryptobot.com/terms.html?n=' + random + '" target="_blank" style="font-weight:bold;margin:0 18px 0 0;padding:0;text-decoration:underline">https://easycryptobot.com/terms.html</a>. Cryptocurrency trading involves risk, and is not suitable for all investors. ' + 'You are responsible for all the risks and financial resources that you are using for trading and you should carefully consider your investment objectives. ' + 'You are agreeing that you are using the EasyCryptoBot application at your own risk. ' + 'EasyCryptoBot and it\'s developers are not liable for any loss or damage resulting from the use of the application. ' + 'If you do not fully understand these risks and conditions or you are not agreeing with them you must NOT USE the Easy Crypto Bot.', function() {
         try {
           storeEula({'accepted': true});
           setTimeout(() => checkForUpdates({}, true, false), 600);
@@ -501,9 +505,9 @@ async function loadStrategiesBt() {
     $('#tsStrategiesList').html("");
     $('#opStrategiesList').html("");
     strategies.forEach(function(d) {
-      $('#btStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#btStrategy\')">' + d.name.replace(/'/g,"\\'") + '</a></li>');
-      $('#tsStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#tsStrategy\')">' + d.name.replace(/'/g,"\\'") + '</a></li>');
-      $('#opStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#opStrategy\')">' + d.name.replace(/'/g,"\\'") + '</a></li>');
+      $('#btStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#btStrategy\')">' + d.name.replace(/'/g, "\\'") + '</a></li>');
+      $('#tsStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#tsStrategy\')">' + d.name.replace(/'/g, "\\'") + '</a></li>');
+      $('#opStrategiesList').append('<li><a href="#/" class="min-width25" onclick="dropDownItem(\'' + d.name + '\', \'#opStrategy\')">' + d.name.replace(/'/g, "\\'") + '</a></li>');
     });
   } catch (err) {
     log('error', 'loadStrategiesBt', err.stack);
@@ -567,7 +571,7 @@ function formatDateSmall(date) {
 }
 
 function fixNumber(number, decimals) {
-   return Number.parseFloat((number).toFixed(decimals));
+  return Number.parseFloat((number).toFixed(decimals));
 }
 
 function formatDateFull(date) {
