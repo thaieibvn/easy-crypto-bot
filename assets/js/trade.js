@@ -1612,7 +1612,7 @@ async function runStrategy(id) {
               await updateExecutionDb(execution);
               break;
             case 'CH_POS_SIZE':
-              execution.positionSizeSell = data;
+              execution.positionSizeToSell = data;
               await updateExecutionDb(execution);
               break;
             case 'TAKE_PROFIT_ORDER_ID':

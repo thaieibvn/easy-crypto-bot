@@ -1086,7 +1086,7 @@ self.addEventListener('message', async function(e) {
       test: testMode
     });
 
-    if(execution.positionSizeToSell == null || execution.positionSizeToSell==undefined) {
+    if (execution.positionSizeToSell == null || execution.positionSizeToSell == undefined) {
       execution.positionSizeToSell = execution.positionSize;
     }
     if (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit === undefined || execution.trades[execution.trades.length - 1].exit === null)) {
