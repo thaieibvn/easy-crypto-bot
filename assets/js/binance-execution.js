@@ -167,9 +167,11 @@ function getOrderTradePrice(execution, orderId, type) {
               self.postMessage([execId, 'CH_POS_SIZE', execution.positionSizeToSell]);
             } else {
               execution.positionSizeToSell = binanceRoundAmmount(qty);
+              self.postMessage([execId, 'CH_POS_SIZE', execution.positionSizeToSell]);
             }
           } else {
             execution.positionSizeToSell = binanceRoundAmmount(qty);
+            self.postMessage([execId, 'CH_POS_SIZE', execution.positionSizeToSell]);
           }
 
           resolve([
@@ -1086,11 +1088,32 @@ self.addEventListener('message', async function(e) {
       test: testMode
     });
 
-    if (execution.positionSizeToSell == null || execution.positionSizeToSell == undefined) {
-      execution.positionSizeToSell = execution.positionSize;
-    }
     if (execution.trades.length > 0 && (execution.trades[execution.trades.length - 1].exit === undefined || execution.trades[execution.trades.length - 1].exit === null)) {
       tradeType = 'sell';
+      if (execution.positionSizeToSell == null || execution.positionSizeToSell == undefined) {
+        if (execution.positionSize != null && execution.positionSize != undefined && execution.positionSize > 0) {
+          execution.positionSizeToSell = execution.positionSize;
+        } else {
+          let curPrice = null;
+          for (let i = 0; i < 10; i++) {
+            let bidAsk = await getBidAsk(execution.instrument);
+            if (isNaN(bidAsk[0])) {
+              await sleep(500);
+            } else {
+              curPrice = bidAsk[0];
+              break;
+            }
+          }
+          if (curPrice == null) {
+            self.postMessage([]);
+            execId,
+            'ERROR',
+            'Cannot connect to Binance ' + execution.instrument
+            return;
+          }
+          execution.positionSizeToSell = binanceRoundAmmount(execution.positionSizeQuoted / curPrice);
+        }
+      }
       if (strategy.stoploss !== null && !isNaN(strategy.stoploss)) {
         stoploss = execution.trades[execution.trades.length - 1].entry * (1 - (strategy.stoploss / 100));
       }
