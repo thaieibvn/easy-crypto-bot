@@ -20,6 +20,7 @@ body {
   line-height: 1;
   background: #333333;
 }
+
 body.is-preload {
   background: #fff;
 }
@@ -141,7 +142,6 @@ hr {
   border-bottom: solid 1px #f9b8e1;
   margin: 2em 0;
 }
-
 
 hr.major {
   margin: 3em 0;
@@ -1744,10 +1744,17 @@ body.is-preload #sidebar nav ul li {
   width: 20em
 }
 
-#modalConfirm a, .two-buttons a {
+.two-buttons a {
   display: inline-block;
   margin: .625em 2%;
   width: 40%
+}
+
+#modalConfirm a {
+  display: inline-block;
+  margin: .625em 2%;
+  width: 40%;
+  max-width: 15em;
 }
 
 #modalConfirm, #modalInfo {
@@ -1877,7 +1884,7 @@ a.expanded>span.caret {
 }
 
 #strategiesTable td:first-child {
-  width:80%
+  width: 80%
 }
 
 #btStrategiesTableNav, #opStrategiesTableNav {

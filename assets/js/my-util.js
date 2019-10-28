@@ -397,9 +397,11 @@ async function checkEulaAccepted() {
   try {
     let eula = await getEula();
     if (eula === null || eula === undefined || !eula.accepted) {
-      openModalAcceptBig('By clicking on "Accept" below you are accepting the full Terms and Conditions of the EasyCryptoBot application, available at <span class="one-click-select" style="font-weight:bold"> https://easycryptobot.com/terms.html</span>.<br>' + 'Cryptocurrency trading involves risk, and is not suitable for all investors. ' + 'You are responsible for all the risks and financial resources that you are using for trading and you should carefully consider your investment objectives. ' + 'You are agreeing that you are using the EasyCryptoBot application at your own risk. ' + 'EasyCryptoBot and it\'s developers are not liable for any loss or damage resulting from the use of the application. ' + 'If you do not fully understand these risks and conditions or you are not agreeing with them you must NOT USE the Easy Crypto Bot.', function() {
+      openModalAcceptBig('<h2 class="text-center">End User License Agreement</h2><br>By clicking on "Accept" below you are accepting the full Terms and Conditions of the EasyCryptoBot application, available at '+
+      '<a href="https://easycryptobot.com/terms.html" target="_blank" style="font-weight:bold;margin:0 18px 0 0;padding:0;text-decoration:underline">https://easycryptobot.com/terms.html</a>. Cryptocurrency trading involves risk, and is not suitable for all investors. ' + 'You are responsible for all the risks and financial resources that you are using for trading and you should carefully consider your investment objectives. ' + 'You are agreeing that you are using the EasyCryptoBot application at your own risk. ' + 'EasyCryptoBot and it\'s developers are not liable for any loss or damage resulting from the use of the application. ' + 'If you do not fully understand these risks and conditions or you are not agreeing with them you must NOT USE the Easy Crypto Bot.', function() {
         try {
           storeEula({'accepted': true});
+          setTimeout(() => checkForUpdates({}, true, false), 600);
         } catch (err) {
           log('error', 'checkEulaAccepted', err.stack);
           openModalInfo("Cannot write in applicatin folder!<br>Please contact stefan@easycryptobot.com", function() {
