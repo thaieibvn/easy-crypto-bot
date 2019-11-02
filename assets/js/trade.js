@@ -628,7 +628,7 @@ async function fillOldExecutions() {
 
         //Check for old version execution (v1.0.26) without resultMoney fields
         for (let trade of execution.trades) {
-          if ((trade.resultMoney == undefined || trade.resultMoney == undefined) && trade.exit != undefined && trade.exit != null) {
+          if (trade.exit != undefined && trade.exit != null && (trade.resultMoney == undefined || trade.resultMoney == null)) {
             trade.resultMoney = (trade.result / 100) * (execution.positionSize * trade.exit);
             isOldVersion = true;
           }
@@ -654,6 +654,14 @@ async function fillOldExecutions() {
         if (execution.minNotionalAmountLeft == undefined || execution.minNotionalAmountLeft == null) {
           execution.minNotionalAmountLeft = 0;
           isOldVersion = true;
+        }
+
+        //Check for old version execution (v1.0.48) with wrong resultMoney fields
+        for (let trade of execution.trades) {
+          if (trade.exit != undefined && trade.exit != null && (trade.resultMoney != undefined && trade.resultMoney != null && trade.resultMoney == 0)) {
+            trade.resultMoney = (trade.result / 100) * (trade.posSize * trade.exit);
+            isOldVersion = true;
+          }
         }
 
         if (isOldVersion) {
@@ -1655,6 +1663,7 @@ async function runStrategy(id) {
               } else {
                 execution.trades[execution.trades.length - 1] = data;
                 execution.takeProfitOrderId = null;
+                execution.trailingSlPriceUsed = -1;
                 await updateExecutionDb(execution);
                 fillExecResInTable(execution);
                 $('#openTrade' + id).html('');
@@ -1861,7 +1870,7 @@ async function manualCloseOpenTrade(id) {
     execution.trades[tradeIndex]['closeDate'] = new Date();
     execution.trades[tradeIndex]['exit'] = curPrice;
     execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (execution.feeRate * 2);
-    execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * curPrice);
+    execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.trades[tradeIndex].posSize * curPrice);
     await updateExecutionDb(execution);
     fillExecResInTable(execution);
     $('#openTrade' + execution.id).html('');
@@ -1899,8 +1908,9 @@ async function manualCloseOpenTrade(id) {
       execution.trades[tradeIndex]['closeDate'] = new Date();
       execution.trades[tradeIndex]['exit'] = finalPrice;
       execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (execution.feeRate * 2);
-      execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * finalPrice);
+      execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.trades[tradeIndex].posSize * finalPrice);
       execution.takeProfitOrderId = null;
+      execution.trailingSlPriceUsed = -1;
       for (let worker of executionWorkers) {
         if (worker.execId == id) {
           worker.wk.postMessage(['UPDATE_TRADE', finalPrice]);

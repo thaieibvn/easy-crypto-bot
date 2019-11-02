@@ -525,6 +525,20 @@ function addZero(number) {
     return number;
   }
 }
+
+function getDatesDiff(date1, date2) {
+  if (!(date1 instanceof Date) || !(date2 instanceof Date)) {
+    return '';
+  }
+  let diff = Math.abs(date2 - date1);
+  let daysDiff = Math.floor(diff / 1000 / 60 / 60 / 24);
+  diff -= daysDiff * 1000 * 60 * 60 * 24;
+  let hoursDiff = Math.floor(diff / 1000 / 60 / 60);
+  diff -= hoursDiff * 1000 * 60 * 60;
+  let minutesDiff = Math.floor(diff / 1000 / 60);
+  return addZero(daysDiff) + 'd ' + addZero(hoursDiff) + 'h ' + addZero(minutesDiff) + 'm'
+}
+
 const months = [
   'Jan',
   'Feb',

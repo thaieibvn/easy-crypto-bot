@@ -536,7 +536,7 @@ async function getBinanceInstrumentsInfo(instrument) {
 }
 
 async function binanceRoundAmmount(amount, instrument) {
-  instrumentInfo = await getBinanceInstrumentsInfo(instrument);
+  let instrumentInfo = await getBinanceInstrumentsInfo(instrument);
   let stepIndex = -1
   try {
     stepIndex = instrumentInfo.stepSize.toString().split(".")[1].indexOf('1');
@@ -556,7 +556,7 @@ async function binanceRoundAmmount(amount, instrument) {
 }
 
 async function binanceRoundTickAmmount(amount, instrument) {
-  instrumentInfo = await getBinanceInstrumentsInfo(instrument);
+  let instrumentInfo = await getBinanceInstrumentsInfo(instrument);
   let stepIndex = -1
   try {
     stepIndex = instrumentInfo.tickSize.toString().split(".")[1].indexOf('1');
@@ -676,14 +676,31 @@ async function binanceMarketSell(execution) {
     return null;
   }
   await binanceCancelOrder(execution.instrument, execution.takeProfitOrderId);
-  let positionSize = execution.trades[execution.trades.length - 1].posSize;
+  let positionSize = execution.positionSizeToSell + execution.minNotionalAmountLeft;
   let priceAndQty = await binanceGetOrderTradePrice(execution.instrument, execution.takeProfitOrderId, 'sell');
   if (priceAndQty !== null) {
-    if (priceAndQty[1] === execution.positionSize) {
+    if (priceAndQty[1] >= execution.positionSize) {
       return priceAndQty[0];
     } else {
-      positionSize = execution.positionSize - priceAndQty[1];
+      positionSize -= priceAndQty[1];
     }
+  }
+  let curPrice = null;
+  for (let i = 0; i < 10; i++) {
+    let bidAsk = await getBinanceBidAsk(execution.instrument);
+    if (isNaN(bidAsk[0])) {
+      await sleep(200);
+    } else {
+      curPrice = bidAsk[0];
+      break;
+    }
+  }
+  let instrumentInfo = await getBinanceInstrumentsInfo(execution.instrument);
+  if (curPrice * positionSize < instrumentInfo.minNotional) {
+    execution.minNotionalAmountLeft = positionSize;
+    return (priceAndQty !== null)
+      ? priceAndQty[0]
+      : execution.trades[execution.trades.length - 1]['entry'];
   }
 
   return new Promise((resolve, reject) => {

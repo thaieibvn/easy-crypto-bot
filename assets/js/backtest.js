@@ -191,7 +191,7 @@ async function runBacktest() {
     $('#btResultNoTrades').hide();
     $('#btTrailingStopWarning').hide();
     $('#btResultDiv').show();
-    $('#btStrategiesTable').html('<thead><tr><td>Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead><tbody>');
+    $('#btStrategiesTable').html('<thead><tr><td>Trade</td><td>Open Date</td><td>Close Date</td><td>Duration</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead><tbody>');
 
     //get all timeframes
     let timeframes = getTimeframes(strategy);
@@ -285,7 +285,8 @@ async function runBacktest() {
         classes = 'text-red fas fa-thumbs-down';
         resultClass = 'text-red';
       }
-      btTradesRows.push('<tr><td>' + count + '&nbsp;<i class="' + classes + '"></td><td>' + formatDateFull(trade.openDate) + '</td><td>' + formatDateFull(trade.closeDate) + '</td><td>' + trade.entry.toFixed(8) + '</td><td>' + trade.exit.toFixed(8) + '</td><td class="' + resultClass + '">' + trade.result.toFixed(2) + '%</td></tr>')
+
+      btTradesRows.push('<tr><td>' + count + '&nbsp;<i class="' + classes + '"></td><td>' + formatDateFull(trade.openDate) + '</td><td>' + formatDateFull(trade.closeDate) + '</td><td>' + getDatesDiff(trade.openDate, trade.closeDate) + '</td><td>' + trade.entry.toFixed(8) + '</td><td>' + trade.exit.toFixed(8) + '</td><td class="' + resultClass + '">' + trade.result.toFixed(2) + '%</td></tr>')
       count++;
     }
     $('#btStrategiesTableNav').html('');
@@ -738,8 +739,8 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
 
           if (indicator.type === 'sto' || indicator.type === 'stoRsi') {
             value = indicator.type === "sto"
-              ? calculateSto(indicator.period, indicator.period2, indicator.period3, closePrices[indicator.timeframe],highPrices[indicator.timeframe], lowPrices[indicator.timeframe])
-              : calculateStoRsi(indicator.period, indicator.period2, indicator.period3, indicator.period4, closePrices[indicator.timeframe],highPrices[indicator.timeframe], lowPrices[indicator.timeframe]);
+              ? calculateSto(indicator.period, indicator.period2, indicator.period3, closePrices[indicator.timeframe], highPrices[indicator.timeframe], lowPrices[indicator.timeframe])
+              : calculateStoRsi(indicator.period, indicator.period2, indicator.period3, indicator.period4, closePrices[indicator.timeframe], highPrices[indicator.timeframe], lowPrices[indicator.timeframe]);
             if (value !== null && value[0] !== null && value[0].length > 0) {
 
               indicator.data.push([
@@ -1023,7 +1024,7 @@ function drawBtResultsChart(startDate, ticks, trades, strategy, instrument, time
   }
 }
 function btResultShowRows(from, to) {
-  $('#btStrategiesTable').html('<thead><tr><td>Trade</td><td>Open Date</td><td>Close Date</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead><tbody>');
+  $('#btStrategiesTable').html('<thead><tr><td>Trade</td><td>Open Date</td><td>Close Date</td><td>Duration</td><td>Open Price</td><td>Close Price</td><td>Result</td></tr></thead><tbody>');
   for (let i = from; i < Math.min(btTradesRows.length, to); i++) {
     $('#btStrategiesTable').append(btTradesRows[i]);
   }

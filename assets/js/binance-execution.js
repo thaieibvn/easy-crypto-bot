@@ -783,7 +783,7 @@ async function startBinanceWebsocket() {
                   execution.trades[tradeIndex]['closeDate'] = new Date();
                   execution.trades[tradeIndex]['exit'] = curPrice;
                   execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (feeRate * 2);
-                  execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * curPrice);
+                  execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.trades[tradeIndex].posSize * curPrice);
                   self.postMessage([
                     execId, 'SELL', execution.trades[tradeIndex]
                   ]);
@@ -846,7 +846,7 @@ async function startBinanceWebsocket() {
               execution.trades[tradeIndex]['closeDate'] = new Date();
               execution.trades[tradeIndex]['exit'] = curPrice;
               execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (feeRate * 2);
-              execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * curPrice);
+              execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.trades[tradeIndex].posSize * curPrice);
               self.postMessage([
                 execId, 'SELL', execution.trades[tradeIndex]
               ]);
@@ -963,7 +963,7 @@ self.addEventListener('message', async function(e) {
           execution.trades[tradeIndex]['closeDate'] = new Date();
           execution.trades[tradeIndex]['exit'] = curPrice;
           execution.trades[tradeIndex]['result'] = (((execution.trades[tradeIndex].exit - execution.trades[tradeIndex].entry) / execution.trades[tradeIndex].entry) * 100) - (feeRate * 2);
-          execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * curPrice);
+          execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.trades[tradeIndex].posSize * curPrice);
           self.postMessage([
             execId, 'SELL', execution.trades[tradeIndex]
           ]);
@@ -1028,7 +1028,7 @@ self.addEventListener('message', async function(e) {
       if (execution.positionSizeQuoted != null && execution.positionSizeQuoted != undefined && execution.positionSizeQuoted > 0) {
         execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSizeQuoted);
       } else {
-        execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.positionSize * e.data[1]);
+        execution.trades[tradeIndex]['resultMoney'] = (execution.trades[tradeIndex]['result'] / 100) * (execution.trades[tradeIndex].posSize * e.data[1]);
       }
       execution.takeProfitOrderId = null;
       trailingSlPriceUsed = -1;
