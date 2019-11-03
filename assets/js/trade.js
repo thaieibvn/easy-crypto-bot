@@ -790,15 +790,16 @@ function sendEmail(execution, type, date, entry) {
     e: entry,
     t: type
   }, function(data, status) {});
-  try {
-    api.sendMessage({
-    chat_id: -331819623,
-    text: type+' ' + execution.type +'!\n Strategy: ' + execution.name + '\n Exchange: ' + execution.exchange + '\n Instrument: ' + execution.instrument + '\n Date: ' + formatDateFull(date) + '\n Entry Price: ' + entry
-    });
-  }catch (e){
-    log('error', 'telegram', e.stack);
+  if (chat_id!=0){
+      try {
+        api.sendMessage({
+        chat_id: chat_id,
+        text: type+' ' + execution.type +'!\n Strategy: ' + execution.name + '\n Exchange: ' + execution.exchange + '\n Instrument: ' + execution.instrument + '\n Date: ' + formatDateFull(date) + '\n Entry Price: ' + entry
+        });
+      }catch (e){
+        log('error', 'telegram', e.stack);
+      }
   }
-
 
 }
 
