@@ -1,5 +1,14 @@
 //EasyCryptoBot Copyright (C) 2018 Stefan Hristov
 let exchangesApiKeys = {};
+let exchangesApiKeys = {};
+let chat_id ='';
+let teleToken = 'XXX'
+var telegram = require('telegram-bot-api');
+var api = new telegram({
+    token: teleToken
+});
+var util = require('util');
+
 
 function tsExecTypeChange() {
   if ($('#trExecTypeSignals').is(':checked')) {
@@ -1137,12 +1146,15 @@ async function sendTradeMail(execution) {
     }
     let trade = execution.trades[execution.trades.length - 1];
     let text = '';
+    let teleText ='';
     if (trade.exit != undefined && trade.exit != null) {
       let exit = await binanceRoundTickAmmount(trade.entry, execution.instrument);
       text = '<li>SELL: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were sold at ' + exit + ' by "' + execution.name + '" on ' + execution.instrument + '. Result: ' + trade.result.toFixed(2) + '% (' + trade.resultMoney.toFixed(8) + ' ' + getQuotedCurrency(execution.instrument) + ').</li>';
+      teleText = 'SELL: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were sold at ' + exit + ' by "' + execution.name + '" on ' + execution.instrument + '. Result: ' + trade.result.toFixed(2) + '% (' + trade.resultMoney.toFixed(8) + ' ' + getQuotedCurrency(execution.instrument) + ').';
     } else {
       let entry = await binanceRoundTickAmmount(trade.entry, execution.instrument);
       text = '<li>BUY: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were bought at ' + entry + ' by "' + execution.name + '" on ' + execution.instrument + '.</li>';
+      teleText ='BUY: ' + trade.posSize + ' ' + getBaseCurrency(execution.instrument) + ' were bought at ' + entry + ' by "' + execution.name + '" on ' + execution.instrument + '.';
     }
     try {
       await notificationsMutex.lock();
@@ -1150,6 +1162,17 @@ async function sendTradeMail(execution) {
     } finally {
       await notificationsMutex.release();
     }
+    if (teleToken!=''){
+      try {
+        api.sendMessage({
+        chat_id: chat_id,
+        text: teleText //'BUY '+execution.type +'!\n Strategy: ' + execution.name + '\n Exchange: ' + execution.exchange + '\n Instrument: ' + execution.instrument + '\n Date: ' + formatDateFull(additionalData) + '\n Entry Price: ' + data + '\n additionalData='+additionalData
+        });
+      }catch (e){
+        dialog.showErrorBox('telegram ', e);
+      }
+    } 
+    
   } catch (err) {
     log('error', 'sendTradeMail', err.stack);
   }
@@ -1639,6 +1662,14 @@ async function runStrategy(id) {
                 execution.trades.push({type: 'Buy', date: additionalData, entry: data});
                 openModalInfo('BUY Alert!<br><div class="text-left">Strategy: ' + execution.name + '<br>Exchange: ' + execution.exchange + '<br>Instrument: ' + execution.instrument + '<br>Date: ' + formatDateFull(additionalData) + '<br>Entry Price: ' + data);
                 sendEmail(execution, 'BUY', additionalData, data);
+                try {
+                  api.sendMessage({
+                  chat_id: -331819623,
+                  text: 'BUY '+execution.type +'!\n Strategy: ' + execution.name + '\n Exchange: ' + execution.exchange + '\n Instrument: ' + execution.instrument + '\n Date: ' + formatDateFull(additionalData) + '\n Entry Price: ' + data + '\n additionalData='+additionalData
+                  });
+                }catch (e){
+                  log('error', 'telegram', e.stack);
+                }
               } else {
                 execution.trades.push(data);
               }
@@ -1660,6 +1691,14 @@ async function runStrategy(id) {
                 $('#executedTrades' + id).html(execution.trades.length);
                 openModalInfo('SELL Alert!<br><div class="text-left">Strategy: ' + execution.name + '<br>Exchange: ' + execution.exchange + '<br>Instrument: ' + execution.instrument + '<br>Date: ' + formatDateFull(additionalData) + '<br>Entry Price: ' + data);
                 sendEmail(execution, 'SELL', additionalData, data);
+                try {
+                  api.sendMessage({
+                  chat_id: -331819623,
+                  text: 'SELL '+execution.type +'!\n Strategy: ' + execution.name + '\n Exchange: ' + execution.exchange + '\n Instrument: ' + execution.instrument + '\n Date: ' + formatDateFull(additionalData) + '\n Entry Price: ' + data + '\n additionalData='+additionalData
+                  });
+                }catch (e){
+                  log('error', 'telegram', e.stack);
+                }
               } else {
                 execution.trades[execution.trades.length - 1] = data;
                 execution.takeProfitOrderId = null;
